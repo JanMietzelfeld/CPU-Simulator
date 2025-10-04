@@ -84,3 +84,7 @@ window.simulator.onEnableAutoScrollForPageTable(() => {
 	renderer.autoScrollForPageTableEnabled = true;
 	return;
 });
+
+window.windowUpdate.onUpdateLog((value: string) => {
+	renderer.updateLog(value)
+});

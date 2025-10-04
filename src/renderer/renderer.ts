@@ -1619,4 +1619,16 @@ export class Renderer {
         await this.readVMPTR(this.dataRepresentationVMPTR);
         return;
     }
+
+    /**
+     * This method updates the log-widget with a message.
+     * @param message The message that gets appended to the log-widget. 
+     */
+    public async updateLog(message: string): Promise<void> {
+        const logTest: HTMLElement | null = document.getElementById("logTest");
+        if (logTest !== null) {
+            logTest.children.namedItem("log-content")!.textContent += message + "\r\n";
+        }
+        return;
+    }
 }

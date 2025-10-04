@@ -8,7 +8,8 @@ declare global {
 	interface Window {
 		mainMemory: any,
 		simulator: any,
-		electron: any
+		electron: any,
+		windowUpdate: any
 	}
 }
 
@@ -58,5 +59,10 @@ contextBridge.exposeInMainWorld("simulator", {
 	onEnableAutoScrollForVirtualRAM: (callback: () => void) => 
 		ipcRenderer.on("enable_auto_scroll_virtual_ram", () => callback()),
 	onEnableAutoScrollForPageTable: (callback: () => void) => 
-		ipcRenderer.on("enable_auto_scroll_page_table", () => callback())
+		ipcRenderer.on("enable_auto_scroll_page_table", () => callback()),
 });
+
+contextBridge.exposeInMainWorld("windowUpdate", {
+	onUpdateLog: (callback: (message: string) => void) => 
+		ipcRenderer.on('update-log', (_event, message) => callback(message))
+})

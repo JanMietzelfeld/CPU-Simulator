@@ -275,6 +275,18 @@ td {
   background-color: var(--prussian-blue);
 }
 
+.log-content {
+  min-height: 200px;
+  margin: 0.5rem 0rem;
+  padding: 0.5rem;
+  font-weight: bold;
+  font-size: large;
+  border-radius: 10px;
+  background-color: var(--prussian-blue);
+  overflow-y: auto;
+  white-space: pre;
+}
+
 @-webkit-keyframes pulse {
   0% {
     -webkit-box-shadow: 0 0 0 0 var(--pumpkin);
