@@ -1011,7 +1011,7 @@ export class Renderer {
                 case "ebx":
                     eventListener = this.onChangeListenerEBX;
                     break;
-                case "edx":
+                case "ecx":
                     eventListener = this.onChangeListenerECX;
                     break;
                 case "vmptr":
@@ -1679,7 +1679,7 @@ export class Renderer {
             return;
         }
         if (!await this._window.simulator.nextCycle()) {
-            alert("Programm finished execution.");
+            //alert("Programm finished execution.");
         }
         await this.reloadPhysicalRAMView();
         await this.reloadVirtualRAMView();
