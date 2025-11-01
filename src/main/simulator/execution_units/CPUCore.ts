@@ -2306,8 +2306,6 @@ export class CPUCore {
         }
         // Return from the interrupt handler by calling the RET operation.
         this.ret();
-        // Enable software interrupts by setting the interrupt flag.
-        this.eflags.setInterrupt();
         // Restore the old EFLAGS contents from the STACK.
         this.popf();
         return true
@@ -2403,8 +2401,6 @@ export class CPUCore {
      * This method does nothing.
      */
     private nop(): void {
-        //this.eflags.enterKernelMode()
-        this.mmu.disableMemoryVirtualization()
         return;
     }
 
