@@ -45,11 +45,26 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 					click() {
 						dialog.showOpenDialog({
 							properties: ["openFile", "createDirectory"],
+							filters: [{ name: "Assembly Files", extensions: ['asm', 'bin'] }]
+						}).then(function(fileObj) {
+							if (!fileObj.canceled) {
+								simulator.createProcess(fileObj.filePaths[0]);
+								win.webContents.send("loaded_program", fileObj.filePaths);
+							}
+						}).catch((err) => win.webContents.send("on_error", err))
+					}
+				},
+				{
+					label: "Assemble Program",
+					accelerator: "CmdOrCtrl+S",
+					click() {
+						dialog.showOpenDialog({
+							properties: ["openFile", "createDirectory"],
 							filters: [{ name: "Assembly Files", extensions: ['asm'] }]
 						}).then(function(fileObj) {
 							if (!fileObj.canceled) {
-								simulator.bootProcess(fileObj.filePaths[0]);
-								win.webContents.send("loaded_program", fileObj.filePaths);
+								simulator.assembleProgram(fileObj.filePaths[0]);
+								win.webContents.send("assembled_program", fileObj.filePaths);
 							}
 						}).catch((err) => win.webContents.send("on_error", err))
 					}
@@ -320,7 +335,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 	});
 
 	ipcMain.handle("readECX", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
-		const content: DoubleWord = simulator.core.edx.content;
+		const content: DoubleWord = simulator.core.ecx.content;
 		let result: string = twosComplementToDecimal(content).toString(basis);
 		if (basis === NumberSystems.HEX) {
 			result = `0x${twosComplementToDecimal(content).toString(16)}`;
@@ -439,16 +454,14 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
-	ipcMain.handle("nextCycle", async (): Promise<boolean> => {
-		let resultOfCycle = false;
+	ipcMain.handle("nextCycle", async (): Promise<void> => {
 		try {
-			resultOfCycle = simulator.cycle();
+			simulator.cycle();
 		} catch (error) {
 			if (error instanceof Error) {
 				win.webContents.send("error", error.message);
 			}
 		}
-		return resultOfCycle;
 	});
 
 	ipcMain.handle("on_disable_auto_scroll_physical_ram", async (): Promise<void> => {

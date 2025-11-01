@@ -977,7 +977,7 @@ export class Renderer {
         this.autoScrollForPhysicalRAMEnabled = true;
         this.autoScrollForVirtualRAMEnabled = true;
         this.autoScrollForPageTableEnabled = true;
-        this.programLoaded = false;
+        this.programLoaded = true;
         this._window = window;
     }
 

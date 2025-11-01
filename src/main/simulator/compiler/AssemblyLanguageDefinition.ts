@@ -6,6 +6,7 @@ export interface AssemblyLanguageDefinition {
     };
 
     comment_format: string;
+    include_format: string;
     
     label_formats: {
         declaration: string;

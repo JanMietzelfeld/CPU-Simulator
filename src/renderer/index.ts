@@ -27,6 +27,19 @@ window.onload = async (event) => {
 	renderer.registerClickListener();
 	renderer.registerRAMSearchListener();
 	renderer.createPhysicalRAMView();
+	renderer.createVirtualRAMView();
+
+	await renderer.readEAX(renderer.dataRepresentationEAX);
+	await renderer.readEBX(renderer.dataRepresentationEBX);
+	await renderer.readECX(renderer.dataRepresentationECX);
+	await renderer.readEFLAGS();
+	await renderer.readEIP(renderer.dataRepresentationEIP);
+	await renderer.readESP(renderer.dataRepresentationESP);
+	await renderer.readPTP(renderer.dataRepresentationPTP);
+	await renderer.readGPTP(renderer.dataRepresentationGPTP);
+	await renderer.readITP(renderer.dataRepresentationITP);
+	await renderer.readNPTP(renderer.dataRepresentationNPTP);
+	await renderer.readVMPTR(renderer.dataRepresentationVMPTR);
 };
 
 window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {

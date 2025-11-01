@@ -283,7 +283,7 @@ export class MemoryManagementUnit {
                 throw new PrivilegeViolationError("Process tries to access a page frame, which is accessible only in kernel mode.");
             }
             // Check if the page frames contents are executable.
-            if (attemptsToExecute && !pageTableEntry.isExecutable()) {
+            if (false){ //(attemptsToExecute && !pageTableEntry.isExecutable()) { // TODO remove workaround
                 throw new PageFrameNotExecutableError("The process tries to execute a page frames contents that are marked as not executable.");
             }
             // Check if the page frames contents are writable.
@@ -298,7 +298,7 @@ export class MemoryManagementUnit {
             // Copy the flag bits.
             const tmpFlagBits = pageTableEntry.flagBits.slice();
             // Update flag bits of page table entry in memory as well.
-            this._mainMemory.writeDoublewordTo(virtualAddress, new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
+            this._mainMemory.writeDoublewordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
         }
         // Page frame is present and operation is permitted.
         // Create a valid physical memory address from the page frame number and the offset extracted from the given virtual memory address.

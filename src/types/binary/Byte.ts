@@ -7,7 +7,7 @@ import { DataSizes } from "../enumerations/DataSizes";
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
 export class Byte extends BinaryValue {
-	public static readonly MAX_POSITIVE_NUMBER_DEC: number = 127;
+	public static readonly MAX_POSITIVE_NUMBER_DEC: number = 255;
 	public static readonly MAX_NEGATIVE_NUMBER_DEC: number = -128;
 	public static readonly NUMBER_OF_BITS_DEC: number = 8;
 
@@ -84,7 +84,7 @@ export class Byte extends BinaryValue {
 		}
 
 		if (integer < Byte.MAX_NEGATIVE_NUMBER_DEC || integer > Byte.MAX_POSITIVE_NUMBER_DEC) {
-			throw new Error(`The given number cannot be expressed using ${DataSizes.BYTE} bits, if the most significant bit should be treated as the sign bit.`);
+			throw new Error(`The given number cannot be expressed using ${DataSizes.BYTE} bits`);
 		}
 
 		var byte: Byte = new Byte();

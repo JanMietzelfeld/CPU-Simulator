@@ -5,9 +5,10 @@
         "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
     },
     "comment_format" : "[ ]*;.*",
+    "include_format" : "\\.(INCLUDE)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
     "label_formats" : {
         "declaration" : "\\.[a-zA-Z][a-zA-Z\\-_0-9]*\\:",
-        "usage" : "[a-zA-Z][a-zA-Z\\-_0-9]*"
+        "usage" : "^[a-zA-Z][a-zA-Z\\-_0-9]*"
     },
     "number_formats" : {
         "decimal" : "-?[ ]*(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+\\b",
@@ -590,7 +591,8 @@
                         "MEMORY_ADDRESS_BINARY",
                         "IMMEDIATE_DECIMAL",
                         "IMMEDIATE_HEXADECIMAL",
-                        "IMMEDIATE_BINARY"
+                        "IMMEDIATE_BINARY",
+                        "LABEL"
                     ]
                 },
                 {

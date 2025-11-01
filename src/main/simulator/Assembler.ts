@@ -30,9 +30,12 @@ export class Assembler {
 	 */
 	private preprocess(fileContents: string): Map<number, string> {
 		const lines: Map<number, string> = new Map();
+
+		let includedContent: string = this.replaceIncludeLabels(fileContents);
+
 		// Split file contents into lines of code, remove comments and mark empty lines for deletion
 		const commentRegex = new RegExp(this.languageDefinition.comment_format, "gim");
-		fileContents.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
+		includedContent.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
 			const lineWithoutComment: string = line.trim().replace(commentRegex, "");
 			if (lineWithoutComment.length !== 0) {
 				// Store line of code in map.
@@ -63,16 +66,46 @@ export class Assembler {
 		return lines;
 	}
 
+	private replaceIncludeLabels(fileContents: string): string {
+
+		let includedContent: string = "";
+
+		// Replace the Include with the content
+		const includeRegex = new RegExp(this.languageDefinition.include_format, "gim");
+		fileContents.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
+			
+			let lineContent: string = line;
+			const regexMatch: RegExpMatchArray | null = includeRegex.exec(line);
+			if (regexMatch !== null) {
+				// Include found.
+				let fileName: string = regexMatch[0].toString();
+				fileName = fileName.substring(fileName.indexOf("\"") + 1, fileName.lastIndexOf("\""));
+
+				let fileContents: string = readFileSync(process.cwd() + "/assembly/" + fileName + ".asm", "utf-8");
+
+				fileContents = this.replaceIncludeLabels(fileContents)
+
+				lineContent = line.replace(includeRegex, () => fileContents);
+			}
+
+			if (lineContent.length !== 0) {
+				includedContent += lineContent + "\n";
+			}			
+		});
+
+		return includedContent;
+	}
+
 	/**
 	 * This method encodes the reduced assembly program to its binary equivalent.
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
 	 * @returns An array of doublewords representing the encoded instructions and their operands of the assembly program.
 	 */
-	private encode(lines: Map<number, string>): DoubleWord[] {
+	private encode(lines: Map<number, string>, baseOffset: number = 0): DoubleWord[] {
 		const encodedInstructions: DoubleWord[] = [];
 		const constants: Map<string, string> = this.locateConstants(lines);
 		const replacedConstants: Map<number, string> = this.replaceConstants(lines, constants);
-		const jumpLabels: Map<string, string> = this.locateJumpLabels(replacedConstants);	
+		const jumpLabels: Map<string, string> = this.locateJumpLabels(replacedConstants, baseOffset);	
 
 		// Remove jump labels as they will not be encoded.
 		lines = this.removeJumpLabels(lines);
@@ -176,6 +209,9 @@ export class Assembler {
 						break;
 					}
 				}
+					if (lineEncoded) {
+						break;
+					}
 			} else {
 				// Instruction has no operands.
 				const regexInstruction = new RegExp(instruction.regex, "gim");
@@ -207,14 +243,14 @@ export class Assembler {
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
 	 * @returns A map of jump labels and their associated (virtual) memory address.
 	 */
-	private locateJumpLabels(lines: Map<number, string>) : Map<string, string> {
+	private locateJumpLabels(lines: Map<number, string>, baseOffset: number = 0) : Map<string, string> {
 		const jumpLabels: Map<string, string> = new Map();
 		/**
 		 * Use this variable in order to count the instructions, that need to be encoded
 		 * later, because the keys in the map do not have to be consecutive, as blank lines 
 		 * have been removed from the original source text.
 		 */
-		let programLocationCounter = 0;
+		let programLocationCounter = baseOffset;
 		for (const [lineNo, line] of lines.entries()) {
 			if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
 				const jumpLabel = line.replace(/\.|:/gim, "");
@@ -410,11 +446,16 @@ export class Assembler {
 			}
 		}
 			
+		let handleLabelsAsImmediate = false;
+		if (instructionMnemonic == "MOV") {
+			handleLabelsAsImmediate = true;
+		}
+
 		// Check for second operand
 		if (regexMatchArrayInstruction.length > 3) {
 			// A second operand given
 			addressingModeOperand2 = this.encodeOperandAddressingMode(regexMatchArrayInstruction[3], line);
-			typeOperand2 = this.encodeOperandType(regexMatchArrayInstruction[3], line);
+			typeOperand2 = this.encodeOperandType(regexMatchArrayInstruction[3], line, handleLabelsAsImmediate);
 			encodedOperandValue2 = this.encodeOperandValue(regexMatchArrayInstruction[3], line, jumpLabels);
 		} else {
 			// No second operand given
@@ -427,7 +468,7 @@ export class Assembler {
 		if (regexMatchArrayInstruction.length > 2) {
 			// A single operand given
 			addressingModeOperand1 = this.encodeOperandAddressingMode(regexMatchArrayInstruction[2], line);
-			typeOperand1 = this.encodeOperandType(regexMatchArrayInstruction[2], line);
+			typeOperand1 = this.encodeOperandType(regexMatchArrayInstruction[2], line, handleLabelsAsImmediate);
 			encodedOperandValue1 = this.encodeOperandValue(regexMatchArrayInstruction[2], line, jumpLabels);
 		} else {
 			// No operand given
@@ -621,17 +662,18 @@ export class Assembler {
 	 * This method encodes the given operands type.
 	 * @param operand An operand whichs type will be encoded.
 	 * @param line The original computer programs line of code which is currently encoded.
+	 * @param handleLabelsAsImmediate By default labels will be interpreted as addresses. Set to true to use the label address as immediate value.
 	 * @returns The binary encoded operands type.
 	 */
-	private encodeOperandType(operand: string, line: number): Array<Bit> {
+	private encodeOperandType(operand: string, line: number, handleLabelsAsImmediate: boolean = false): Array<Bit> {
 		let encodedType: Array<Bit> = new Array<Bit>(7);
 		if (operand.length === 0) {
 			encodedType = new Array<Bit>(7).fill(0);
 		} else if (operand.startsWith("*%") || operand.startsWith("%")) {
 			encodedType = new Array<Bit>(1, 1, 0, 0, 0, 0, 0);
-		} else if (operand.startsWith("$")) {
+		} else if (operand.startsWith("$") || (operand.match(this.languageDefinition.label_formats.usage) && handleLabelsAsImmediate)) {
 			encodedType = new Array<Bit>(1, 0, 1, 0, 0, 0, 0);
-		} else if (operand.startsWith("@") || operand.match(this.languageDefinition.label_formats.usage)) {
+		} else if (operand.startsWith("@") || (operand.match(this.languageDefinition.label_formats.usage) && !handleLabelsAsImmediate)) {
 			encodedType = new Array<Bit>(1, 1, 1, 0, 0, 0, 0);
 		} else {
 			throw Error(`In line ${line + 1}: Unrecognized type of operand.`);
@@ -691,10 +733,11 @@ export class Assembler {
 	 * The instructions will be encoded using the opcodes defined in the language definition.
 	 * The order in which the instructions appear in the input program is preserved during the compilation process.
 	 * @param s File contents of an .asm file containing a computer program written in assembly language.
+	 * @param baseOffset Base address where the program will be in memory. Needed to adjust static addresses in jump labels. Default is 0.
 	 * @returns An array of strings representing the binary encoded instructions of the given computer program.
 	 */
-	public compile(s: string): DoubleWord[] {
+	public compile(s: string, baseOffset: number = 0): DoubleWord[] {
 		const lines: Map<number, string> = this.preprocess(s);
-		return this.encode(lines);
+		return this.encode(lines, baseOffset);
 	}
 }
