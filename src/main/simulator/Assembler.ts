@@ -30,9 +30,12 @@ export class Assembler {
 	 */
 	private preprocess(fileContents: string): Map<number, string> {
 		const lines: Map<number, string> = new Map();
+
+		let includedContent: string = this.replaceIncludeLabels(fileContents);
+
 		// Split file contents into lines of code, remove comments and mark empty lines for deletion
 		const commentRegex = new RegExp(this.languageDefinition.comment_format, "gim");
-		fileContents.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
+		includedContent.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
 			const lineWithoutComment: string = line.trim().replace(commentRegex, "");
 			if (lineWithoutComment.length !== 0) {
 				// Store line of code in map.
@@ -61,6 +64,36 @@ export class Assembler {
 			lines.delete(lineNo);
 		}
 		return lines;
+	}
+
+	private replaceIncludeLabels(fileContents: string): string {
+
+		let includedContent: string = "";
+
+		// Replace the Include with the content
+		const includeRegex = new RegExp(this.languageDefinition.include_format, "gim");
+		fileContents.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
+			
+			let lineContent: string = line;
+			const regexMatch: RegExpMatchArray | null = includeRegex.exec(line);
+			if (regexMatch !== null) {
+				// Include found.
+				let fileName: string = regexMatch[0].toString();
+				fileName = fileName.substring(fileName.indexOf("\"") + 1, fileName.lastIndexOf("\""));
+
+				let fileContents: string = readFileSync(process.cwd() + "/assembly/" + fileName + ".asm", "utf-8");
+
+				fileContents = this.replaceIncludeLabels(fileContents)
+
+				lineContent = line.replace(includeRegex, () => fileContents);
+			}
+
+			if (lineContent.length !== 0) {
+				includedContent += lineContent + "\n";
+			}			
+		});
+
+		return includedContent;
 	}
 
 	/**

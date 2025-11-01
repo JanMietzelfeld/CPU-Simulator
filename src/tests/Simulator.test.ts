@@ -7,7 +7,7 @@ describe('Test Simulator', () => {
         "./settings/language_definition.json",
         "./assembly"
     );
-    simulator.bootProcess("./assembly/examples/loop.asm");
+    simulator.createProcess("./assembly/examples/loop.asm");
     
     test('Test if PTP register points to a valid page table entry', () => {
         const expectedOutput: DoubleWord = new DoubleWord([1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);

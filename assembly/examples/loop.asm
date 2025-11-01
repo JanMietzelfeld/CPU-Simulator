@@ -1,3 +1,5 @@
+.LOOP_START:
+
 MOV $0x4, %eax      ; Kopiere den Wert 100 in das Register eax.
 
 .loop: 

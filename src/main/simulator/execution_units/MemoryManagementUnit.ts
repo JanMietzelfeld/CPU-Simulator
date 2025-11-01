@@ -298,7 +298,7 @@ export class MemoryManagementUnit {
             // Copy the flag bits.
             const tmpFlagBits = pageTableEntry.flagBits.slice();
             // Update flag bits of page table entry in memory as well.
-            this._mainMemory.writeDoublewordTo(virtualAddress, new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
+            this._mainMemory.writeDoublewordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
         }
         // Page frame is present and operation is permitted.
         // Create a valid physical memory address from the page frame number and the offset extracted from the given virtual memory address.

@@ -1,5 +1,6 @@
 {
     "comment_format" : "[ ]*;.*",
+    "include_format" : "\\.(INCLUDE)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
     "label_formats" : {
         "declaration" : "\\.[a-zA-Z][a-zA-Z\\-_0-9]*\\:",
         "usage" : "^[a-zA-Z][a-zA-Z\\-_0-9]*"

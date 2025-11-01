@@ -232,16 +232,11 @@ export class CPUCore {
 
     /**
      * This method performs a single instruction cycle.
-     * @returns True, if the cycle was performed normally and false, if the cycle could not be performed because the programm has ended.
      */
-    public cycle(): boolean {
+    public cycle(): void {
         this.fetch();
-        if (this.eir.content.toString() === new DoubleWord().toString()) {
-            return false;
-        }
         this.decode();
         this.execute();
-        return true;
     }
 
     /**
@@ -249,7 +244,7 @@ export class CPUCore {
      * The next instruction to be executed is determined by the content of the command pointer.
      * The command pointer always points to the instruction to be executed.
      */
-    private fetch() {
+    private fetch(): void {
         // Read address of next instruction from EIP register.
         const instructionAddress: VirtualAddress = this.eip.content;
         // Read next instruction from mainMemory.
@@ -262,7 +257,7 @@ export class CPUCore {
     /**
      * This method decodes or analyses the instruction found in the EIR register and prepares execution.
      */
-    private decode() {
+    private decode(): void {
         // Read instruction from EIR register.
         const instruction: Instruction = this.eir.content;
         // Split instruction into its components.
@@ -358,7 +353,7 @@ export class CPUCore {
     /**
      * This method executes the instruction found in the EIR register.
      */
-    private execute() {
+    private execute(): void {
         if (this._decodedInstruction === null) {
             throw new Error("No instruction is currently ready to be executed.");
         }
@@ -366,12 +361,12 @@ export class CPUCore {
         
         // Debug prints
 
-        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber())
-        const wasInKernelMode = this.eflags.isInKernelMode
-        this.eflags.enterKernelMode()
-        console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false))
+        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());
+        const wasInKernelMode = this.eflags.isInKernelMode();
+        this.eflags.enterKernelMode();
+        console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false));
         if (!wasInKernelMode) {
-            this.eflags.enterUserMode()
+            this.eflags.enterUserMode();
         }
 
         let jumpPerformed = false;
@@ -717,14 +712,11 @@ export class CPUCore {
                 this.eax.content = DoubleWord.fromInteger(num);
                 this.ebx.content = DoubleWord.fromInteger(err);
                 break;
-            case DevCommands.PROCESS_CREATE:
-                throw new NotImplementedError("Operand " + devCommandNameByValue(op1) + " is not yet implemented for the DEV instruction.");
+            case DevCommands.CPU_ENABLE_MEMORY_VIRTUALIZATION: //  00001010 enableMemoryVirtualization()
+                this.mmu.enableMemoryVirtualization();
                 break;
-            case DevCommands.PROCESS_EXIT:
-                throw new NotImplementedError("Operand " + devCommandNameByValue(op1) + " is not yet implemented for the DEV instruction.");
-                break;
-            case DevCommands.PROCESS_YIELD:
-                throw new NotImplementedError("Operand " + devCommandNameByValue(op1) + " is not yet implemented for the DEV instruction.");
+            case DevCommands.CPU_DISABLE_MEMORY_VIRTUALIZATION: //  00001011 disableMemoryVirtualization()
+                this.mmu.disableMemoryVirtualization();
                 break;
             default:
                 throw new BadOperandError("Unknown first operand " + op1 + " for DEV instruction.");
@@ -2044,8 +2036,8 @@ export class CPUCore {
         // }
         // Read contents of flags register from STACK into flags register.
         this.eflags.content = this.mmu.readByteFrom(this.esp.content);
-        // Deallocate four byte or one doubleword from STACK by incrementing the value in ESP.
-        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
+        // Deallocate four byte or one Byte from STACK by incrementing the value in ESP.
+        this.mmu.clearMemory(this.esp.content, DataSizes.BYTE);
         // TODO: Call interrupt handler for deallocation of page frame in page table.
         this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(1));
         return;
@@ -2264,9 +2256,9 @@ export class CPUCore {
             );
         }
 
-        // Only allow INT for interrupt index 0 to 3
-        if (0 > target.value.toUnsignedNumber() || 3 < target.value.toUnsignedNumber()) {
-            throw new BadOperandError("Interrupt operand must be between 0 and 3.")
+        // Only allow INT for interrupt index 0 to 255
+        if (0 > target.value.toUnsignedNumber() || 255 < target.value.toUnsignedNumber()) {
+            throw new BadOperandError("Interrupt operand must be between 0 and 255.")
         }
 
         // Push the current EFLAGS onto the STACK to save them for later.
@@ -2452,7 +2444,7 @@ export class CPUCore {
             throw new RegisterNotWritableInUserModeError(
                 msg.replace("__REGISTER__", "EIR")
             );
-        } else if (register === this.gptp && !this.eflags.isInKernelMode()) {
+        } else if (register === this.ptp && !this.eflags.isInKernelMode()) {
             // Writing to the GPTP register is only allowed in kernel mode.
             const msg: string = CPUCore._ERROR_MESSAGE_REGISTER_NOT_WRITABLE_IN_USER_MODE;
             throw new RegisterNotWritableInUserModeError(
@@ -2570,10 +2562,7 @@ export class CPUCore {
                 register = this.esp;
                 break;
             case EncodedReadableRegisters.GPTP:
-                if (this.gptp === null) {
-                    throw new RegisterNotAvailableError("Could not access GPTP register. Please enable virtualization before trying to access GPTP.");
-                }
-                register = this.gptp;
+                register = this.ptp;
                 break;
             case EncodedReadableRegisters.ITP:
                 register = this.itp;
@@ -2618,10 +2607,7 @@ export class CPUCore {
                 register = this.esp;
                 break;
             case EncodedWritableRegisters.GPTP:
-                if (this.gptp === null) {
-                    throw new RegisterNotAvailableError("Could not access GPTP register. Please enable virtualization before trying to access GPTP.");
-                }
-                register = this.gptp;
+                register = this.ptp;
                 break;
             case EncodedWritableRegisters.ITP:
                 register = this.itp;

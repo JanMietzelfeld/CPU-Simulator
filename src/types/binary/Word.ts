@@ -2,7 +2,7 @@ import { Bit } from "./Bit";
 import { DataSizes } from "../enumerations/DataSizes";
 
 export class Word {
-	protected static readonly MAX_POSITIVE_NUMBER_DEC: number = 32_767;
+	protected static readonly MAX_POSITIVE_NUMBER_DEC: number = 65_535;
 	protected static readonly MAX_NEGATIVE_NUMBER_DEC: number = -32_768;
 	public static readonly NUMBER_OF_BITS_DEC: number = 16;
 
@@ -75,7 +75,7 @@ export class Word {
 		}
 
 		if (integer < Word.MAX_NEGATIVE_NUMBER_DEC || integer > Word.MAX_POSITIVE_NUMBER_DEC) {
-			throw new Error(`The given number cannot be expressed using ${Word.NUMBER_OF_BITS_DEC} bits, if the most significant bit should be treated as the sign bit.`);
+			throw new Error(`The given number cannot be expressed using ${Word.NUMBER_OF_BITS_DEC} bits`);
 		}
 
 		var word: Word = new Word();
