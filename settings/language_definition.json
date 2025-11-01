@@ -1,11 +1,13 @@
 {
     "constant_formats" : {
-        "declarationInteger" : "^const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?[0-9]*$",
-        "declarationString" : "^const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?\"[a-zA-Z0-9]*\"$",
+        "declarationDecimal" : "^[ ]*(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*--?[ ]*(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
+        "declarationHexadecimal" : "^(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]?-?[ ]*0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
+        "declarationBinary" : "^[ ]*(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0b[01]+$",
+        "declarationString" : "^[ ]*(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*\"[a-zA-Z0-9]*\"$",
         "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
     },
     "comment_format" : "[ ]*;.*",
-    "include_format" : "\\.(INCLUDE)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
+    "include_format" : "^[ ]*(include)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
     "label_formats" : {
         "declaration" : "\\.[a-zA-Z][a-zA-Z\\-_0-9]*\\:",
         "usage" : "^[a-zA-Z][a-zA-Z\\-_0-9]*"
@@ -53,9 +55,9 @@
             "code" : "1000"
         },
         {
-            "name" : "GPTP",
+            "name" : "PTP",
             "aliases" : [
-                "PTP"
+                "GPTP"
             ],
             "code" :  "1001"
         }

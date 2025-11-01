@@ -290,8 +290,24 @@ export class Assembler {
 		 */
 		let programLocationCounter = 0;
 		for (const [lineNo, line] of lines.entries()) {
-			if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationInteger, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?[0-9]*/gim, "");
+			if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
+				const constantName = line.replace(/const[ ]|[ ]?=[ ]?.*/gim, "");
+				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
+				constants.set(
+					constantName, 
+					constantValue
+				);
+				lines.delete(lineNo);
+			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim"))) {
+				const constantName = line.replace(/const[ ]|[ ]?=[ ]?.*/gim, "");
+				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
+				constants.set(
+					constantName, 
+					constantValue
+				);
+				lines.delete(lineNo);
+			} if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
+				const constantName = line.replace(/const[ ]|[ ]?=[ ]?.*/gim, "");
 				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
 				constants.set(
 					constantName, 

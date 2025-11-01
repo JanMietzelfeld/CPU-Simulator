@@ -1,6 +1,8 @@
 export interface AssemblyLanguageDefinition {
     constant_formats: {
-        declarationInteger: string;
+        declarationDecimal: string;
+        declarationHexadecimal: string;
+        declarationBinary: string;
         declarationString: string;
         usage: string;
     };

@@ -1,7 +1,8 @@
 JMP SOS_BOOT ; boot the kernel
 
-.INCLUDE "os/sos/interupts"
-.INCLUDE "os/sos/util"
+include "os/sos/constants"
+include "os/sos/interupts"
+include "os/sos/util"
 
 ; Start of the BOOT Code
 
@@ -26,9 +27,9 @@ JMP SOS_BOOT ; boot the kernel
     ;   - Run the init process
     ;
 
-    MOV $0xC0000000, %esp   ; initialize stack pointer
+    MOV $OS_CONST_OS_CODE_START, %esp   ; initialize stack pointer
 
-    MOV $0xE0100400, %itp   ; initialize interrupt pointer
+    MOV $OS_CONST_PCB_INTERRUPT_TABLE_START, %itp   ; initialize interrupt pointer
 
 ; Set Up Interrupt Table
     
@@ -85,11 +86,11 @@ JMP SOS_BOOT ; boot the kernel
 
 ; Interrupt Table Is Set Up
 
-    MOV $0xD0400000, %gptp   ; initialize PTP (Level 1 Page Table Location)
+    MOV $OS_CONST_PAGE_TABLE_LIST_START, %ptp   ; initialize PTP (Level 1 Page Table Location)
 
 ; Set Up Page Table (L1) for the init process
 
-    MOV %gptp, %eax
+    MOV %ptp, %eax
 
     ADD $0x2FFFFC, %eax  ; 4*786432 - 4 = 3145724 = 0x300000 For the stack
     MOV $0xC00BFFFF, %ebx; C = Present, Writable
@@ -107,7 +108,7 @@ JMP SOS_BOOT ; boot the kernel
 
 ; Create a PCB for the init process - 0xE00C0000 - 0xE00FFFFF - PCB List (1 PCB = 1KiB)
 
-    MOV $0xE00C0000, %eax
+    MOV $OS_CONST_PCB_LIST_START, %eax
     ADD $0x400, %eax ; First entry is invalid because pid 0 is invalid
 
     ; Process Control Block layout (1KiB) 0x000 - 0x3FF
@@ -166,15 +167,18 @@ JMP SOS_BOOT ; boot the kernel
 
     ; 0xE0100000 - 0xE01003FF - PCB Table Mapping   (256 Entries * 4 Bytes = 1 KiB)                  /
 
-    MOV $0xE0100000, %eax ; Get a pointer to the PCB Table Mapping List
+    MOV $OS_CONST_PCB_MAPPING_TABLE_START, %eax ; Get a pointer to the PCB Table Mapping List
     ADD $4, %eax ; First entry is invalid because pid 0 is invalid
 
-    MOV $0xE00C0400, *%eax ;update the Mapping for pid 1
+    MOV $OS_CONST_PCB_LIST_START, %ebx
+    ADD $OS_CONST_PCB_SIZE, %ebx ; First entry is invalid because pid 0 is invalid
+
+    MOV %ebx, *%eax ;update the Mapping for pid 1
 
     ; Set Running process pcb pointer
     ; 0xE0100A00 - 0xE0100A00 - Running process *PCB(4 Byte)                                          |
-    MOV $0xE0100A00, %eax ; Get a pointer to the PCB pointer
-    MOV $0xE00C0400, *%eax ; Set the active pid to 1
+    MOV $OS_CONST_CURRENT_PCB_POINTER, %eax ; Get a pointer to the PCB pointer
+    MOV %ebx, *%eax ; Set up the active pcb
 
 ; Process is now initialized in the os data structures
 
@@ -192,7 +196,7 @@ JMP SOS_BOOT ; boot the kernel
     PUSH $0x7365722F
     PUSH $0x6F732F75 ; move filename "os/user/init.bin\0" onto stack
 
-    DEV $0b0110, %esp   ; 00000110 - file_open (filename_ptr=op2) -> fd=eax
+    DEV $DEV_COMMAND_OPEN_FILE, %esp   ; 00000110 - file_open (filename_ptr=op2) -> fd=eax
     
     POP %ecx
     POP %ecx
@@ -206,19 +210,19 @@ JMP SOS_BOOT ; boot the kernel
     ; read 4KiB bytes (assume for now that the init program is not bigger than 4KiB)
     PUSH $0x100     ; buffer length
     PUSH $0x0       ; write init to the first page frame located at 0x0
-    DEV $0b0010, %ebx     ; 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
+    DEV $DEV_COMMAND_IO_READ_BUFFER, %ebx     ; 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
  
     ; set ecx to bytes_read
     MOV %eax, %ecx ; bytes_read
 
     ; update Page Table 
 
-    MOV %gptp, %eax
+    MOV %ptp, %eax
 
     MOV $0x80000000, *%eax ; set the present bit to 1 and assign the first Pysical Address of frame 0 starting at 0x00000000
 
 ; Activate Memory Virtualization
-DEV $0b00001010, $0
+DEV $DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
 
 PUSHF
 AND $0xE0FFFFFF, *%esp ; reset flags
