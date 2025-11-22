@@ -304,7 +304,9 @@ export class ArithmeticLogicUnit {
             ) ? 1 : 0;
         }
         this.checkForOverflow(carry);
-        this.checkCarry(carry);
+        
+
+
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -384,7 +386,7 @@ export class ArithmeticLogicUnit {
     }
 
     /**
-     * This method performs an arithmetic shift on the given binary value one bit to the right.
+     * This method performs a logical shift on the given binary value one bit to the right.
      * @param operand The operand to perform a right shift on.
      * @returns The bit right shifted.
      */
@@ -420,7 +422,7 @@ export class ArithmeticLogicUnit {
     }
 
     /**
-     * This method performs an arithmetic shift on the given binary value one bit to the left.
+     * This method performs an logical shift on the given binary value one bit to the left.
      * @param operand The operand to perform a right shift on.
      * @returns The bit left shifted.
      */
@@ -436,6 +438,91 @@ export class ArithmeticLogicUnit {
         }
         return removedBit;
     }
+
+     /**
+     * This method performs a logical left shift on a given binary value
+     * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
+     * @param value The second operand, binary value to be shifted.
+     * @param count The first operand, number of left shifts.
+     * @returns The resulting binary value.
+     */
+    public shl(value: DoubleWord, count: DoubleWord, ): DoubleWord {
+
+        const result: DoubleWord = new DoubleWord();
+
+        this._eflags.clearCarry()
+
+
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
+            result.value = new Array<Bit>().concat(value.getLeastSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber())).concat(new Array<Bit>(count.toUnsignedNumber()));
+
+            count.toUnsignedNumber() === 1 && value.value.at(0) !== value.value.at(1) ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+            value.value.at(0) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+        }
+
+        this.checkForZero(result);
+        this.checkForParity(result);
+        this.checkForSigned(result);
+
+        return result;
+    }
+
+    /**
+     * This method performs a logical right shift on a given binary value
+     * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
+     * @param value The second operand, binary value to be shifted.
+     * @param count The first operand, number of right shifts.
+     * @returns The resulting binary value.
+     */
+    public shr(value: DoubleWord, count: DoubleWord): DoubleWord {
+
+        const result: DoubleWord = new DoubleWord();
+
+        this._eflags.clearCarry()
+
+
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
+            result.value = new Array<Bit>(count.toUnsignedNumber()).fill(0, 0, count.toUnsignedNumber()).concat(value.getMostSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()));
+
+            value.value.at(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry();
+            count.toUnsignedNumber() == 1 && value.value.at(0) == 1 ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        }
+
+        this.checkForZero(result);
+        this.checkForParity(result);
+        this.checkForSigned(result);
+
+        return result;
+    }
+
+    /**
+     * This method performs a arithmetic right shift on a given binary value
+     * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
+     * @param value The second operand, binary value to be shifted.
+     * @param count The first operand, number of right shifts.
+     * @returns The resulting binary value.
+     */
+    public sar(value: DoubleWord, count: DoubleWord): DoubleWord {
+
+        const result: DoubleWord = new DoubleWord();
+
+        this._eflags.clearCarry()
+
+
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
+            result.value = new Array<Bit>(count.toUnsignedNumber()).fill(value.value.at(0)!, 0, count.toUnsignedNumber()).concat(value.getMostSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()));
+
+            value.value.at(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+        }
+
+        this._eflags.clearOverflow();
+        this.checkForZero(result);
+        this.checkForParity(result);
+        this.checkForSigned(result);
+
+        return result;
+    }
+
 
     /**
      * This method multiplies both the given binary, doubleword sized values using Booths mulitplication algorithm, 
@@ -473,8 +560,8 @@ export class ArithmeticLogicUnit {
      * This method divides both the given binary, doubleword sized values.
      * 
      * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
-     * @param dividend The first operand, which divides the dividend.
-     * @param divisor The second operand, which gets divided by the divisor.
+     * @param dividend The first operand, which gets divided by the divisor.
+     * @param divisor The second operand, which divides the dividend.
      * @returns The resulting quotient.
      */
     public div(dividend: DoubleWord, divisor: DoubleWord): DoubleWord {

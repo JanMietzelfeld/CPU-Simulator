@@ -20,53 +20,61 @@
 ;
 
 ; UTIL_INITIALIZE_PAGE_TABLE
-; Parameters 
 ; Parameters (ebx is a pointer to the start of the Page Table):
-;   (ebx)     Pointer to the Page Table
+;   (ebx)     Pointer to the Page Table entry
 ; Return value (immediate value):
 ;   none
 .UTIL_INITIALIZE_PAGE_TABLE:
 
-MOV $0, %ecx
+    PUSH %ebx
 
-.INITIALIZE_PAGE_TABLE_INIT_USER_FLAGS:
-    MOV $0x40000000, *%ebx ;Set Writable bit to 1
-    ADD $4, %ebx
+    ; push "os/util/page_table.bin\0" onto stack
 
-    ; test if done
-    ADD $1, %ecx
+    PUSH $0x696E0000
+    PUSH $0x6C652E62
+    PUSH $0x5F746162
+    PUSH $0x70616765
+    PUSH $0x74696C2F
+    PUSH $0x6F732F75 
 
-    TEST $786432, %ecx ;There are 786432 Entries in user space
-    JNE INITIALIZE_PAGE_TABLE_INIT_USER_FLAGS
+    MOV %esp, %ebx
 
-MOV %ecx, %eax
-MOV $0, %ecx
+    ; SYSCALLS_FILE_OPEN
+    ; Parameters (ebx is a pointer to the start of an ASCII filename):
+    ;   (ebx)     Pointer to a ASCII filename
+    ; Return value (immediate value):
+    ;   eax     file descriptor
+    CALL SYSCALLS_FILE_OPEN
+    ; TODO check for error code
 
-.INITIALIZE_PAGE_TABLE_INIT_KERNEL_FLAGS:
+    POP %ebx
+    POP %ebx
+    POP %ebx
+    POP %ebx
+    POP %ebx
+    POP %ebx
 
-    AND $0x800FFFFF, %eax ; set up 1 - 1 map
+    POP %ebx ; Pointer to the Page Table entry
 
-    CMP $65536, %ecx ;There are 65536 Entries in the code segment kernel space
+    PUSH $CONST_OS_PAGE_TABLE_SIZE
+    PUSH %ebx
+    PUSH %eax
 
-    JL INITIALIZE_PAGE_TABLE_INIT_KERNEL_CODE_SEGMENT
+    MOV %esp, %ebx
 
-    OR $0x90000000, %eax ; Set Present and Mode bit to 1
-    MOV %eax, *%ebx 
-    JMP INITIALIZE_PAGE_TABLE_SKIP_INIT_KERNEL_CODE_SEGMENT
+    ; SYSCALLS_FILE_READ
+    ; Parameters (ebx is a pointer to the following struct):
+    ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
+    ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
+    ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
+    ; Return value (immediate value):
+    ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
+    CALL SYSCALLS_FILE_READ
+    ; TODO check for error code
 
-    .INITIALIZE_PAGE_TABLE_INIT_KERNEL_CODE_SEGMENT:
-        OR $0xB0000000, %eax ;Set Present, Mode and Executable bit to 1
-        MOV %eax, *%ebx 
-
-    .INITIALIZE_PAGE_TABLE_SKIP_INIT_KERNEL_CODE_SEGMENT:
-    
-    ADD $4, %ebx
-
-    ; test if done
-    ADD $1, %ecx
-
-    TEST $262144, %ecx ;There are 262144 Entries in kernel space
-    JNE INITIALIZE_PAGE_TABLE_INIT_KERNEL_FLAGS
+    POP %ebx
+    POP %ebx
+    POP %ebx
 
 ; Page Table Is Set Up
 

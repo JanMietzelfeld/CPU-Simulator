@@ -33,6 +33,9 @@ import { devCommandNameByValue, DevCommands } from "../../../types/enumerations/
 import { BadOperandError } from "../../../types/errors/BadOperandError";
 import { NotImplementedError } from "../../../types/errors/NotImplementedError";
 import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
+import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
+import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
+import { PageFaultError } from "../../../types/errors/PageFaultError";
 
 
 /**
@@ -165,6 +168,8 @@ export class CPUCore {
      */
     private readonly _processingWidth: DataSizes;
 
+    private interruptQueue: InterruptNumbers[] = [];
+
     /**
      *  The binary encoded type of the currently executed instruction.
      */
@@ -234,9 +239,36 @@ export class CPUCore {
      * This method performs a single instruction cycle.
      */
     public cycle(): void {
-        this.fetch();
-        this.decode();
-        this.execute();
+
+        //First handle all pending interrupts
+        if (this.interruptQueue.length !== 0) {
+            console.log("Interrupted");
+            this.int(new InstructionOperand(
+                EncodedAddressingModes.DIRECT,
+                EncodedOperandTypes.IMMEDIATE,
+                DoubleWord.fromInteger(this.interruptQueue.shift() as InterruptNumbers)
+            ));
+            return;
+        }
+
+        try {
+            this.fetch();
+            this.decode();
+            this.execute();
+        } catch(error) {
+            if (error instanceof PageFaultError) {
+                console.log("Page Fault")
+                this.triggertException(InterruptNumbers.PAGE_FAULT);
+
+                // Write the "bad" address onto the interrupt STACK.
+                this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+                this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
+            }
+            else
+            {
+                console.log(error)
+            }
+        }
     }
 
     /**
@@ -245,6 +277,7 @@ export class CPUCore {
      * The command pointer always points to the instruction to be executed.
      */
     private fetch(): void {
+
         // Read address of next instruction from EIP register.
         const instructionAddress: VirtualAddress = this.eip.content;
         // Read next instruction from mainMemory.
@@ -364,7 +397,10 @@ export class CPUCore {
         console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());
         const wasInKernelMode = this.eflags.isInKernelMode();
         this.eflags.enterKernelMode();
-        console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false));
+        if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
+            console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false));
+
+        }
         if (!wasInKernelMode) {
             this.eflags.enterUserMode();
         }
@@ -539,8 +575,27 @@ export class CPUCore {
                     this._decodedInstruction.operands![1]!
                 );
                 break;
+            case EncodedOperations.SHL: // SHL = SAL
+                this.shl(
+                    this._decodedInstruction.operands![0],
+                    this._decodedInstruction.operands![1]!
+                );
+                break;
+            case EncodedOperations.SHR:
+                this.shr(
+                    this._decodedInstruction.operands![0],
+                    this._decodedInstruction.operands![1]!
+                );
+                break;
+            case EncodedOperations.SAR:
+                this.sar(
+                    this._decodedInstruction.operands![0],
+                    this._decodedInstruction.operands![1]!
+                );
+                break;
             default:
-                throw new Error("Unrecognized operation found.");
+                // Call interrupt handler for Invalid Opcode.
+                this.triggertException(InterruptNumbers.INVALID_OPCODE);
                 break;
         }
         if (!jumpPerformed) {
@@ -594,7 +649,6 @@ export class CPUCore {
      * @param data Command-dependend
      * @throws {UnsupportedOperandTypeError}
      * @throws {MissingOperandError} If one of the operands is missing.
-     * @throws {PrivilegeViolationError} If called in user mode.
      * @throws {BadOperandError} If command or data could not be interpreted correctly.
      * @author Laurin Gehlenborg
      */
@@ -602,7 +656,8 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            throw new PrivilegeViolationError("DEV can only be called when CPU is in kernel mode.");
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
         }
 
         // Check if exactly two operands are present.
@@ -967,6 +1022,183 @@ export class CPUCore {
     }
 
     /**
+     * This method is a proxy for the SHL operation provided by the ALU.
+     * It takes two binary values from the locations defined by the given operands to perfom the computation on.
+     * The result is written to the location defined by the second operand.
+     * @param source An operand used as the first argument for the operation.
+     * @param target An operand used as the second argument for the operation and to write the result to.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     */
+    private shl(source: InstructionOperand, target: InstructionOperand): void {
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "ADD")
+            );
+        }
+        // Check if exactly two operands are present.
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (source.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "two operands").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        // Define variables to write the operands values to.
+        let firstOperandsValue: DoubleWord;
+        let secondOperandsValue: DoubleWord;
+        // Read the binary value from the location defined by the first operand.
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
+            firstOperandsValue = source.value;
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
+        } else {
+            firstOperandsValue = this.readRegister(source);
+        }
+        // Read the binary value from the location defined by the second operand.
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
+        } else {
+            secondOperandsValue = this.readRegister(target);
+        }
+        // Perform the ADD operation.
+        const result: DoubleWord = this.alu.shl(secondOperandsValue, firstOperandsValue);
+        // Write the result to the location defined by the second operand.
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            this.mmu.writeDoublewordTo(target.value, result, false);
+        } else {
+            this.writeRegister(result, target);
+        }
+        return;
+    }
+
+    /**
+     * This method is a proxy for the SHR operation provided by the ALU.
+     * It takes two binary values from the locations defined by the given operands to perfom the computation on.
+     * The result is written to the location defined by the second operand.
+     * @param source An operand used as the first argument for the operation.
+     * @param target An operand used as the second argument for the operation and to write the result to.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     */
+    private shr(source: InstructionOperand, target: InstructionOperand): void {
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "ADD")
+            );
+        }
+        // Check if exactly two operands are present.
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (source.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "two operands").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        // Define variables to write the operands values to.
+        let firstOperandsValue: DoubleWord;
+        let secondOperandsValue: DoubleWord;
+        // Read the binary value from the location defined by the first operand.
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
+            firstOperandsValue = source.value;
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
+        } else {
+            firstOperandsValue = this.readRegister(source);
+        }
+        // Read the binary value from the location defined by the second operand.
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
+        } else {
+            secondOperandsValue = this.readRegister(target);
+        }
+        // Perform the ADD operation.
+        const result: DoubleWord = this.alu.shr(secondOperandsValue, firstOperandsValue);
+        // Write the result to the location defined by the second operand.
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            this.mmu.writeDoublewordTo(target.value, result, false);
+        } else {
+            this.writeRegister(result, target);
+        }
+        return;
+    }
+
+    /**
+     * This method is a proxy for the SAR operation provided by the ALU.
+     * It takes two binary values from the locations defined by the given operands to perfom the computation on.
+     * The result is written to the location defined by the second operand.
+     * @param source An operand used as the first argument for the operation.
+     * @param target An operand used as the second argument for the operation and to write the result to.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     */
+    private sar(source: InstructionOperand, target: InstructionOperand): void {
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "ADD")
+            );
+        }
+        // Check if exactly two operands are present.
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (source.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "two operands").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        // Define variables to write the operands values to.
+        let firstOperandsValue: DoubleWord;
+        let secondOperandsValue: DoubleWord;
+        // Read the binary value from the location defined by the first operand.
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
+            firstOperandsValue = source.value;
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
+        } else {
+            firstOperandsValue = this.readRegister(source);
+        }
+        // Read the binary value from the location defined by the second operand.
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
+        } else {
+            secondOperandsValue = this.readRegister(target);
+        }
+        // Perform the ADD operation.
+        const result: DoubleWord = this.alu.sar(secondOperandsValue, firstOperandsValue);
+        // Write the result to the location defined by the second operand.
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+            this.mmu.writeDoublewordTo(target.value, result, false);
+        } else {
+            this.writeRegister(result, target);
+        }
+        return;
+    }
+
+    /**
      * This method is a proxy for the MUL operation provided by the ALU.
      * It takes two binary values from the locations defined by the given operands to perfom the computation on.
      * The result is written to the location defined by the second operand.
@@ -1073,8 +1305,16 @@ export class CPUCore {
         } else {
             secondOperandsValue = this.readRegister(target);
         }
+        let result = new DoubleWord();
         // Perform the DIV operation.
-        const result: DoubleWord = this.alu.div(secondOperandsValue, firstOperandsValue);
+        try {
+            result = this.alu.div(secondOperandsValue, firstOperandsValue);
+        } catch (error) {
+            if (error instanceof DivisionByZeroError) {
+                this.triggertException(InterruptNumbers.DIVIDE_ERROR);
+                return;
+            }
+        }
         // Write the result to the location defined by the second operand.
         if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
@@ -1963,13 +2203,13 @@ export class CPUCore {
     /**
      * This method clears the interrupt flag.
      * The CPU will ignore all software interrupts to occur.
-     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode.
      */
     private cli(): void {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            throw new PrivilegeViolationError("PUSHF can only executed in kernel mode, but current process is running in user mode.");
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
         }
         this.eflags.clearInterrupt();
         return;
@@ -1978,13 +2218,13 @@ export class CPUCore {
     /**
      * This method sets the interrupt flag.
      * This enables the CPU to handle software interrupts.
-     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode.
      */
     private sti(): void {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            throw new PrivilegeViolationError("PUSHF can only executed in kernel mode, but current process is running in user mode.");
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
         }
         this.eflags.setInterrupt();
         return;
@@ -1996,14 +2236,14 @@ export class CPUCore {
 
     /**
      * This method pushes the contents of the EFLAGS register onto the STACK.
-     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode.
      * @throws {StackOverflowError} If the ESP reached the lowest possible address (top) of the STACK segment.
      */
     private pushf(): void {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            throw new PrivilegeViolationError("PUSHF can only executed in kernel mode, but current process is running in user mode.");
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
         }
         // Check whether ESP reached lowest address (top) of STACK segment.
         // if (this.esp.content.equal(Doubleword.fromInteger(this._lowestAddressOfStackDec))) {
@@ -2014,32 +2254,40 @@ export class CPUCore {
         this.esp.content = this.alu.sub(this.esp.content, DoubleWord.fromInteger(1));
         // Write contents of flags register on STACK.
         this.mmu.writeByteTo(this.esp.content, this.eflags.content);
+
+        this.esp.content = this.alu.sub(this.esp.content, DoubleWord.fromInteger(3));
+
         return;
     }
 
     /**
      * This method reads the contents of the EFLAGS register from the STACK into the EFLAGS register.
      * The STACK pointer is incremented by 1 (byte/address) after the operation and the used memory gets deallocated.
-     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode.
      * @throws {StackUnderflowError} If the ESP reached the highest possible address (bottom) of the STACK segment.
      */
     private popf(): void {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            throw new PrivilegeViolationError("POPF can only executed in kernel mode, but current process is running in user mode.");
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
         }
         // Check whether ESP reached highest address (bottom) of STACK segment.
         // if (this.esp.content.equal(Doubleword.fromInteger(this._highestAddressOfStackDec))) {
         //     // ESP reached highest possible address (bottom) of STACK segment.
         //     throw new StackOverflowError("Could not perform POPF operation. STACK pointer reached bottom of the STACK.");
         // }
+
+        this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(3));
+
         // Read contents of flags register from STACK into flags register.
-        this.eflags.content = this.mmu.readByteFrom(this.esp.content);
+        let content = this.mmu.readByteFrom(this.esp.content);
         // Deallocate four byte or one Byte from STACK by incrementing the value in ESP.
         this.mmu.clearMemory(this.esp.content, DataSizes.BYTE);
         // TODO: Call interrupt handler for deallocation of page frame in page table.
         this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(1));
+
+        this.eflags.content = content;
         return;
     }
 
@@ -2052,7 +2300,7 @@ export class CPUCore {
      * @throws {UnknownRegisterError} If the targeted register is unknown.
      * @throws {MissingOperandError} If the operand given is of type NO.
      */
-    private pop(target: InstructionOperand) {
+    public pop(target: InstructionOperand) {
         // Check whether ESP reached highest address (bottom) of STACK segment.
         // if (this.esp.content.equal(Doubleword.fromInteger(this._highestAddressOfStackDec))) {
         //     // ESP reached highest address (bottom) of STACK segment.
@@ -2101,7 +2349,7 @@ export class CPUCore {
      * @throws {UnknownRegisterError} If the targeted register is unknown.
      * @throws {MissingOperandError} If the operand given is of type NO.
      */
-    private push(source: InstructionOperand) {
+    public push(source: InstructionOperand) {
         // Check whether ESP reached lowest address (top) of STACK segment.
         // if (this.esp.content.equal(Doubleword.fromInteger(this._lowestAddressOfStackDec))) {
         //     // ESP reached lowest address (top) of STACK segment.
@@ -2207,7 +2455,7 @@ export class CPUCore {
         this.eip.content = this.mmu.readDoublewordFrom(this.esp.content, false);
         // Deallocate one doubleword from the STACK by incrementing ESP.
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
-        // TODO: Call interrupt handler for deallocation of page frame in page table.
+
         this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) + 4);
         return true;
     }
@@ -2261,12 +2509,22 @@ export class CPUCore {
             throw new BadOperandError("Interrupt operand must be between 0 and 255.")
         }
 
-        // Push the current EFLAGS onto the STACK to save them for later.
-        this.pushf();
         // Switch to kernel mode.
         this.eflags.enterKernelMode();
+
+        // Switch to the interrupt stack
+        let stackPointer = this.esp.content;
+        this.esp.content = Address.fromInteger(0xFFFFFFFF);
+        
+        // Write the user stack address to the interrupt STACK.
+        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.mmu.writeDoublewordTo(this.esp.content, stackPointer, false);
+
         // Disable software interrupts by clearing the interrupt flag.
         this.eflags.clearInterrupt();
+        // Push the current EFLAGS onto the STACK to save them for later.
+        this.pushf();
+  
         // Add the number of the interrupt handler to the interrupt tables base address, which is stored in the ITP register.
         const interruptHandlerTableEntry: Address = Address.fromInteger(this.itp.content.toUnsignedNumber() + target.value.toUnsignedNumber()*4);
         // Load interrupt handler address
@@ -2295,19 +2553,27 @@ export class CPUCore {
      * This method returns from an interrupt handler triggered by a software interrupt. It reads the return address from the STACK
      * and transfers control back to the interrupted process. Additionally, the EFLAGS gets restored from the STACK, the interrupt flag
      * is cleared and the CPU switches back to user mode.
-     * @returns Always returns true to indicate a jump was performed.
+     * @returns returns true to indicate a jump was performed.
      * @throws {PrivilegeViolationError} If the CPU is not in kernel mode when this mehtod is called.
      */
     public iret(): boolean {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            throw new PrivilegeViolationError("IRET can only be called when CPU is in kernel mode.");
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return false;
         }
         // Return from the interrupt handler by calling the RET operation.
         this.ret();
         // Restore the old EFLAGS contents from the STACK.
         this.popf();
+        // Restore the old STACK value.
+        this.esp.content = this.mmu.readDoublewordFrom(this.esp.content, false);
+
+        this.eflags.setInterrupt();
+
+        this.eflags.enterUserMode();
+
         return true
     }
 
@@ -2656,5 +2922,37 @@ export class CPUCore {
      */
     public setEIP(address: Address) {
         this.eip.content = address;
+    }
+
+    public triggertException(number: InterruptNumbers)
+    {
+        if (this.eflags.interrupt == 0) {
+            this.reset(); //A CPU exception while interrupt are disabled -> panic, reset system
+            return;
+        }
+
+        this.int(new InstructionOperand(
+            EncodedAddressingModes.DIRECT,
+            EncodedOperandTypes.IMMEDIATE,
+            DoubleWord.fromInteger(number)
+        ));
+
+        let returnValue = this.mmu.readDoublewordFrom(this.esp.content, false);
+
+        //Make sure the current instruction is re-executed
+        const returnAddress: DoubleWord = this.alu.sub(returnValue, DoubleWord.fromInteger(12));
+        // Overwrite the return address on the STACK.
+        this.mmu.writeDoublewordTo(this.esp.content, returnAddress, false);
+    }
+
+    public triggertExternalInterrupt(number: InterruptNumbers)
+    {
+        //Add interrupt to list to be executed after current instruction finishes
+        this.interruptQueue.push(number);
+        
+    }
+
+    public reset() {
+        // TODO implement
     }
 }

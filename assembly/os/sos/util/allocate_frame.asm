@@ -10,31 +10,30 @@
 
     ; UTIL_ALLOCATE_FRAME
     ; Parameters 
-    ;   none
+    ;   ebx     pcb pointer
     ; Return value (immediate value):
     ;   eax     frame address (0xFFFFFFFF = invalid)
     .UTIL_ALLOCATE_FRAME:
 
-    ;MOV OS_MEMORY_MAP_START, %eax
-    MOV $0xE0000000, %eax
+    MOV $CONST_OS_MEMORY_MAP_START, %eax
+    MOV $0, %ecx
 
-
-    .ALLOCATE_FRAME_SEARCH_FOR_FREE_FRAME:
-        TEST $0, *%eax
-        JE ALLOCATE_FRAME_FOUND_FREE_FRAME
-        ;TEST OS_MEMORY_MAP_END, %eax
-        TEST $0xE00BFFFF, %eax
-        JE ALLOCATE_FRAME_NO_FRAME_FOUND
+    ._ALLOCATE_FRAME_SEARCH_FOR_FREE_FRAME:
+        CMP $0, *%eax
+        JE _ALLOCATE_FRAME_FOUND_FREE_FRAME
+        CMP $CONST_OS_MEMORY_MAP_END, %eax
+        JE _ALLOCATE_FRAME_NO_FRAME_FOUND
         ADD $1, %eax
-        JMP ALLOCATE_FRAME_SEARCH_FOR_FREE_FRAME
+        ADD $CONST_OS_FRAME_SIZE, %ecx
+        JMP _ALLOCATE_FRAME_SEARCH_FOR_FREE_FRAME
 
 
-    .ALLOCATE_FRAME_FOUND_FREE_FRAME:
-        ;MOV OS_RUNNUNG_PID, *%eax
-        MOV $0xE0100A00, *%eax
+    ._ALLOCATE_FRAME_FOUND_FREE_FRAME:
+        MOV %ebx, *%eax
+        MOV %ecx, %eax
         RET
 
-    .ALLOCATE_FRAME_NO_FRAME_FOUND:
+    ._ALLOCATE_FRAME_NO_FRAME_FOUND:
         MOV $0xFFFFFFFF, %eax
         RET
 

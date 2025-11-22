@@ -43,6 +43,9 @@ export enum EncodedOperations {
 	SYSENTER = "0100101",
 	SYSEXIT = "0100110",
 	DEV = "0100111",
+	SHL = "0101000", // SHL = SAL
+	SHR = "0101001",
+	SAR = "0101010",
 	NOP = "1111111"
 }
 

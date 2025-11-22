@@ -1,17 +1,15 @@
 ; UTIL_CREATE_PCB
-; Parameters (ebx is a pointer to the start of an ASCII preocess name):
-;   (ebx)     Pointer to a ASCII preocess name
+; Parameters (ebx is a pointer to the start of an ASCII process name):
+;   (ebx)     Pointer to a ASCII process name
 ; Return value:
-;   none
+;   (eax) Pointer to the new PCB (0xFFFFFFFF = error)
 .UTIL_CREATE_PCB:
 
+    PUSH %ebx ; push the Pointer to a ASCII process name
 
-; Create a PCB - 0xE00C0000 - 0xE00FFFFF - PCB List (1 PCB = 1KiB)
+    MOV $CONST_OS_PCB_LIST_START, %eax
 
-    ;MOV OS_PCP_MAPPING_START, %eax
-    MOV $0xE0100000, %eax
-
-    ADD $0x400, %eax ; First entry is invalid because pid 0 is invalid
+    ADD $CONST_OS_PCB_SIZE, %eax ; First entry is invalid because pid 0 is invalid
 
     ; Process Control Block layout (1KiB) 0x000 - 0x3FF
     ; 0x03B - 0x3FF unused
@@ -52,162 +50,173 @@
 
     ADD $1, %eax ; location of the status bit
 
-    .CRAETE_PCB_FIND_FREE:
-    MOV *%eax, %ebx
-    AND $0xFF000000, %ebx
-    TEST $0, %ebx
-    JZ CREATE_PCB_FOUND_FREE
-    ADD $0x400, %eax
-    ADD $1, %ecx
-    TEST $256, %ecx
-    JNZ CRAETE_PCB_FIND_FREE
+    ._CREATE_PCB_FIND_FREE:
+        MOV *%eax, %ebx ; get status 
+        AND $0xFF000000, %ebx
+        CMP $0, %ebx
+        JE _CREATE_PCB_FOUND_FREE ; is this PCB entry free (pid = 0)
+        ADD $CONST_OS_PCB_SIZE, %eax
+        ADD $1, %ecx ; pid %ecx taken check for %ecx + 1
+        CMP $256, %ecx
+        JNE _CREATE_PCB_FIND_FREE ; check next pid
 
-    ; if here, we failed to find a free PCB -> max process count already reached
+        ; if here, we failed to find a free PCB -> max process count already reached
 
-    ; TODO handle error
+        ; return error
 
-    .CREATE_PCB_FOUND_FREE:
-    SUB $1, %eax
+        POP %eax ; pop ASCII name
+        MOV $0xFFFFFFFF, %eax
+        RET
 
-    ;eax is the pointer to the new PCB
+    ._CREATE_PCB_FOUND_FREE:
+        SUB $1, %eax
 
-    PUSH %ecx ; push pid
+        ;eax is the pointer to the new PCB
 
-    MOV %ecx, *%eax ;set pid
-    ADD $1, %eax
+        PUSH %ecx ; push pid
 
-    MOV $2, *%eax ;set status to to Waiting 
-    ADD $1, %eax
+        PUSH %eax ; push the pointer to the new PCB
 
-    ; allocate Page Table
+        MOV %ecx, *%eax ;set pid
+        ADD $1, %eax
 
-    ADD $4, %eax
+        MOV $2, *%eax ; set status to to Waiting 
+        ADD $1, %eax
 
-    ; copy name
+        ; allocate Page Table
 
-    MOV $0, %ecx
-    SUB $1, %ebx
+        SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %ecx
+        ADD $CONST_OS_PAGE_TABLE_LIST_START, %ecx
 
-    .CREATE_PCB_COPY_NAME:
-    ADD $1, %ebx
-    ADD $1, %ecx
-    MOV *%ebx, *%eax
-    ADD $1, %eax
+        PUSH %ecx ; push the pointer to the Page Table
 
-    TEST $32, %ecx
-    JZ CREATE_PCB_COPY_NAME_DONE
+        MOV %ecx, *%eax  ; set page table pointer
+        ADD $4, %eax
 
-    TEST $0, *%ebx
-    JNZ CREATE_PCB_COPY_NAME
+        MOV %ecx, %ebx
 
-    .CREATE_PCB_COPY_NAME_DONE:
-    MOV $0, *%eax ; \0 null byte
+        PUSH %eax ; save eax
 
-    MOV $32, %ebx
-    SUB %ecx, %ebx
-    ADD %ebx, %eax ; To make sure we point to the next PCB element independently from the name length
+        ; UTIL_INITIALIZE_PAGE_TABLE
+        ; Parameters 
+        ; Parameters (ebx is a pointer to the start of the Page Table):
+        ;   (ebx)     Pointer to the Page Table
+        ; Return value (immediate value):
+        ;   none
+        CALL UTIL_INITIALIZE_PAGE_TABLE
 
+        POP %eax ; restore eax
 
-    ; reset Page Table CPU registers 
+        ; copy name
 
-    ; 0x03A - 0x03A flags         (1 bytes) \
-    ; 0x036 - 0x039 esp           (4 bytes) |
-    ; 0x032 - 0x035 eip           (4 bytes) |
-    ; 0x02E - 0x031 ecx           (4 bytes) | - CPU registers
-    ; 0x02A - 0x02D ebx           (4 bytes) |
-    ; 0x026 - 0x039 eax           (4 bytes) /
+        MOV $0, %ecx
+        MOV %esp, %ebx
+        ADD $11, %ebx ; get the ASCII Pointer - 1
 
-    MOV $0, *%eax   ; eax
-    ADD $4, %eax
+    ._CREATE_PCB_COPY_NAME:
+        ADD $1, %ebx
+        ADD $1, %ecx
+        MOV *%ebx, *%eax
+        ADD $1, %eax
 
-    MOV $0, *%eax   ; ebx
-    ADD $4, %eax
+        CMP $32, %ecx ; did we copy 32 chars
+        JZ _CREATE_PCB_COPY_NAME_DONE
 
-    MOV $0, *%eax   ; ecx
-    ADD $4, %eax
+        CMP $0, *%ebx ; did we just copy the null byte
+        JNE _CREATE_PCB_COPY_NAME
 
-    MOV $0, *%eax   ; eip
-    ADD $4, %eax
+    ._CREATE_PCB_COPY_NAME_DONE:
+        MOV $0, *%eax ; make sure last char is a null byte
 
-    MOV $0xC0000000, *%eax   ; esp
-    ADD $4, %eax
-
-    MOV $0xE0000000, *%eax   ; flags set cpl and interrupt bit to 1 (user mode with interrupts enabled)
-    ADD $4, %eax
-
-    ; allocate Page Table
-
-    ; OS_PAGE_TABLE_START
-
-    MOV *%esp, %ebx ; get pid
-    MUL $0x1000000, %ebx
-
-    PUSH %ebx ; push the pointer to the Page Table
-
-    ; ebx is a pointer to the Page Table
-
-    ; UTIL_INITIALIZE_PAGE_TABLE
-    ; Parameters 
-    ; Parameters (ebx is a pointer to the start of the Page Table):
-    ;   (ebx)     Pointer to the Page Table
-    ; Return value (immediate value):
-    ;   none
-    CALL UTIL_INITIALIZE_PAGE_TABLE
+        MOV $32, %ebx
+        SUB %ecx, %ebx
+        ADD %ebx, %eax ; To make sure we point to the next PCB element independently from the name length
 
 
-; PCB created
+        ; reset Page Table CPU registers 
 
-; Add PCB to the system (PCB Mapping, any status mapping...)
+        ; 0x03A - 0x03A flags         (1 bytes) \
+        ; 0x036 - 0x039 esp           (4 bytes) |
+        ; 0x032 - 0x035 eip           (4 bytes) |
+        ; 0x02E - 0x031 ecx           (4 bytes) | - CPU registers
+        ; 0x02A - 0x02D ebx           (4 bytes) |
+        ; 0x026 - 0x039 eax           (4 bytes) /
 
-    ; 0xE0100000 - 0xE01003FF - PCB Table Mapping   (256 Entries * 4 Bytes = 1 KiB)                  /
+        MOV $0, *%eax   ; eax
+        ADD $4, %eax
 
-    ;MOV OS_PCP_MAPPING_START, %eax ; Get a pointer to the PCB Table Mapping List
-    MOV $0xE0100000, %eax ; Get a pointer to the PCB Table Mapping List
-    ADD $4, %eax ; First entry is invalid because pid 0 is invalid
+        MOV $0, *%eax   ; ebx
+        ADD $4, %eax
 
-    MOV %esp, %ebx
-    ADD $4, %ebx
+        MOV $0, *%eax   ; ecx
+        ADD $4, %eax
 
-    MOV $1, %ecx ; entry 0 is invalid
+        MOV $CONST_OS_PCB_INTERRUPT_TABLE_START, *%eax   ; eip
+        ADD $4, %eax
 
-    .CREATE_PCB_UPDATE_PCB_MAPPING_LIST:
-    TEST %ecx, *%ebx
-    JE CREATE_PCB_UPDATED_PCB_MAPPING_LIST
+        MOV $CONST_OS_CODE_START, *%eax   ; esp
+        ADD $4, %eax
 
-    ADD $1, %ecx
-    ADD $4, %eax
+        MOV $0xE0000000, *%eax   ; flags - set cpl and interrupt bit to 1 (user mode with interrupts enabled)
+        ADD $4, %eax
 
-    JMP CREATE_PCB_UPDATE_PCB_MAPPING_LIST
 
-    .CREATE_PCB_UPDATED_PCB_MAPPING_LIST:
+    ; PCB created
 
-    MOV *%esp, *%eax ;update the Mapping for pid 1
+    ; Add PCB to the system (PCB Mapping, any status mapping...)
+
+        ; 0xE0100000 - 0xE01003FF - PCB Table Mapping   (256 Entries * 4 Bytes = 1 KiB)                  /
+
+        MOV $CONST_OS_PCB_MAPPING_TABLE_START, %eax ; Get a pointer to the PCB Table Mapping List
+        ADD $4, %eax ; First entry is invalid because pid 0 is invalid
+
+        MOV %esp, %ebx
+        ADD $8, %ebx ; get pid
+
+        MOV $1, %ecx ; pid counter (entry 0 is invalid)
+
+    ._CREATE_PCB_UPDATE_PCB_MAPPING_LIST:
+        CMP %ecx, *%ebx
+        JE _CREATE_PCB_UPDATED_PCB_MAPPING_LIST
+
+        ADD $1, %ecx
+        ADD $4, %eax
+
+        JMP _CREATE_PCB_UPDATE_PCB_MAPPING_LIST
+
+    ._CREATE_PCB_UPDATED_PCB_MAPPING_LIST:
+
+        ; *%esp = ptp
+
+        MOV *%esp, *%eax ; update the Mapping
 
     ; Add to waiting queue
-    ; OS_WAITING_QUEUE_START
 
-    ;MOV OS_WAITING_QUEUE_START, %eax
-    MOV $0xE0100800, %eax
+    MOV $CONST_OS_PROCESS_WAITING_QUEUE_START, %eax
+    SUB $1, %eax 
 
+    ._CREATE_PCB_SEARCH_WAITING_LIST:
+        ADD $1, %eax
+        CMP $0, *%eax ; find next free entry in the queue
+        JNE _CREATE_PCB_SEARCH_WAITING_LIST ; entry is present
+        
+        ; entry is free
 
-    .CREATE_PCB_SEARCH_WAITING_LIST:
-    TEST $0, *%eax
-    ADD $1, %eax
-    JNE CREATE_PCB_SEARCH_WAITING_LIST
-    
-    SUB $1, *%eax 
+        ; eax is the pointer to the next free entry in the waiting queue
 
-    ; eax is the pointer to the next free entry in the waiting queue
+        MOV %esp, %ebx
+        ADD $8, %ebx ; get pointer to pid
 
-    MOV %esp, %ebx
-    ADD $4, %ebx ; get pointer to pid
-
-    MOV *%ebx, *%eax ; add the pid to the queue
+        MOV *%ebx, *%eax ; add the pid to the queue
 
 ; Process is now initialized in the os data structures
+
+POP %ebx ; ptp
 
 POP %eax ; pcb pointer (return value)
 
 POP %ebx ; pop pid
+
+POP %ebx ; process name
 
 RET

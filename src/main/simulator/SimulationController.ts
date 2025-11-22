@@ -146,7 +146,8 @@ export class SimulationController {
 
         //Assemble the init program (needed by the os)
         this.assembleProgram(process.cwd() + "/os_filesystem/os/user/init.asm");
-        
+
+        this.createUtilityFiles();
 
         while (this.core.eflags.isInKernelMode())
         {
@@ -173,9 +174,74 @@ export class SimulationController {
         if (!pathToProgramCode.endsWith(".bin")) {
             throw new EvalError("Expected a binary or assembly file")
         }
-     
-        //TODO call the syscall to create a process
 
+        if (!pathToProgramCode.includes("/os_filesystem/")) {
+            throw new EvalError("file must be in the os_filesystem")
+        }
+
+        let relativePathToCode = pathToProgramCode.substring(pathToProgramCode.indexOf("/os_filesystem/") + "/os_filesystem/".length)
+     
+        if (this.core.eflags.interrupt == 0)
+        {
+            return; // TODO throw error
+        }
+
+        let eaxContent = this.core.eax.content;
+
+        let ebxContent = this.core.ebx.content;
+
+        this.core.push(new InstructionOperand(
+            EncodedAddressingModes.DIRECT,
+            EncodedOperandTypes.IMMEDIATE,
+            DoubleWord.fromInteger(0)
+        ));
+
+        for (let i = relativePathToCode.length - 1; i >= 0; i-=4) {
+            let element = 0;
+
+            for (let j = 0; j < 4; j++) {
+
+                if (i - j >= 0) {
+                    element += relativePathToCode.charCodeAt(i - j) * Math.pow(2, j);
+                }                
+            }
+
+            this.core.push(new InstructionOperand(
+                EncodedAddressingModes.DIRECT,
+                EncodedOperandTypes.IMMEDIATE,
+                DoubleWord.fromInteger(element)
+            ));
+        }
+
+        this.core.eax.content = DoubleWord.fromInteger(16);
+
+        this.core.ebx.content = this.core.ptp.content;
+
+
+        // Call interrupt handler.
+        this.core.int(new InstructionOperand(
+            EncodedAddressingModes.DIRECT,
+            EncodedOperandTypes.IMMEDIATE,
+            DoubleWord.fromInteger(128)
+        ));
+
+        for (let i = relativePathToCode.length - 1; i >= 0; i-=4) {
+            this.core.pop(new InstructionOperand(
+                EncodedAddressingModes.DIRECT,
+                EncodedOperandTypes.IMMEDIATE,
+                DoubleWord.fromInteger(0)
+            ));
+        }
+
+        this.core.pop(new InstructionOperand(      
+            EncodedAddressingModes.DIRECT,
+            EncodedOperandTypes.REGISTER,
+            DoubleWord.fromInteger(0)
+        ));
+
+        this.core.eax.content = eaxContent;
+
+        this.core.ebx.content = ebxContent;
 
         return;
     }
@@ -238,6 +304,76 @@ export class SimulationController {
         }
 
         return data;
+    }
+
+        /**
+     * This method is used to assemble a program
+     * @param pathToProgramCode 
+     * @returns 
+     */
+    public createUtilityFiles(): void {
+        
+        let zeroFramePath = process.cwd() + "/os_filesystem/os/util/zero_frame.bin"
+
+        let pageTablePath = process.cwd() + "/os_filesystem/os/util/page_table.bin"
+
+
+        let fileContents: Array<DoubleWord> = [];
+
+        for (let i = 0; i < 4096; i++) {
+            fileContents.push(DoubleWord.fromInteger(0))
+        }
+
+        let binaryProgram: number[] = [];
+
+        fileContents.forEach(word => {
+            
+            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
+            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
+            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
+            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
+        });
+
+        let buffer = Buffer.from(binaryProgram);
+
+        writeFileSync(zeroFramePath, buffer);
+
+        fileContents = [];
+
+        for (let i = 0; i < 786432; i++) {
+            fileContents.push(DoubleWord.fromInteger(1073741824)); //0x40000000 = 1073741824
+        }
+
+        for (let i = 0; i < 262144; i++) {
+            if (i < 65536)
+            {
+                let value = 2415919104;  //0xB0000000 = 2415919104
+
+                fileContents.push(DoubleWord.fromInteger(value + i + 786432));
+            }
+            else
+            {
+                let value = 2952790016;  //0x90000000 = 2952790016
+
+                fileContents.push(DoubleWord.fromInteger(value + i + 786432));
+            }
+        }
+
+        binaryProgram = [];
+
+        fileContents.forEach(word => {
+            
+            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
+            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
+            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
+            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
+        });
+
+        buffer = Buffer.from(binaryProgram);
+
+        writeFileSync(pageTablePath, buffer);
+
+        return;
     }
 
 

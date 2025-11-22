@@ -271,10 +271,7 @@ export class MemoryManagementUnit {
             throw new PageFaultError(
                 `The page associated with the virtual memory address ${virtualAddress} is currently not present.`,
                 pageTableEntry.flagBits,
-                new PhysicalAddress(virtualAddress
-                    .getMostSignificantBits(MemoryManagementUnit.NUMBER_BITS_PAGE_FRAME_ADDRESS)
-                    .concat(new Array<Bit>(MemoryManagementUnit.NUMBER_BITS_OFFSET).fill(0))
-                )
+                new PhysicalAddress(virtualAddress.value)
             );
         }
         if (!ignorePermissionFlags) {

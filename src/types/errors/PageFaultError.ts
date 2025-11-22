@@ -16,16 +16,16 @@ export class PageFaultError extends Error {
      * This field stores the page table entrys pyhsical address which
      * is currently not associated with a page. 
      */
-	public readonly addressOfPageTableEntry: PhysicalAddress;
+	public readonly addressOfPageFault: PhysicalAddress;
 
 	/**
 	 * Constructs a new instance with the given message.
 	 * @param description A short text describing the error and its cause.
 	 */
-	constructor(description: string, flags: Array<Bit>, addressOfPageTableEntry: PhysicalAddress) {
+	constructor(description: string, flags: Array<Bit>, addressOfPageFault: PhysicalAddress) {
 		super(description);
 		this.flags = flags;
-		this.addressOfPageTableEntry = addressOfPageTableEntry;
+		this.addressOfPageFault = addressOfPageFault;
         // Set the prototype explicitly to enable typechecking.
         Object.setPrototypeOf(this, PageFaultError.prototype);
     }

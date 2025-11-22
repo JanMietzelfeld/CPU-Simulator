@@ -191,6 +191,15 @@ export class InstructionDecoder {
             case EncodedOperations.SBB:
                 decodedRTypeOperation = EncodedOperations.SBB;
                 break;
+            case EncodedOperations.SHL:
+                decodedRTypeOperation = EncodedOperations.SHL;
+                break;
+            case EncodedOperations.SHR:
+                decodedRTypeOperation = EncodedOperations.SHR;
+                break;
+            case EncodedOperations.SAR:
+                decodedRTypeOperation = EncodedOperations.SAR;
+                break;
             case EncodedOperations.MUL:
                 decodedRTypeOperation = EncodedOperations.MUL;
                 break;

@@ -9,5 +9,7 @@ include "os/sos/util/initialize_page_table"
 
 include "os/sos/util/load_program"
 
+include "os/sos/util/scheduler"
+
 
 

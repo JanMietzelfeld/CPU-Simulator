@@ -18,23 +18,23 @@
     MOV *%ebx, %ebx
     ; %ebx is a pointer to the filename
 
-    ; SYSCALLS_IO_FILE_STAT
+    ; SYSCALLS_FILE_STAT
     ; Parameters (ebx is a pointer to the start of an ASCII filename):
     ;   (ebx)     Pointer to a ASCII filename
     ; Return value (immediate value):
     ;   eax     file length or error code (>=0 = length, -1 = file adoes not exists, -2 = not a file)
-    CALL SYSCALLS_IO_FILE_STAT
+    CALL SYSCALLS_FILE_STAT
     ; TODO check for error code
 
 
     PUSH %eax ; Push the file length onto the stack
 
-    ; SYSCALLS_IO_FILE_OPEN
+    ; SYSCALLS_FILE_OPEN
     ; Parameters (ebx is a pointer to the start of an ASCII filename):
     ;   (ebx)     Pointer to a ASCII filename
     ; Return value (immediate value):
     ;   eax     file descriptor
-    CALL SYSCALLS_IO_FILE_OPEN
+    CALL SYSCALLS_FILE_OPEN
     ; TODO check for error code
 
     PUSH %eax ; Push the file descriptor onto the stack
@@ -45,34 +45,48 @@
 
     ; calculate number of needed frames
 
-    MOV %esp, %ecx
-    ADD $4, %ecx
-    MOV *%ecx, %eax ; get file lenght
+    MOV %esp, %eax
+    ADD $4, %eax
+    MOV *%eax, %eax ; get file lenght
 
-    DIV $0x1000, %eax ; divide by frame size (2¹²)
+    MOV %eax, %ebx ; copy
 
-    ; TODO check if there is a remainder, if not skip this
-    ADD $1, %eax ; In most cases the lenght is not a multiple of the frame lenght 
+    SHR $CONST_OS_FRAME_BIT_SIZE, %eax ; divide by frame size (2¹²) = 12 bit shifts to the right
+
+    ; check if there is a remainder
+    MOV $CONST_CPU_BIT_WIDTH, %ecx 
+    SUB $CONST_OS_FRAME_BIT_SIZE, %ecx
+    SAL %ecx, %ebx
+    CMP $0, %ebx
+    JE UTIL_LOAD_PROGRAM_NO_REMAINDER
+        ADD $1, %eax ; if there is a remainder we need to allocate one more frame for it
+    .UTIL_LOAD_PROGRAM_NO_REMAINDER:
 
     PUSH %eax ; Push the number of needed frames onto the stack
 
     PUSH $1 ; Push the number of written frames onto the stack
 
-    .LOAD_PROG_ALLOCATE_FRAMES:
+    ._LOAD_PROG_ALLOCATE_FRAMES:
+
+        ; set up parameter
+        MOV %esp, %ebx
+        ADD $16, %ebx
+        MOV *%ebx, %ebx
+        ADD $4, %ebx
+        MOV *%ebx, %ebx ; ebx = pcb pointer
 
         ; UTIL_ALLOCATE_FRAME
         ; Parameters 
-        ;   none
+        ;   ebx     pcb pointer
         ; Return value (immediate value):
         ;   eax     frame address (0xFFFFFFFF = invalid)
         CALL UTIL_ALLOCATE_FRAME
-
-        ; %eax = frame start address
         ; TODO check if address is invalid
+
         PUSH %eax ; Push the frame start address onto the stack
 
-        ; struct for syscall
-        PUSH $0x1000 ; Push the buffer size onto the stack
+        ; struct for syscall Read
+        PUSH $CONST_OS_FRAME_SIZE ; Push the buffer size onto the stack
         PUSH %eax ; Push the frame start address onto the stack
 
         MOV %esp, %ecx
@@ -81,19 +95,22 @@
 
         MOV %esp, %ebx ; set ebx to start of the struct
 
-        ; SYSCALLS_IO_FILE_READ
+        ; SYSCALLS_FILE_READ
         ; Parameters (ebx is a pointer to the following struct):
         ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
         ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
         ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
         ; Return value (immediate value):
         ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
-        CALL SYSCALLS_IO_FILE_READ
+        CALL SYSCALLS_FILE_READ
         ; TODO check for error code
 
+        POP %ebx
+        POP %ebx
+        POP %ebx
 
         PUSH $0         ; seek mode
-        PUSH $0x1000    ; seek offset
+        PUSH $CONST_OS_FRAME_SIZE    ; seek offset
 
         MOV %esp, %ecx
         ADD $20, %ecx
@@ -101,15 +118,19 @@
 
         MOV %esp, %ebx ; set ebx to start of the struct
 
-        ; SYSCALLS_IO_FILE_SEEK
+        ; SYSCALLS_FILE_SEEK
         ; Parameters (ebx is a pointer to the following struct):
         ;   *(ebx)     file descriptor
         ;   *(ebx+4)   seek offset
         ;   *(ebx+8)   seek mode (0 - Seek from current position, 1 - Seek from start of file, 2 - Seek from end of file)
         ; Return value (immediate value):
         ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
-        CALL SYSCALLS_IO_FILE_SEEK
+        CALL SYSCALLS_FILE_SEEK
         ; TODO check for error code
+
+        POP %ebx
+        POP %ebx
+        POP %ebx
 
         ; map the frame into the virtial memory space
 
@@ -122,44 +143,37 @@
         ADD $4, %ecx
         MOV *%ecx, %ecx
         SUB $1, %ecx
-        MUL $4, %ecx
+        SHL $2, %ecx ; ecx = offset to get to the page table entry to be updated
 
-        POP %ebx ; get ebx back
+        MOV %esp, %ebx ; get ebx back
+        ADD $20, %ebx
         MOV *%ebx, %ebx
-        ADD $4, %ebx ; pointer to the pcb
+        ADD $4, %ebx
+        MOV *%ebx, %ebx ; ebx = pcb pointer
 
-        MOV *%ebx, %eax
-        ADD $2, %eax
-        PUSH %eax ; PUSH the start address of the Page Table
+        ADD $2, %ebx ; address of the Page Table Pointer
+        MOV *%ebx, %eax ; Page Table Pointer
 
-        ADD %ecx, *%esp
+        ADD %ecx, %eax ; add the offset
+        POP %ecx ; frame start address
 
-        MOV %esp, %ecx
-        ADD $4, %ecx
+        AND $0xFFFFF000, %ecx ; calculate the address part of the page table entry
+        SHR $12, %ecx ; make space for the flags (12)
+        OR $0xA0000000, %ecx ; A = Present and Executable bit
+        MOV %ecx, *%eax
 
-        AND $0x11111000, *%ecx ; calculate the address part of the page table entry
-        DIV $8, *%ecx ; make space for the flags
-        OR $0xA0000000, *%ecx ; A = Present, Mode and Executable bit
-        MOV *%esp, %eax
-        MOV *%ecx, *%eax
-
-        POP %ebx ; POP the start address of the Page Table
-
-
-        POP %ebx ; frame start address
-
-        MOV %esp, %eax
-        ADD $4, %eax
-        TEST *%esp, *%eax
-        JE LOAD_PROG_FIND_FRAMES_END
+        MOV %esp, %eax 
+        ADD $4, %eax ; number of nedded frames
+        CMP *%esp, *%eax
+        JE _LOAD_PROG_FIND_FRAMES_END
         ADD $1, *%esp
-        JMP LOAD_PROG_ALLOCATE_FRAMES
+        JMP _LOAD_PROG_ALLOCATE_FRAMES
 
-    .LOAD_PROG_FIND_FRAMES_END:
-    POP %ebx ; POP the number of written frames onto the stack
-    POP %ebx ; POP the number of needed frames onto the stack
-    POP %ebx ; POP the file descriptor onto the stack
-    POP %ebx ; POP the file lenght onto the stack
+    ._LOAD_PROG_FIND_FRAMES_END:
+        POP %eax ; POP the number of written frames onto the stack
+        POP %ebx ; POP the number of needed frames onto the stack
+        POP %ebx ; POP the file descriptor onto the stack
+        POP %ebx ; POP the file lenght onto the stack
+        POP %ebx ; POP the ebx input
 
-
-    RET
+RET
