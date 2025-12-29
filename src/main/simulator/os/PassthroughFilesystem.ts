@@ -97,13 +97,14 @@ export class PassthroughFilesystem {
         return 0;
     }
 
-    public io_close(fd: number) {
+    public io_close(fd: number): number {
         // TODO maybe add return value indicating success/error if invalid fd is given
         if (!this.fd_map.has(fd)) {
             // invalid fd
-            return;
+            return -1;
         }
         this.fd_map.delete(fd);
+        return 0;
     }
 
     public io_read_buffer(fd: number, buffer: Uint8Array, size: number): number {
@@ -209,28 +210,5 @@ export class PassthroughFilesystem {
             return -2;
         }
         return stat.size;
-    }
-
-    public console_print_number(num: number) {
-        console.log(num);
-    }
-
-    public console_read_number(): [number, number] {
-        if (this.stdin_buffer.length === 0) {
-            // error -1 -> no input ready
-            return [0, -1];
-        }
-        const line = this.stdin_buffer[0]
-        this.stdin_buffer.shift();
-        const num = parseInt(new TextDecoder('latin1').decode(line));
-        if (isNaN(num)) {
-            // error -2 -> could not parse number
-            return [0, -2];
-        }
-        if (num > DoubleWord.MAXIMUM_NUMBER_DEC || num < DoubleWord.MINIMUM_NUMBER_DEC) {
-            // error -2 -> number does not fit into signed 32 bit DoubleWord
-            return [0, -3]
-        }
-        return [num, 0];
     }
 }

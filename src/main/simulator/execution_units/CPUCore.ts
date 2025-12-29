@@ -177,6 +177,8 @@ export class CPUCore {
     
     public fs: PassthroughFilesystem;
 
+    public newProcessPath: string = "";
+
     /**
      * Constructs an instance of a CPU core.
      * @param mainMemory The main memory of the system.
@@ -235,26 +237,90 @@ export class CPUCore {
         return this._virtualizationEnabled;
     }
 
+    private checkNewProcess(): void
+    {
+        if (this.eflags.interrupt && this.newProcessPath !== "")
+        {
+
+            let eaxContent = this.eax.content;
+
+            let ebxContent = this.ebx.content;
+
+            let ecxContent = this.ecx.content;
+
+            let count = 0;
+            let nullByte = "\0";
+            this.newProcessPath = this.newProcessPath.concat(nullByte);
+
+            while (this.newProcessPath.length % 4 != 0)
+            {
+                this.newProcessPath = this.newProcessPath.concat(nullByte);
+            }
+
+            for (let i = 0; i < this.newProcessPath.length; i+=4) {
+                let element = 0;
+
+                for (let j = 0; j < 4; j++) {
+
+                    element += this.newProcessPath.charCodeAt(this.newProcessPath.length - 1 - i - j) * Math.pow(2, j*8);            
+                }
+
+                this.push(new InstructionOperand(
+                    EncodedAddressingModes.DIRECT,
+                    EncodedOperandTypes.IMMEDIATE,
+                    DoubleWord.fromInteger(element)
+                ));
+
+                count++;
+            }
+
+            this.eax.content = DoubleWord.fromInteger(16);
+
+            this.ebx.content = this.esp.content;
+
+
+            // Call interrupt handler.
+            this.triggertException(128);
+
+            while (this.eflags.isInKernelMode())
+            {
+                this.internalCycle();
+            }
+
+            for (let i = 0; i < count; i++) {
+                this.pop(new InstructionOperand(
+                    EncodedAddressingModes.DIRECT,
+                    EncodedOperandTypes.REGISTER,
+                    DoubleWord.fromInteger(0)
+                ));
+            }
+
+            this.eax.content = eaxContent;
+
+            this.ebx.content = ebxContent;
+
+            this.ecx.content = ecxContent;
+
+            this.newProcessPath = "";
+        }
+    }
+
     /**
-     * This method performs a single instruction cycle.
+     * This method performs a single user instruction cycle.
      */
     public cycle(): void {
 
-        //First handle all pending interrupts
-        if (this.interruptQueue.length !== 0) {
-            console.log("Interrupted");
-            this.int(new InstructionOperand(
-                EncodedAddressingModes.DIRECT,
-                EncodedOperandTypes.IMMEDIATE,
-                DoubleWord.fromInteger(this.interruptQueue.shift() as InterruptNumbers)
-            ));
-            return;
-        }
-
         try {
-            this.fetch();
-            this.decode();
-            this.execute();
+        
+            this.checkNewProcess();
+
+            this.internalCycle();
+
+            while (this.eflags.isInKernelMode())
+            {
+                this.internalCycle();
+            }
+
         } catch(error) {
             if (error instanceof PageFaultError) {
                 console.log("Page Fault")
@@ -269,6 +335,27 @@ export class CPUCore {
                 console.log(error)
             }
         }
+
+        //Now handle all pending interrupts
+        if (this.eflags.interrupt && this.interruptQueue.length !== 0) {
+            console.log("Interrupted");
+            this.int(new InstructionOperand(
+                EncodedAddressingModes.DIRECT,
+                EncodedOperandTypes.IMMEDIATE,
+                DoubleWord.fromInteger(this.interruptQueue.shift() as InterruptNumbers)
+            ));
+            return;
+        }
+    }
+
+    /**
+     * This method performs a single instruction cycle.
+     */
+    private internalCycle(): void {
+
+        this.fetch();
+        this.decode();
+        this.execute();
     }
 
     /**
@@ -395,15 +482,16 @@ export class CPUCore {
         // Debug prints
 
         console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());
-        const wasInKernelMode = this.eflags.isInKernelMode();
-        this.eflags.enterKernelMode();
-        if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
-            console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false));
+        try {
+            if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
+                console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false));
+            }
+        }
+        catch(e) {
+            console.log("Stack value: Not Mapped");
+        }
 
-        }
-        if (!wasInKernelMode) {
-            this.eflags.enterUserMode();
-        }
+        
 
         let jumpPerformed = false;
         switch (operation) {
@@ -593,6 +681,9 @@ export class CPUCore {
                     this._decodedInstruction.operands![1]!
                 );
                 break;
+            case EncodedOperations.INVTLB:
+                this.invtlb();
+                break;
             default:
                 // Call interrupt handler for Invalid Opcode.
                 this.triggertException(InterruptNumbers.INVALID_OPCODE);
@@ -715,7 +806,7 @@ export class CPUCore {
                 break;
                 
             case DevCommands.IO_CLOSE:
-                this.fs.io_close(data.value.toUnsignedNumber())
+                this.eax.content =  DoubleWord.fromInteger(this.fs.io_close(data.value.toUnsignedNumber()))
                 break;
                 
             case DevCommands.IO_READ_BUFFER: // 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
@@ -743,7 +834,7 @@ export class CPUCore {
                 break;
             case DevCommands.FILE_CREATE: // 00000100 - file_create (filename_ptr=op2)
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
-                this.fs.file_create(filename);
+                this.eax.content =  DoubleWord.fromInteger(this.fs.file_create(filename));
                 break;
             case DevCommands.FILE_DELETE: // 00000101 file_delete (filename_ptr=op2) -> success=eax
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
@@ -759,18 +850,13 @@ export class CPUCore {
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
                 this.eax.content = DoubleWord.fromInteger(this.fs.file_stat(filename));
                 break;
-            case DevCommands.CONSOLE_PRINT_NUMBER: // 00001000 - console_print_number(number=op2)
-                this.fs.console_print_number(op2);
+            case DevCommands.CPU_IS_MEMORY_VIRTUALIZATION_ENABLED: //  00001010 isMemoryVirtualizationEnabled()
+                this.eax.content = DoubleWord.fromInteger(this.mmu.isMemoryVirtualizationEnabled());
                 break;
-            case DevCommands.CONSOLE_READ_NUMBER: //  00001001 - console_read_number() -> number=eax, error=ebx
-                const [num, err] = this.fs.console_read_number();
-                this.eax.content = DoubleWord.fromInteger(num);
-                this.ebx.content = DoubleWord.fromInteger(err);
-                break;
-            case DevCommands.CPU_ENABLE_MEMORY_VIRTUALIZATION: //  00001010 enableMemoryVirtualization()
+            case DevCommands.CPU_ENABLE_MEMORY_VIRTUALIZATION: //  00001011 enableMemoryVirtualization()
                 this.mmu.enableMemoryVirtualization();
                 break;
-            case DevCommands.CPU_DISABLE_MEMORY_VIRTUALIZATION: //  00001011 disableMemoryVirtualization()
+            case DevCommands.CPU_DISABLE_MEMORY_VIRTUALIZATION: //  00001100 disableMemoryVirtualization()
                 this.mmu.disableMemoryVirtualization();
                 break;
             default:
@@ -2250,12 +2336,10 @@ export class CPUCore {
         //     // ESP reached highest possible address (top) of STACK segment.
         //     throw new StackUnderflowError("Could not perform PUSHF operation. STACK pointer reached top of the STACK.");
         // }
-        // Allocate one byte on STACK by decrementing the value in ESP.
-        this.esp.content = this.alu.sub(this.esp.content, DoubleWord.fromInteger(1));
+        // Allocate 4 bytes on STACK by decrementing the value in ESP.
+        this.esp.content = this.alu.sub(this.esp.content, DoubleWord.fromInteger(4));
         // Write contents of flags register on STACK.
-        this.mmu.writeByteTo(this.esp.content, this.eflags.content);
-
-        this.esp.content = this.alu.sub(this.esp.content, DoubleWord.fromInteger(3));
+        this.mmu.writeDoublewordTo(this.esp.content, Address.fromInteger(this.eflags.content.toUnsignedNumber()), false);
 
         return;
     }
@@ -2278,16 +2362,14 @@ export class CPUCore {
         //     throw new StackOverflowError("Could not perform POPF operation. STACK pointer reached bottom of the STACK.");
         // }
 
-        this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(3));
-
         // Read contents of flags register from STACK into flags register.
-        let content = this.mmu.readByteFrom(this.esp.content);
-        // Deallocate four byte or one Byte from STACK by incrementing the value in ESP.
-        this.mmu.clearMemory(this.esp.content, DataSizes.BYTE);
-        // TODO: Call interrupt handler for deallocation of page frame in page table.
-        this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(1));
+        let content = this.mmu.readDoublewordFrom(this.esp.content, false);
+        // Deallocate four bytes from STACK by incrementing the value in ESP.
+        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
 
-        this.eflags.content = content;
+        this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(4));
+
+        this.eflags.content = new Byte(content.getLeastSignificantBits(8));
         return;
     }
 
@@ -2509,21 +2591,22 @@ export class CPUCore {
             throw new BadOperandError("Interrupt operand must be between 0 and 255.")
         }
 
+        let eflagsValue = DoubleWord.fromInteger(this.eflags.content.toUnsignedNumber());
         // Switch to kernel mode.
         this.eflags.enterKernelMode();
+        this.eflags.clearInterrupt();
 
         // Switch to the interrupt stack
         let stackPointer = this.esp.content;
-        this.esp.content = Address.fromInteger(0xFFFFFFFF);
+        this.esp.content = Address.fromInteger(0x0);
         
         // Write the user stack address to the interrupt STACK.
         this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
         this.mmu.writeDoublewordTo(this.esp.content, stackPointer, false);
 
-        // Disable software interrupts by clearing the interrupt flag.
-        this.eflags.clearInterrupt();
         // Push the current EFLAGS onto the STACK to save them for later.
-        this.pushf();
+        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.mmu.writeDoublewordTo(this.esp.content, eflagsValue, false);
   
         // Add the number of the interrupt handler to the interrupt tables base address, which is stored in the ITP register.
         const interruptHandlerTableEntry: Address = Address.fromInteger(this.itp.content.toUnsignedNumber() + target.value.toUnsignedNumber()*4);
@@ -2566,15 +2649,15 @@ export class CPUCore {
         // Return from the interrupt handler by calling the RET operation.
         this.ret();
         // Restore the old EFLAGS contents from the STACK.
-        this.popf();
+        let eflagsValue = this.mmu.readDoublewordFrom(Address.fromInteger(this.esp.content.toUnsignedNumber()), false);
+        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
+        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) + 4);
+
         // Restore the old STACK value.
         this.esp.content = this.mmu.readDoublewordFrom(this.esp.content, false);
 
-        this.eflags.setInterrupt();
-
-        this.eflags.enterUserMode();
-
-        return true
+        this.eflags.content = new Byte(eflagsValue.getLeastSignificantBits(8));
+        return true;
     }
 
     /*
@@ -2667,6 +2750,23 @@ export class CPUCore {
      * This method does nothing.
      */
     private nop(): void {
+        return;
+    }
+
+    /**
+     * This method invalidates the TLB
+     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode when this mehtod is called.
+     */
+    private invtlb(): void {
+               // Check whether CPU is in kernel mode.
+        if (!this.eflags.isInKernelMode()) {
+            // CPU is not in kernel mode.
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
+        }
+
+        this.mmu.invalidateTLB();
+
         return;
     }
 
@@ -2924,6 +3024,10 @@ export class CPUCore {
         this.eip.content = address;
     }
 
+
+    /**
+     * Trigger an Exeption
+     */
     public triggertException(number: InterruptNumbers)
     {
         if (this.eflags.interrupt == 0) {
@@ -2931,20 +3035,22 @@ export class CPUCore {
             return;
         }
 
+        let returnValue = this.eip.content;
+
         this.int(new InstructionOperand(
             EncodedAddressingModes.DIRECT,
             EncodedOperandTypes.IMMEDIATE,
             DoubleWord.fromInteger(number)
         ));
 
-        let returnValue = this.mmu.readDoublewordFrom(this.esp.content, false);
-
         //Make sure the current instruction is re-executed
-        const returnAddress: DoubleWord = this.alu.sub(returnValue, DoubleWord.fromInteger(12));
         // Overwrite the return address on the STACK.
-        this.mmu.writeDoublewordTo(this.esp.content, returnAddress, false);
+        this.mmu.writeDoublewordTo(this.esp.content, returnValue, false);
     }
 
+    /**
+     * Trigger an External Interrupt
+     */
     public triggertExternalInterrupt(number: InterruptNumbers)
     {
         //Add interrupt to list to be executed after current instruction finishes

@@ -268,9 +268,14 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		const fromPhysicalAddressDec: number = parseInt(fromVirtualAddressHexString, 16);
 		const toPhysicalAddressDec: number = parseInt(toVirtualAddressHexString, 16);
 		for (let i = fromPhysicalAddressDec; i <= toPhysicalAddressDec; ++i) {
-			const physicalAddress:PhysicalAddress = simulator.core.mmu.translate(VirtualAddress.fromInteger(i), false, false, true, true);
-			const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
-			tmp.set(`0x${(i).toString(16)}`, byte.toString());
+			try {
+				const physicalAddress:PhysicalAddress = simulator.core.mmu.translate(VirtualAddress.fromInteger(i), false, false, true, true);
+				const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
+				tmp.set(`0x${(i).toString(16)}`, byte.toString());
+			}
+			catch (e) {
+				tmp.set(`0x${(i).toString(16)}`, "Not Mapped");
+			}
 		}
 		return tmp;
 	});

@@ -46,6 +46,7 @@ export enum EncodedOperations {
 	SHL = "0101000", // SHL = SAL
 	SHR = "0101001",
 	SAR = "0101010",
+	INVTLB = "0101011",
 	NOP = "1111111"
 }
 

@@ -69,7 +69,13 @@ export class Address extends DoubleWord {
 			throw new Error("Given number is not an integer.");
 		}
 		if (integer < 0) {
+			integer = Address.MAX_NUMBER_UNSIGNED_DEC + integer + 1;
+		}
+		if (integer < 0) {
 			throw new Error("Minimal value for an address is a decimal zero, but the given integer is smaller than zero.");
+		}
+		if (integer > Address.MAX_NUMBER_UNSIGNED_DEC) {
+			integer = integer - Address.MAX_NUMBER_UNSIGNED_DEC - 1;
 		}
 		if (integer > Address.MAX_NUMBER_UNSIGNED_DEC) {
 			throw new Error(`The given number cannot be expressed with ${DataSizes.DOUBLEWORD} bits.`);

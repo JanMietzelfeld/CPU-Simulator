@@ -245,6 +245,9 @@ export class InstructionDecoder {
             case EncodedOperations.NOP:
                 decodedRTypeOperation = EncodedOperations.NOP;
                 break;
+            case EncodedOperations.INVTLB:
+                decodedRTypeOperation = EncodedOperations.INVTLB;
+                break;
             default:
                 throw Error("Unrecognized R-type instrcution.");
                 break;

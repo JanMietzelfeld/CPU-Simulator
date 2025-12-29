@@ -262,10 +262,10 @@
             "mnemonic" : "SHL",
             "opcode" : "0101000",
             "type" : "R",
-            "regex": "(SHL)[ ]+(__SOURCE__)[ ]*,[ ]*(__TARGET__)",
+            "regex": "(SHL)[ ]+(__COUNT__)[ ]*,[ ]*(__TARGET__)",
             "operands" : [
                 {
-                    "name" : "__SOURCE__",
+                    "name" : "__COUNT__",
                     "allowed_types" : [
                         "REGISTER_DIRECT",
                         "REGISTER_INDIRECT",
@@ -293,10 +293,10 @@
             "mnemonic" : "SAL",
             "opcode" : "0101000",
             "type" : "R",
-            "regex": "(SAL)[ ]+(__SOURCE__)[ ]*,[ ]*(__TARGET__)",
+            "regex": "(SAL)[ ]+(__COUNT__)[ ]*,[ ]*(__TARGET__)",
             "operands" : [
                 {
-                    "name" : "__SOURCE__",
+                    "name" : "__COUNT__",
                     "allowed_types" : [
                         "REGISTER_DIRECT",
                         "REGISTER_INDIRECT",
@@ -324,10 +324,10 @@
             "mnemonic" : "SHR",
             "opcode" : "0101001",
             "type" : "R",
-            "regex": "(SHR)[ ]+(__SOURCE__)[ ]*,[ ]*(__TARGET__)",
+            "regex": "(SHR)[ ]+(__COUNT__)[ ]*,[ ]*(__TARGET__)",
             "operands" : [
                 {
-                    "name" : "__SOURCE__",
+                    "name" : "__COUNT__",
                     "allowed_types" : [
                         "REGISTER_DIRECT",
                         "REGISTER_INDIRECT",
@@ -355,10 +355,10 @@
             "mnemonic" : "SAR",
             "opcode" : "0101010",
             "type" : "R",
-            "regex": "(SAR)[ ]+(__SOURCE__)[ ]*,[ ]*(__TARGET__)",
+            "regex": "(SAR)[ ]+(__COUNT__)[ ]*,[ ]*(__TARGET__)",
             "operands" : [
                 {
-                    "name" : "__SOURCE__",
+                    "name" : "__COUNT__",
                     "allowed_types" : [
                         "REGISTER_DIRECT",
                         "REGISTER_INDIRECT",
@@ -1104,6 +1104,12 @@
             "opcode" : "1111111",
             "type" : "R",
             "regex" : "(NOP)"
+        },
+        {
+            "mnemonic" : "INVTLB",
+            "opcode" : "0101011",
+            "type" : "R",
+            "regex" : "(INVTLB)"
         },
         {
             "mnemonic" : "DEV",

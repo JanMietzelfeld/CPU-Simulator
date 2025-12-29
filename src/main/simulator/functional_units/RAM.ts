@@ -102,7 +102,7 @@ export class RAM {
         if (this._cells.has(addressDecimal)) {
             result = this._cells.get(addressDecimal)!;
         } else {
-            result = new Byte()
+            result = new Byte();
         }
         return result;
     }

@@ -134,7 +134,7 @@ export class SimulationController {
             throw new EvalError("Unexpected begin of OS memory");
         }
 
-        const compiledOS: DoubleWord[] = this._assembler.compile(readFileSync(`${this._pathToAssemblyFiles}/os/sos/sos.asm`, "utf-8"), kernelCodeStartAddress)
+        const compiledOS: DoubleWord[] = this._assembler.compile(readFileSync(`${process.cwd()}/os_filesystem/os/src/sos.asm`, "utf-8"), kernelCodeStartAddress)
 
         disassemble(compiledOS, kernelCodeStartAddress) //For debugging
 
@@ -149,10 +149,7 @@ export class SimulationController {
 
         this.createUtilityFiles();
 
-        while (this.core.eflags.isInKernelMode())
-        {
-            this.core.cycle();
-        }
+        this.core.cycle();        
 
         return;
     }
@@ -181,68 +178,8 @@ export class SimulationController {
 
         let relativePathToCode = pathToProgramCode.substring(pathToProgramCode.indexOf("/os_filesystem/") + "/os_filesystem/".length)
      
-        if (this.core.eflags.interrupt == 0)
-        {
-            return; // TODO throw error
-        }
-
-        let eaxContent = this.core.eax.content;
-
-        let ebxContent = this.core.ebx.content;
-
-        this.core.push(new InstructionOperand(
-            EncodedAddressingModes.DIRECT,
-            EncodedOperandTypes.IMMEDIATE,
-            DoubleWord.fromInteger(0)
-        ));
-
-        for (let i = relativePathToCode.length - 1; i >= 0; i-=4) {
-            let element = 0;
-
-            for (let j = 0; j < 4; j++) {
-
-                if (i - j >= 0) {
-                    element += relativePathToCode.charCodeAt(i - j) * Math.pow(2, j);
-                }                
-            }
-
-            this.core.push(new InstructionOperand(
-                EncodedAddressingModes.DIRECT,
-                EncodedOperandTypes.IMMEDIATE,
-                DoubleWord.fromInteger(element)
-            ));
-        }
-
-        this.core.eax.content = DoubleWord.fromInteger(16);
-
-        this.core.ebx.content = this.core.ptp.content;
-
-
-        // Call interrupt handler.
-        this.core.int(new InstructionOperand(
-            EncodedAddressingModes.DIRECT,
-            EncodedOperandTypes.IMMEDIATE,
-            DoubleWord.fromInteger(128)
-        ));
-
-        for (let i = relativePathToCode.length - 1; i >= 0; i-=4) {
-            this.core.pop(new InstructionOperand(
-                EncodedAddressingModes.DIRECT,
-                EncodedOperandTypes.IMMEDIATE,
-                DoubleWord.fromInteger(0)
-            ));
-        }
-
-        this.core.pop(new InstructionOperand(      
-            EncodedAddressingModes.DIRECT,
-            EncodedOperandTypes.REGISTER,
-            DoubleWord.fromInteger(0)
-        ));
-
-        this.core.eax.content = eaxContent;
-
-        this.core.ebx.content = ebxContent;
-
+        this.core.newProcessPath = relativePathToCode;
+        
         return;
     }
 

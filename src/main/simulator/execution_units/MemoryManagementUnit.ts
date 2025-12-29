@@ -131,6 +131,13 @@ export class MemoryManagementUnit {
         this._flags = eflags;
     }
 
+
+    /**
+     * This method retruns if memory virtualization is enabled 1 = eabled | 0 = disabled.
+     */
+    public isMemoryVirtualizationEnabled(): number {
+        return this._memoryVirtualizationEnabled ? 1 : 0;
+    }
     /**
      * This method enables memory virtualization.
      */
@@ -143,6 +150,13 @@ export class MemoryManagementUnit {
      */
     public disableMemoryVirtualization() {
         this._memoryVirtualizationEnabled = false;
+    }
+
+    /**
+     * This method invalidates the TLB.
+     */
+    public invalidateTLB() {
+        this._tlb.clear();
     }
 
     /**
@@ -360,4 +374,5 @@ export class MemoryManagementUnit {
         }
         return pageTableEntry;
     }
+
 }

@@ -1,4 +1,12 @@
 ._INIT_START:
-PUSH $0
-POP %eax
+NOP
+PUSH %ecx
+NOP
+POP %ecx
+NOP
+MOV $CONST_SYSCALL_PROCESS_YIELD, %eax
+INT $0x80
 JMP _INIT_START
+
+
+include "os/include/syscalls"

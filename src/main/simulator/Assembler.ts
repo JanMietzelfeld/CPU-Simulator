@@ -81,8 +81,7 @@ export class Assembler {
 				let fileName: string = regexMatch[0].toString();
 				fileName = fileName.substring(fileName.indexOf("\"") + 1, fileName.lastIndexOf("\""));
 
-				let fileContents: string = readFileSync(process.cwd() + "/assembly/" + fileName + ".asm", "utf-8");
-
+				let fileContents: string = readFileSync(process.cwd() + "/os_filesystem/" + fileName + ".asm", "utf-8");
 				fileContents = this.replaceIncludeLabels(fileContents)
 
 				lineContent = line.replace(includeRegex, () => fileContents);
