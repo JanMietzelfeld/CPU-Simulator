@@ -120,7 +120,8 @@
 ; | 0x0E - 0x0E Page Fault                           |
 ; | 0x0F - 0x1F Unused                               |
 ; | -------------------------------------------------|
-; | 0x20 - 0x7F Unused          - Hardware interupts |
+; | 0x20 - 0x20 Timer           - Hardware interupts |
+; | 0x21 - 0x7F Unused          - Hardware interupts |
 ; | 0x80 - 0x80 System Calls    - Software interupt  | External interrupts (224)
 ; | 0x81 - 0xFF Unused          - Hardware interupts |
 ; |--------------------------------------------------|
@@ -160,3 +161,7 @@
 ; process_create = 16
 ; process_exit = 17
 ; process_yield = 18
+; 
+; 19-23 unused
+;
+; timer_start = 24

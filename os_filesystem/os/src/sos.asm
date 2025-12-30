@@ -77,6 +77,11 @@ include "os/src/util"
 
     ; --- Set up the External interrupts---
 
+    ; Set up the ISR for 0x20 (Timer)
+    MOV %itp, %eax
+    ADD $0x80, %eax ; Interrupt Nummber 0x20 * 4 Bytes = 0x80
+    MOV INTERRUPTS_TIMER, *%eax
+
     ; Set up the ISR for 0x80 (System Calls)
     MOV %itp, %eax
     ADD $0x200, %eax ; Interrupt Nummber 0x80 * 4 Bytes = 0x200
@@ -107,7 +112,7 @@ include "os/src/util"
     ;   eax     success status (0 = success, -1 = error)
     CALL SYSCALLS_PROCESS_CREATE
     CMP $-1, %eax
-    JNE _SOS_BOOT_FAILED_PROCESS_CREATION
+    JNE _SOS_BOOT_INIT_PROCESS_CREATED
 
     ; this should not be able to happen
 
@@ -115,7 +120,38 @@ include "os/src/util"
 
     ; TODO stop the simulator
 
-    ._SOS_BOOT_FAILED_PROCESS_CREATION:
+    ._SOS_BOOT_INIT_PROCESS_CREATED:
+
+    ; Create the idle process
+
+    ; the code for idle Program should be located in the file os/idle (as bynary file)
+
+    PUSH $0 ; null-termination for filename on stack
+
+    PUSH $0x2E62696E
+    PUSH $0x69646C65
+    PUSH $0x7365722F
+    PUSH $0x6F732F75 ; move filename "os/user/idle.bin\0" onto stack
+
+    MOV %esp, %ebx
+
+    ; SYSCALLS_PROCESS_CREATE
+    ; Parameters (ebx is a pointer to the start of an ASCII filename):
+    ;   (ebx)     Pointer to a ASCII filename
+    ; Return value:
+    ;   eax     success status (0 = success, -1 = error)
+    CALL SYSCALLS_PROCESS_CREATE
+    CMP $-1, %eax
+    JNE _SOS_BOOT_IDLE_PROCESS_CREATED
+
+    ; this should not be able to happen
+
+    ; panic
+
+    ; TODO stop the simulator
+
+    ._SOS_BOOT_IDLE_PROCESS_CREATED:
+
 
     ; set the init process to the running process
     MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
@@ -131,10 +167,6 @@ include "os/src/util"
     SUB $1, %eax
     AND $0xFFFFFF, *%eax
     OR $0x1000000, *%eax ;set status to to Running 
-
-    ; remove the init process from the waiting list
-    MOV $CONST_OS_PROCESS_WAITING_QUEUE_START, %eax
-    MOV $0, *%eax
 
 
 ; Activate Memory Virtualization

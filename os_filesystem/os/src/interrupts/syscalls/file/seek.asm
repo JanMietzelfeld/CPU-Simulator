@@ -7,7 +7,7 @@
 ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
 .SYSCALLS_FILE_SEEK_WITH_ASSERTS:
     
-    ADD $8, %ebx ; handle overflow
+    ADD $8, %ebx ; TODO handle overflow
     CALL ASSERT_EBX_IN_USERSPACE
     SUB $8, %ebx
 

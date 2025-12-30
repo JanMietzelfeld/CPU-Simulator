@@ -96,6 +96,12 @@
     JMP _INTERRUPTS_SYSCALLS_END_SYSCALL
     ._INTERRUPTS_SYSCALLS_SKIP_SYSCALL_PROCESS_YIELD:
 
+    CMP $CONST_SYSCALL_TIMER_START, %eax
+    JNE _INTERRUPTS_SYSCALLS_SKIP_SYSCALL_TIMER_START
+    CALL SYSCALLS_TIMER_START_WITH_ASSERTS
+    JMP _INTERRUPTS_SYSCALLS_END_SYSCALL
+    ._INTERRUPTS_SYSCALLS_SKIP_SYSCALL_TIMER_START:
+
     ; invalid syscall
     ; terminat the process
     CALL SYSCALLS_PROCESS_EXIT
@@ -105,15 +111,18 @@
 
 ; collect all the syscall handlers here
 
-    include "os/src/syscalls/process/create"
-    include "os/src/syscalls/process/exit"
-    include "os/src/syscalls/process/yield"
+    include "os/src/interrupts/syscalls/process/create"
+    include "os/src/interrupts/syscalls/process/exit"
+    include "os/src/interrupts/syscalls/process/yield"
 
-    include "os/src/syscalls/file/close"
-    include "os/src/syscalls/file/create"
-    include "os/src/syscalls/file/delete"
-    include "os/src/syscalls/file/open"
-    include "os/src/syscalls/file/read"
-    include "os/src/syscalls/file/seek"
-    include "os/src/syscalls/file/stat"
-    include "os/src/syscalls/file/write"
+    include "os/src/interrupts/syscalls/file/close"
+    include "os/src/interrupts/syscalls/file/create"
+    include "os/src/interrupts/syscalls/file/delete"
+    include "os/src/interrupts/syscalls/file/open"
+    include "os/src/interrupts/syscalls/file/read"
+    include "os/src/interrupts/syscalls/file/seek"
+    include "os/src/interrupts/syscalls/file/stat"
+    include "os/src/interrupts/syscalls/file/write"
+    
+    include "os/src/interrupts/syscalls/timer/start"
+

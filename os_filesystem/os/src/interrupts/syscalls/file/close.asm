@@ -4,9 +4,6 @@
 ; Return value:
 ;   eax     success status (0 = success, -1 = invalid file descriptor)
 .SYSCALLS_FILE_CLOSE_WITH_ASSERTS:
-    
-    CALL ASSERT_EBX_IN_USERSPACE
-
 .SYSCALLS_FILE_CLOSE:
 
     ; 1    00000001 - io_close (fd=op2)

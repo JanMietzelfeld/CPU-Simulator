@@ -83,3 +83,10 @@
     ; Return value:
     ;   none
     const CONST_SYSCALL_PROCESS_YIELD = 18
+    
+   ; SYSCALLS_TIMER_START
+    ; Parameters:
+    ;   (ebx)     Time to wait
+    ; Return value:
+    ;   eax     success status (0 = success, -1 = error)
+    const CONST_SYSCALL_TIMER_START = 24

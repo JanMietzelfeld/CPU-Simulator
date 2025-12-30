@@ -2,7 +2,7 @@
 
 ; UTIL_SCHEDULER
 ; Parameters:
-;   none     
+;   none  
 ; Return value :
 ;   none
 .UTIL_SCHEDULER:
@@ -82,13 +82,13 @@
 
     ; ebx = status
 
-    CMP $0, %ebx ; is the process terminated ?
+    CMP $CONST_OS_PROCESS_STATUS_TERMINATED, %ebx ; is the process terminated ?
     JE _UTIL_SCHEDULER_FIND_NEXT
 
-    CMP $1, %ebx ; is the process running ?
+    CMP $CONST_OS_PROCESS_STATUS_RUNNING, %ebx ; is the process running ?
     JE _UTIL_SCHEDULER_PROCESS_RUNNING
 
-    CMP $3, %ebx  ; is the process blocked ?
+    CMP $CONST_OS_PROCESS_STATUS_BLOCKED, %ebx  ; is the process blocked ?
     JE _UTIL_SCHEDULER_PROCESS_BLOCKED
 
     ._UTIL_SCHEDULER_PROCESS_RUNNING:
@@ -97,7 +97,10 @@
 
     ; set process to waiting
     AND $0xFFFFFF, *%eax
-    OR $0x2000000, *%eax
+
+    MOV $CONST_OS_PROCESS_STATUS_WAITING, %ebx
+    SHL $24, %ebx
+    OR %ebx, *%eax
 
     ; get pid
 
@@ -114,35 +117,39 @@
 
     ; add current process to the waiting queue
 
-    CMP $1, %ebx ; idle process should not be added to the waiting list
+    CMP $1, %ebx ; init process should not be added to the waiting list
+    JE _UTIL_SCHEDULER_FIND_NEXT
+    CMP $2, %ebx ; idle process should not be added to the waiting list
     JE _UTIL_SCHEDULER_FIND_NEXT
 
     SUB $1, %ecx
+    SHL $24, %ebx
+
 
     ._UTIL_SCHEDULER_SEARCH_WAITING_LIST:
     ADD $1, %ecx
-    CMP $0, *%ecx
+    MOV *%ecx, %eax
+    SHR $24, %eax
+    CMP $0, %eax
     JNE _UTIL_SCHEDULER_SEARCH_WAITING_LIST
-    MOV %ebx, *%ecx ; add the current process to the end of the waiting queue
+    AND $0xFFFFFF, *%ecx
+    OR %ebx, *%ecx ; add the current process to the end of the waiting queue
     JMP _UTIL_SCHEDULER_FIND_NEXT
 
     ._UTIL_SCHEDULER_PROCESS_BLOCKED:
 
-    ; ebx = status, eax = pointer to status bit in the pcb
-
-    SUB $1, %eax
-
-    ; eax = pcb pointer
-
-    ; get pid
-
-    MOV *%eax, %ebx
-    SHR $24, %ebx ; move the 8 bit pid to the lsb
-
 
     MOV $CONST_OS_PROCESS_BLOCKED_QUEUE_START, %ecx
 
-    ; ebx = pid, ecx = process blocked queue start
+    ; ecx = process blocked queue start
+
+    ; get pid
+
+    MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
+    MOV *%eax, %eax ; pcb pointer
+
+    MOV *%eax, %ebx
+    AND $0xFF000000, %ebx
 
     ; add to the blocked queue
 
@@ -150,9 +157,12 @@
 
     ._UTIL_SCHEDULER_SEARCH_BLOCKED_LIST:
     ADD $1, %ecx
-    CMP $0, *%ecx
+    MOV *%ecx, %eax
+    SHR $24, %eax
+    CMP $0, %eax
     JNE _UTIL_SCHEDULER_SEARCH_BLOCKED_LIST
-    MOV %ebx, *%ecx ; add the current process to the end of the waiting queue
+    AND $0xFFFFFF, *%ecx
+    OR %ebx, *%ecx ; add the current process to the end of the blocked queue
 
     ._UTIL_SCHEDULER_FIND_NEXT:
 
@@ -189,8 +199,8 @@
 
     ; no process is waiting, run the idle process 
 
-    ; set eax to 1 (idle process)
-    MOV $1, %eax
+    ; set eax to 2 (idle process)
+    MOV $2, %eax
 
     ; find the PCB for the pid
 
@@ -212,7 +222,9 @@
     ; set the process status to running
     ADD $1, %ecx
     AND $0xFFFFFF, *%ecx
-    OR $0x1000000, *%ecx
+    MOV $CONST_OS_PROCESS_STATUS_RUNNING, %ebx
+    SHL $24, %ebx
+    OR %ebx, *%ecx
 
     ; set the ptp to the pcbs ptp
     ADD $1, %ecx

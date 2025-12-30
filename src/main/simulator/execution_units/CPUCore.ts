@@ -36,6 +36,7 @@ import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
 import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
 import { PageFaultError } from "../../../types/errors/PageFaultError";
+import { Timer } from "./Timer";
 
 
 /**
@@ -177,7 +178,11 @@ export class CPUCore {
     
     public fs: PassthroughFilesystem;
 
+    public readonly timer: Timer;
+
     public newProcessPath: string = "";
+
+    public mainMemory: RAM;
 
     /**
      * Constructs an instance of a CPU core.
@@ -203,8 +208,10 @@ export class CPUCore {
         // TODO: Adopt ALU to be able to use different processing widths.
         this.alu = new ArithmeticLogicUnit(this.eflags);
         // TODO: Adopt MMU to be able to use different processing widths.
+        this.mainMemory = mainMemory;
         this.mmu = new MemoryManagementUnit(mainMemory, this.ptp, this.alu, this.eflags);
         this.fs = new PassthroughFilesystem(process.cwd() + "/os_filesystem");
+        this.timer = new Timer(this);
         this._decodedInstruction = null;
         this._processingWidth = processingWidth;
     }
@@ -314,7 +321,13 @@ export class CPUCore {
         
             this.checkNewProcess();
 
-            this.internalCycle();
+            if (this.eflags.isInUserMode())
+            {
+
+                this.internalCycle();
+
+                this.timer.countDown();
+            }
 
             while (this.eflags.isInKernelMode())
             {
@@ -335,15 +348,11 @@ export class CPUCore {
                 console.log(error)
             }
         }
-
+        
         //Now handle all pending interrupts
         if (this.eflags.interrupt && this.interruptQueue.length !== 0) {
             console.log("Interrupted");
-            this.int(new InstructionOperand(
-                EncodedAddressingModes.DIRECT,
-                EncodedOperandTypes.IMMEDIATE,
-                DoubleWord.fromInteger(this.interruptQueue.shift() as InterruptNumbers)
-            ));
+            this.triggertException(this.interruptQueue.shift() as InterruptNumbers)
             return;
         }
     }
@@ -484,7 +493,9 @@ export class CPUCore {
         console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());
         try {
             if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
-                console.log("Stack value: " + this.mmu.readDoublewordFrom(this.esp.content, false));
+                const physicalAddress: PhysicalAddress = this.mmu.translate(this.esp.content, false, false, true);
+                let value = this.mainMemory.readDoublewordFrom(physicalAddress);
+                console.log("Stack value: " + value);
             }
         }
         catch(e) {
@@ -806,7 +817,7 @@ export class CPUCore {
                 break;
                 
             case DevCommands.IO_CLOSE:
-                this.eax.content =  DoubleWord.fromInteger(this.fs.io_close(data.value.toUnsignedNumber()))
+                this.eax.content =  DoubleWord.fromInteger(this.fs.io_close(op2))
                 break;
                 
             case DevCommands.IO_READ_BUFFER: // 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
@@ -858,6 +869,14 @@ export class CPUCore {
                 break;
             case DevCommands.CPU_DISABLE_MEMORY_VIRTUALIZATION: //  00001100 disableMemoryVirtualization()
                 this.mmu.disableMemoryVirtualization();
+                break;
+            case DevCommands.TIMER_GET_FINISHED: //  00001101 getReadyID() -> id=eax
+                this.eax.content = DoubleWord.fromInteger(this.timer.getReadyID());
+                break;
+            case DevCommands.TIMER_SET: //  00001110 addTimer()
+                const timeValue = this.internal_pop().toUnsignedNumber();
+
+                this.timer.addTimer(op2, timeValue);
                 break;
             default:
                 throw new BadOperandError("Unknown first operand " + op1 + " for DEV instruction.");

@@ -84,21 +84,42 @@
         ADD $1, %eax
 
         AND $0xFFFFFF, *%eax
-        OR $0x2000000, *%eax ; set status to to Waiting 
+        MOV $CONST_OS_PROCESS_STATUS_WAITING, %ebx
+        SHL $24, %ebx
+        OR %ebx, *%eax ; set status to to Waiting 
         ADD $1, %eax
 
         ; allocate Page Table
         SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %ecx
         ADD $CONST_OS_PAGE_TABLE_LIST_START, %ecx
 
-        PUSH %ecx ; push the pointer to the Page Table
 
         MOV %ecx, *%eax  ; set page table pointer
         ADD $4, %eax
 
-        MOV %ecx, %ebx
+        MOV %ecx, %ebx ; ebx = pointer to the Page Table
 
         PUSH %eax ; save eax
+
+
+        CMP $CONST_OS_PAGE_TABLE_LIST_START, %ebx
+        JL _UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER
+        CMP $CONST_OS_PAGE_TABLE_LIST_END, %ebx
+        JG _UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER
+
+        JMP _UTIL_CREATE_PCB_VALID_PAGE_TABLE_POINTER
+
+        ._UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER:
+
+            POP %eax ; eax
+            POP %eax ; pcb
+            ADD $1, *%eax ; status bit 
+            MOV $0, *%eax ; set status to to terminated 
+            POP %eax ; pid
+            POP %eax ; pop ASCII name
+            MOV $0xFFFFFFFF, %eax
+            RET
+        ._UTIL_CREATE_PCB_VALID_PAGE_TABLE_POINTER:
 
         ; UTIL_INITIALIZE_PAGE_TABLE
         ; Parameters 
@@ -114,7 +135,7 @@
 
         MOV $0, %ecx
         MOV %esp, %ebx
-        ADD $11, %ebx ; get the ASCII Pointer - 1
+        ADD $7, %ebx ; get the ASCII Pointer - 1
 
     ._UTIL_CREATE_PCB_COPY_NAME:
         ADD $1, %ebx
@@ -137,7 +158,7 @@
         ADD %ebx, %eax ; To make sure we point to the next PCB element independently from the name length
 
 
-        ; reset Page Table CPU registers 
+        ; reset PCB CPU registers 
 
         ; 0x03A - 0x03D flags         (4 bytes) \
         ; 0x036 - 0x039 esp           (4 bytes) |
@@ -158,8 +179,8 @@
         MOV _UTIL_CREATE_PCB_START_POINT, *%eax   ; eip
         ADD $4, %eax
 
-        MOV %esp, %ebx
-        ADD $4, %ebx
+        MOV %esp, %ebx ; get pcb pointer
+        MOV *%ebx, %ebx ; ebx = pcb pointer
         ADD $CONST_OS_PCB_KERNEL_STACK_TOP_OFFSET, %ebx
         MOV %ebx, *%eax   ; esp
         ADD $4, %eax
@@ -178,7 +199,7 @@
         ADD $4, %eax ; First entry is invalid because pid 0 is invalid
 
         MOV %esp, %ebx
-        ADD $8, %ebx ; get pid
+        ADD $4, %ebx ; get pid
 
         MOV $1, %ecx ; pid counter (entry 0 is invalid)
 
@@ -193,14 +214,21 @@
 
     ._UTIL_CREATE_PCB_UPDATED_PCB_MAPPING_LIST:
 
-        ; *%esp + 4 = pcb pointer
+        ; *%esp = pcb pointer
 
         MOV %esp, %ecx
-        ADD $4, %ecx
 
         MOV *%ecx, *%eax ; update the Mapping
 
     ; Add to waiting queue
+
+    MOV %esp, %ebx
+    ADD $4, %ebx ; get pointer to pid
+    MOV *%ebx, %ebx
+    CMP $1, %ebx
+    JE _UTIL_CREATE_PCB_SKIP_WAITING_QUEUE
+    CMP $2, %ebx
+    JE _UTIL_CREATE_PCB_SKIP_WAITING_QUEUE
 
     MOV $CONST_OS_PROCESS_WAITING_QUEUE_START, %eax
     SUB $1, %eax 
@@ -217,16 +245,17 @@
         ; eax is the pointer to the next free entry in the waiting queue
 
         MOV %esp, %ebx
-        ADD $8, %ebx ; get pointer to pid
+        ADD $4, %ebx ; get pointer to pid
         MOV *%ebx, %ebx
         SHL $24, %ebx
         AND $0xFF000000, %ebx
         AND $0xFFFFFF, *%eax
         OR %ebx, *%eax ; add the pid to the queue
 
-; Process is now initialized in the os data structures
+    ._UTIL_CREATE_PCB_SKIP_WAITING_QUEUE:
 
-POP %ebx ; ptp
+
+; Process is now initialized in the os data structures
 
 POP %eax ; pcb pointer (return value)
 

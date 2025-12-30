@@ -235,7 +235,7 @@
         JMP _UTIL_LOAD_PROGRAM_ALLOCATE_FRAMES
 
     ._UTIL_LOAD_PROGRAM_FIND_FRAMES_END:
-        POP %eax ; POP the number of written frames onto the stack
+        POP %ebx ; POP the number of written frames onto the stack
         POP %ebx ; POP the number of needed frames onto the stack
         POP %ebx ; POP the file descriptor onto the stack
         POP %ebx ; POP the file lenght onto the stack
