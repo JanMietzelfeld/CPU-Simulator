@@ -1,5 +1,5 @@
 
-; constants for the syscall number
+; constants for the syscall numbers
 
     ; SYSCALLS_FILE_READ
     ; Parameters (ebx is a pointer to the following struct):
@@ -84,7 +84,7 @@
     ;   none
     const CONST_SYSCALL_PROCESS_YIELD = 18
     
-   ; SYSCALLS_TIMER_START
+    ; SYSCALLS_TIMER_START
     ; Parameters:
     ;   (ebx)     Time to wait
     ; Return value:

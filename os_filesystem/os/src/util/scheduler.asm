@@ -9,8 +9,8 @@
     ;
     ; Process Control Block layout (1KiB) 0x000 - 0x3FF
     ; 0x200 - 0x3FF kernel stack  (512 bytes)
-    ; 0x03B - 0x1FF unused
-    ; 0x03A - 0x03A eflags        (1 bytes) \
+    ; 0x03E - 0x1FF unused
+    ; 0x03A - 0x03D eflags        (4 bytes) \
     ; 0x036 - 0x039 esp           (4 bytes) |
     ; 0x032 - 0x035 eip           (4 bytes) |
     ; 0x02E - 0x031 ecx           (4 bytes) | - CPU registers

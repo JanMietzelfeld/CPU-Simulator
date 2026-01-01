@@ -1,12 +1,11 @@
-JMP _SOS_BOOT ; boot the kernel
+JMP _OS_ENTRY ; start of the os
 
+; include dependencies
 include "os/src/constants"
 include "os/src/interupts"
 include "os/src/util"
 
-; Start of the BOOT Code
-
-._SOS_BOOT:
+._OS_ENTRY:
     ; This is the entry point of the OS
     ;
     ; Assumptions at this point:
@@ -14,7 +13,7 @@ include "os/src/util"
     ;   - Memory Virtualization is disabled
     ;
     ; Things we needs to set up before starting the first process:
-    ;   - Stack Pointer
+    ;   - Stack Pointer        return
     ;   - Interrupt Pointer
     ;   - Interrupt table itself
     ;   - Page Table Pointer
@@ -23,7 +22,7 @@ include "os/src/util"
     ;   - Set the current running pid to the init process id (1)
     ;   - Loading the code for the init process into Memory
     ;   - Activate Memory Virtualization
-    ;   - Switch to user mode
+    ;   - Switch to user mode (init still runs in kernel mode)
     ;   - Run the init process
     ;
 
@@ -94,7 +93,7 @@ include "os/src/util"
 
 ; Create the init process
     
-    ; the code for init Program should be located in the file os/init (as bynary file)
+    ; the code for init Program should be located in the file os/user/init (as bynary file)
 
     PUSH $0 ; null-termination for filename on stack
 
@@ -122,9 +121,9 @@ include "os/src/util"
 
     ._SOS_BOOT_INIT_PROCESS_CREATED:
 
-    ; Create the idle process
+; Create the idle process
 
-    ; the code for idle Program should be located in the file os/idle (as bynary file)
+    ; the code for idle Program should be located in the file os/user/idle (as bynary file)
 
     PUSH $0 ; null-termination for filename on stack
 
@@ -142,7 +141,7 @@ include "os/src/util"
     ;   eax     success status (0 = success, -1 = error)
     CALL SYSCALLS_PROCESS_CREATE
     CMP $-1, %eax
-    JNE _SOS_BOOT_IDLE_PROCESS_CREATED
+    JNE _OS_ENTRY_IDLE_PROCESS_CREATED
 
     ; this should not be able to happen
 
@@ -150,7 +149,7 @@ include "os/src/util"
 
     ; TODO stop the simulator
 
-    ._SOS_BOOT_IDLE_PROCESS_CREATED:
+    ._OS_ENTRY_IDLE_PROCESS_CREATED:
 
 
     ; set the init process to the running process

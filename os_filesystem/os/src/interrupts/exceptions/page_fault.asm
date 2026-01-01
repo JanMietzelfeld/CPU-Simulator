@@ -18,11 +18,11 @@
     CMP $0xFFFFFFF, %eax
     JNE _INTERRUPTS_PAGE_FAULT_NO_UTIL_ALLOCATE_FRAME_ERROR
 
-    ; memory is full 
-    ; TODO implement memory swapping
-    
-    ; for now we just terminat the process
-    CALL SYSCALLS_PROCESS_EXIT
+        ; memory is full 
+        ; TODO implement memory swapping
+        
+        ; for now we just terminate the process
+        CALL SYSCALLS_PROCESS_EXIT
 
     ._INTERRUPTS_PAGE_FAULT_NO_UTIL_ALLOCATE_FRAME_ERROR:
 

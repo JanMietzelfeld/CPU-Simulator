@@ -4,9 +4,7 @@
 ; Return value (immediate value):
 ;   eax     file descriptor (-1 = error)
 .SYSCALLS_FILE_OPEN_WITH_ASSERTS:
-    
     CALL ASSERT_ZERO_TERMINATED_EBX_FILENAME_IN_USERSPACE
-
 .SYSCALLS_FILE_OPEN:
     
     ; 6    00000110 - file_open (filename_ptr=op2) -> fd=eax

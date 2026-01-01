@@ -98,38 +98,38 @@
     SUB $1, %ecx
 
     ._INTERRUPTS_TIMER_SEARCH_WAITING_LIST:
-    ADD $1, %ecx
-    CMP $0, *%ecx
-    JNE _INTERRUPTS_TIMER_SEARCH_WAITING_LIST
+        ADD $1, %ecx
+        CMP $0, *%ecx
+        JNE _INTERRUPTS_TIMER_SEARCH_WAITING_LIST
 
-    SHL $24, %ebx
-    AND $0xFFFFFF, *%ecx  
-    OR %ebx, *%ecx ; add the current process to the end of the waiting queue   
-    JMP _INTERRUPTS_TIMER_RETURN
+        SHL $24, %ebx
+        AND $0xFFFFFF, *%ecx  
+        OR %ebx, *%ecx ; add the current process to the end of the waiting queue   
+        JMP _INTERRUPTS_TIMER_RETURN
 
     ._INTERRUPTS_TIMER_CONTEXT_SWITCH:
-    ; force a context switch (but run the init process first)
-    ; add the init at the front of the queue
-    MOV $CONST_OS_PROCESS_WAITING_QUEUE_START, %ecx
+        ; force a context switch (but run the init process first)
+        ; add init at the front of the queue
+        MOV $CONST_OS_PROCESS_WAITING_QUEUE_START, %ecx
 
-    MOV *%ecx, %eax
-
-    ; eax = first entry (pid) in the waiting queue
-
-    ; ecx = process waiting queue start
-
-    ._INTERRUPTS_TIMER_UPDATE_WAITING_LIST:
-        SHL $24, %ebx
-        AND $0xFFFFFF, *%ecx
-        OR %ebx, *%ecx        
-        ADD $1, %ecx
-        MOV %eax, %ebx
         MOV *%ecx, %eax
-        SHR $24, %ebx
-        CMP $0, %ebx
-        JNE _INTERRUPTS_TIMER_UPDATE_WAITING_LIST
 
-    CALL UTIL_SCHEDULER
+        ; eax = first entry (pid) in the waiting queue
+
+        ; ecx = process waiting queue start
+
+        ._INTERRUPTS_TIMER_UPDATE_WAITING_LIST:
+            SHL $24, %ebx
+            AND $0xFFFFFF, *%ecx
+            OR %ebx, *%ecx        
+            ADD $1, %ecx
+            MOV %eax, %ebx
+            MOV *%ecx, %eax
+            SHR $24, %ebx
+            CMP $0, %ebx
+            JNE _INTERRUPTS_TIMER_UPDATE_WAITING_LIST
+
+        CALL UTIL_SCHEDULER
 
 ._INTERRUPTS_TIMER_RETURN:
     POP %ecx

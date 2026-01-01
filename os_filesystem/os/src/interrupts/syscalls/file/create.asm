@@ -3,11 +3,8 @@
 ;   (ebx)     Pointer to a ASCII filename
 ; Return value (immediate value):
 ;   eax     success status (0 = success, -1 = file already exist)
-
 .SYSCALLS_FILE_CREATE_WITH_ASSERTS:
-    
     CALL ASSERT_ZERO_TERMINATED_EBX_FILENAME_IN_USERSPACE
-
 .SYSCALLS_FILE_CREATE:
 
     ; 4    00000100 - file_create (filename_ptr=op2)
