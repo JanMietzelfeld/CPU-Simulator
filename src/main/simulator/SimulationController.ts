@@ -136,7 +136,7 @@ export class SimulationController {
 
         const compiledOS: DoubleWord[] = this._assembler.compile(readFileSync(`${process.cwd()}/os_filesystem/os/src/sos.asm`, "utf-8"), kernelCodeStartAddress)
 
-        disassemble(compiledOS, kernelCodeStartAddress) //For debugging
+        //disassemble(compiledOS, kernelCodeStartAddress) //For debugging
 
         for (let i = 0; i < compiledOS.length; i++) {
             this.mainMemory.writeDoublewordTo(PhysicalAddress.fromInteger(kernelCodeStartAddress + i*DoubleWord.SIZE_IN_BYTES), compiledOS[i])
@@ -180,8 +180,22 @@ export class SimulationController {
         }
 
         let relativePathToCode = pathToProgramCode.substring(pathToProgramCode.indexOf("/os_filesystem/") + "/os_filesystem/".length)
-     
-        this.core.newProcessPath = relativePathToCode;
+        relativePathToCode = relativePathToCode.concat("\0");
+
+        while (relativePathToCode.length % 4 != 0)
+        {
+            relativePathToCode = relativePathToCode.concat("\0");
+        }
+
+        let buffer: number[] = [];
+
+        for (let i = 0; i < relativePathToCode.length; i++) {
+
+            buffer.push(relativePathToCode.charCodeAt(i));
+        }
+
+
+        writeFileSync(process.cwd() + "/os_filesystem/os/util/new_process_name.bin", Buffer.from(buffer));
         
         return;
     }
@@ -253,6 +267,8 @@ export class SimulationController {
      */
     public createUtilityFiles(): void {
         
+        writeFileSync(process.cwd() + "/os_filesystem/os/util/new_process_name.bin", Buffer.from([0]));
+
         let zeroFramePath = process.cwd() + "/os_filesystem/os/util/zero_frame.bin"
 
         let pageTablePath = process.cwd() + "/os_filesystem/os/util/page_table.bin"

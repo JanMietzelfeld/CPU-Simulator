@@ -174,7 +174,7 @@ DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
 
 PUSH $CONST_KERNEl_MEMORY_START ; push the esp value after iret for the user stack
 
-PUSH $0xE0 ; flags
+PUSH $0x20 ; flags
 
 PUSH $0 ; push the address to return to after iret
 

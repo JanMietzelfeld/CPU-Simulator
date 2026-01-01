@@ -67,6 +67,8 @@
 
     MOV %esp, %ebx
 
+    PUSH %eax ; file descriptor
+
     DEV $CONST_DEV_COMMAND_CPU_IS_MEMORY_VIRTUALIZATION_ENABLED, $0
     PUSH %eax ; is virtualization enabled
     DEV $CONST_DEV_COMMAND_CPU_DISABLE_MEMORY_VIRTUALIZATION, $0
@@ -90,9 +92,27 @@
 
     POP %ebx ; was virtualization enabled
     CMP $0, %ebx
-    JE _UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTIALIZATION
+    JE _UTIL_INITIALIZE_PAGE_TABLE_SKIP_MEMORY_VIRTIALIZATION
         DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
-    ._UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTIALIZATION:
+    ._UTIL_INITIALIZE_PAGE_TABLE_SKIP_MEMORY_VIRTIALIZATION:
+
+    POP %ebx ; file descriptor
+
+    ; SYSCALLS_FILE_CLOSE
+    ; Parameters (ebx is used as a immediate value):
+    ;   ebx     file descriptor
+    ; Return value:
+    ;   eax     success status (0 = success, -1 = invalid file descriptor)
+    CALL SYSCALLS_FILE_CLOSE
+    CMP $-1, %eax
+    JNE _UTIL_INITIALIZE_PAGE_TABLE_FILE_CLOSED
+    ; this should not be able to happen
+
+    ; panic
+
+    ; TODO stop the simulator
+
+    ._UTIL_INITIALIZE_PAGE_TABLE_FILE_CLOSED:
 
     POP %ebx
     POP %ebx

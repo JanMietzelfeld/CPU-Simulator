@@ -235,11 +235,27 @@
         JMP _UTIL_LOAD_PROGRAM_ALLOCATE_FRAMES
 
     ._UTIL_LOAD_PROGRAM_FIND_FRAMES_END:
-        POP %ebx ; POP the number of written frames onto the stack
-        POP %ebx ; POP the number of needed frames onto the stack
-        POP %ebx ; POP the file descriptor onto the stack
-        POP %ebx ; POP the file lenght onto the stack
-        POP %ebx ; POP the ebx input
+        POP %ebx ; POP the number of written frames from the stack
+        POP %ebx ; POP the number of needed frames from the stack
+        POP %ebx ; POP the file descriptor from the stack
+
+        POP %eax ; POP the file lenght from the stack
+        POP %eax ; POP the ebx input
+
+        ; SYSCALLS_FILE_CLOSE
+        ; Parameters (ebx is used as a immediate value):
+        ;   ebx     file descriptor
+        ; Return value:
+        ;   eax     success status (0 = success, -1 = invalid file descriptor)
+        CALL SYSCALLS_FILE_CLOSE
+        CMP $-1, %eax
+        JNE _UTIL_LOAD_PROGRAM_FILE_CLOSED
+            ; this should not be able to happen
+
+            ; panic
+
+            ; TODO stop the simulator
+        ._UTIL_LOAD_PROGRAM_FILE_CLOSED:
 
 MOV $0, %eax
 RET

@@ -180,8 +180,6 @@ export class CPUCore {
 
     public readonly timer: Timer;
 
-    public newProcessPath: string = "";
-
     public mainMemory: RAM;
 
     /**
@@ -244,108 +242,55 @@ export class CPUCore {
         return this._virtualizationEnabled;
     }
 
-    private checkNewProcess(): void
-    {
-        if (this.eflags.interrupt && this.newProcessPath !== "")
-        {
-
-            let eaxContent = this.eax.content;
-
-            let ebxContent = this.ebx.content;
-
-            let ecxContent = this.ecx.content;
-
-            let count = 0;
-            let nullByte = "\0";
-            this.newProcessPath = this.newProcessPath.concat(nullByte);
-
-            while (this.newProcessPath.length % 4 != 0)
-            {
-                this.newProcessPath = this.newProcessPath.concat(nullByte);
-            }
-
-            for (let i = 0; i < this.newProcessPath.length; i+=4) {
-                let element = 0;
-
-                for (let j = 0; j < 4; j++) {
-
-                    element += this.newProcessPath.charCodeAt(this.newProcessPath.length - 1 - i - j) * Math.pow(2, j*8);            
-                }
-
-                this.push(new InstructionOperand(
-                    EncodedAddressingModes.DIRECT,
-                    EncodedOperandTypes.IMMEDIATE,
-                    DoubleWord.fromInteger(element)
-                ));
-
-                count++;
-            }
-
-            this.eax.content = DoubleWord.fromInteger(16);
-
-            this.ebx.content = this.esp.content;
-
-
-            // Call interrupt handler.
-            this.triggertException(128);
-
-            while (this.eflags.isInKernelMode())
-            {
-                this.internalCycle();
-            }
-
-            for (let i = 0; i < count; i++) {
-                this.pop(new InstructionOperand(
-                    EncodedAddressingModes.DIRECT,
-                    EncodedOperandTypes.REGISTER,
-                    DoubleWord.fromInteger(0)
-                ));
-            }
-
-            this.eax.content = eaxContent;
-
-            this.ebx.content = ebxContent;
-
-            this.ecx.content = ecxContent;
-
-            this.newProcessPath = "";
-        }
-    }
 
     /**
      * This method performs a single user instruction cycle.
      */
     public cycle(): void {
 
-        try {
-        
-            this.checkNewProcess();
+        if (this.eflags.isInUserMode())
+        {
 
-            if (this.eflags.isInUserMode())
-            {
-
+            try {
                 this.internalCycle();
 
                 this.timer.countDown();
-            }
 
-            while (this.eflags.isInKernelMode())
-            {
+            } catch(error) {
+                if (error instanceof PageFaultError) {
+                    console.log("Page Fault")
+                    this.triggertException(InterruptNumbers.PAGE_FAULT);
+
+                    // Write the "bad" address onto the interrupt STACK.
+                    this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+                    this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
+                }
+                else
+                {
+                    console.log(error)
+                }
+            }
+        }
+
+        while (this.eflags.isInKernelMode())
+        {
+            try {
+
                 this.internalCycle();
-            }
 
-        } catch(error) {
-            if (error instanceof PageFaultError) {
-                console.log("Page Fault")
-                this.triggertException(InterruptNumbers.PAGE_FAULT);
+            } catch(error) {
+                if (error instanceof PageFaultError) {
+                    console.log("Page Fault")
+                    this.triggertException(InterruptNumbers.PAGE_FAULT);
 
-                // Write the "bad" address onto the interrupt STACK.
-                this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
-                this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
-            }
-            else
-            {
-                console.log(error)
+                    // Write the "bad" address onto the interrupt STACK.
+                    this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+                    this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
+                }
+                else
+                {
+                    console.log(error)
+                }
             }
         }
         
@@ -363,7 +308,15 @@ export class CPUCore {
     private internalCycle(): void {
 
         this.fetch();
-        this.decode();
+        try {
+            this.decode();
+        }
+        catch(e)
+        {
+            console.log("Invalid Opcode");
+            this.triggertException(InterruptNumbers.INVALID_OPCODE);
+            return;
+        }
         this.execute();
     }
 
