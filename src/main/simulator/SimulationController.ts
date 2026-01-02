@@ -134,7 +134,7 @@ export class SimulationController {
             throw new EvalError("Unexpected begin of OS memory");
         }
 
-        const compiledOS: DoubleWord[] = this._assembler.compile(readFileSync(`${process.cwd()}/os_filesystem/os/src/sos.asm`, "utf-8"), kernelCodeStartAddress)
+        const compiledOS: DoubleWord[] = this._assembler.compile(readFileSync(`${process.cwd()}/os_filesystem/os/src/os_entry.asm`, "utf-8"), kernelCodeStartAddress)
 
         //disassemble(compiledOS, kernelCodeStartAddress) //For debugging
 
