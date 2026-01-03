@@ -134,6 +134,18 @@ export class InstructionDecoder {
             case EncodedOperations.JNE:
                 decodedJTypeOperation = EncodedOperations.JNE;
                 break;
+            case EncodedOperations.JA:
+                decodedJTypeOperation = EncodedOperations.JA;
+                break;
+            case EncodedOperations.JAE:
+                decodedJTypeOperation = EncodedOperations.JAE;
+                break;
+            case EncodedOperations.JB:
+                decodedJTypeOperation = EncodedOperations.JB;
+                break;
+            case EncodedOperations.JBE:
+                decodedJTypeOperation = EncodedOperations.JBE;
+                break;
             case EncodedOperations.JG:
                 decodedJTypeOperation = EncodedOperations.JG;
                 break;

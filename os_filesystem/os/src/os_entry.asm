@@ -95,14 +95,11 @@ include "os/src/util"
     
     ; the code for init Program should be located in the file os/user/init (as bynary file)
 
-    PUSH $0 ; null-termination for filename on stack
 
-    PUSH $0x2E62696E
-    PUSH $0x696E6974
-    PUSH $0x7365722F
-    PUSH $0x6F732F75 ; move filename "os/user/init.bin\0" onto stack
+    const _OS_ENTRY_CONST_INIT_FILE_PATH = "os/user/init.bin"
 
-    MOV %esp, %ebx
+
+    MOV $_OS_ENTRY_CONST_INIT_FILE_PATH, %ebx
 
     ; SYSCALLS_PROCESS_CREATE
     ; Parameters (ebx is a pointer to the start of an ASCII filename):
@@ -125,14 +122,9 @@ include "os/src/util"
 
     ; the code for idle Program should be located in the file os/user/idle (as bynary file)
 
-    PUSH $0 ; null-termination for filename on stack
+    const _OS_ENTRY_CONST_IDLE_FILE_PATH = "os/user/idle.bin"
 
-    PUSH $0x2E62696E
-    PUSH $0x69646C65
-    PUSH $0x7365722F
-    PUSH $0x6F732F75 ; move filename "os/user/idle.bin\0" onto stack
-
-    MOV %esp, %ebx
+    MOV $_OS_ENTRY_CONST_IDLE_FILE_PATH, %ebx
 
     ; SYSCALLS_PROCESS_CREATE
     ; Parameters (ebx is a pointer to the start of an ASCII filename):

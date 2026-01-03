@@ -47,6 +47,10 @@ export enum EncodedOperations {
 	SHR = "0101001",
 	SAR = "0101010",
 	INVTLB = "0101011",
+	JA = "0101100",
+	JAE = "0101101",
+	JB = "0101110",
+	JBE = "0101111",
 	NOP = "1111111"
 }
 

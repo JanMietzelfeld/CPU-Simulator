@@ -26,16 +26,9 @@
 
     PUSH %ebx
 
-    ; push "os/util/page_table.bin\0" onto stack
+    const _UTIL_INITIALIZE_PAGE_TABLE_CONST_PAGE_TABLE_FILE_PATH = "os/util/page_table.bin"
 
-    PUSH $0x696E0000
-    PUSH $0x6C652E62
-    PUSH $0x5F746162
-    PUSH $0x70616765
-    PUSH $0x74696C2F
-    PUSH $0x6F732F75 
-
-    MOV %esp, %ebx
+    MOV $_UTIL_INITIALIZE_PAGE_TABLE_CONST_PAGE_TABLE_FILE_PATH, %ebx
 
     ; SYSCALLS_FILE_OPEN
     ; Parameters (ebx is a pointer to the start of an ASCII filename):
@@ -51,13 +44,6 @@
 
     ; TODO stop the simulator
     ._UTIL_INITIALIZE_PAGE_TABLE_FILE_OPEN:
-
-    POP %ebx
-    POP %ebx
-    POP %ebx
-    POP %ebx
-    POP %ebx
-    POP %ebx
 
     POP %ebx ; Pointer to the Page Table entry
 

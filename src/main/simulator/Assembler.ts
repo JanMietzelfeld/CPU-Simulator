@@ -102,7 +102,7 @@ export class Assembler {
 	 */
 	private encode(lines: Map<number, string>, baseOffset: number = 0): DoubleWord[] {
 		const encodedInstructions: DoubleWord[] = [];
-		const constants: Map<string, string> = this.locateConstants(lines);
+		const constants: Map<string, string> = this.locateConstants(lines, baseOffset);
 		const replacedConstants: Map<number, string> = this.replaceConstants(lines, constants);
 		const jumpLabels: Map<string, string> = this.locateJumpLabels(replacedConstants, baseOffset);	
 
@@ -130,6 +130,12 @@ export class Assembler {
 		let lineEncoded = false;
 		lineEncoded = false;
 		
+		if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
+			const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, constants);
+			encodedInstructions.push(...encodedInstruction);
+			lineEncoded = true;
+			return encodedInstructions;
+		}
 		// For every line of code, search for a contained instruction.
 		for (const instruction of this.languageDefinition.instructions) {
 			const illegalCombosOfOperandTypes: {__SOURCE__: string, __TARGET__: string}[] | undefined 
@@ -225,11 +231,7 @@ export class Assembler {
 				}
 			}
 		}
-		if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-			const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, constants);
-			encodedInstructions.push(...encodedInstruction);
-			lineEncoded = true;
-		}
+		
 		if (!lineEncoded) {
 			throw new UnrecognizedInstructionError(`Unrecognized or invalid instruction found in line ${lineNo + 1}: ${line}`);
 		}
@@ -252,19 +254,37 @@ export class Assembler {
 		let programLocationCounter = baseOffset;
 		for (const [lineNo, line] of lines.entries()) {
 			if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
-				const jumpLabel = line.replace(/\.|:/gim, "");
-				jumpLabels.set(
-					jumpLabel, 
-					VirtualAddress.fromInteger(programLocationCounter).toString()
-				);
+
+				let labelRegex = new RegExp(this.languageDefinition.label_formats.declaration, "gim");
+				const regexMatch: RegExpMatchArray | null = labelRegex.exec(line);
+
+				if (regexMatch !== null) {
+					// label found.
+					let stringValue: string = regexMatch[0].toString();
+					const jumpLabel = stringValue.substring(stringValue.indexOf(".") + 1, stringValue.lastIndexOf(":"));
+
+					jumpLabels.set(
+						jumpLabel, 
+						VirtualAddress.fromInteger(programLocationCounter).toString()
+					);
+				}
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
 				//If a string constant is found, skip as many memory cells as needed to fit all characters plus null terminator 
 				//plus one instruction for the jump instruction.
-				const constValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?|"/gim, "") + "\0";
-				//Calculate the size the string will use in memory including null termination and round up to the next size that
-				//is divisible by four. This insures the string always fits into multiple double words.
-				const stringMemSize = Math.ceil((Buffer.byteLength(constValue) / 4)) * 4;
-				programLocationCounter += stringMemSize + 12;
+				let stringConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
+				const regexMatch: RegExpMatchArray | null = stringConstValueRegex.exec(line);
+
+				if (regexMatch !== null) {
+					// Const found.
+					let stringValue: string = regexMatch[0].toString();
+					const constValue = stringValue.substring(stringValue.indexOf("\"") + 1, stringValue.lastIndexOf("\"")) + "\0";
+
+					//Calculate the size the string will use in memory including null termination and round up to the next size that
+					//is divisible by four. This insures the string always fits into multiple double words.
+					const stringMemSize = Math.ceil((Buffer.byteLength(constValue) / 4)) * 4;
+					programLocationCounter += stringMemSize + 12;
+				}
+
 			} else {
 				programLocationCounter += 12;
 			}
@@ -280,53 +300,71 @@ export class Assembler {
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
 	 * @returns A map of integer constants and their value.
 	 */
-	private locateConstants(lines: Map<number, string>) : Map<string, string> {
+	private locateConstants(lines: Map<number, string>, baseOffset: number = 0) : Map<string, string> {
 		const constants: Map<string, string> = new Map();
 		/**
 		 * Use this variable in order to count the instructions, that need to be encoded
 		 * later, because the keys in the map do not have to be consecutive, as blank lines 
 		 * have been removed from the original source text.
 		 */
-		let programLocationCounter = 0;
+		let programLocationCounter = baseOffset;
 		for (const [lineNo, line] of lines.entries()) {
+
+			let regexMatch: RegExpMatchArray | null = null;
+
 			if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?.*/gim, "");
-				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
-				constants.set(
-					constantName, 
-					constantValue
-				);
-				lines.delete(lineNo);
+
+				let decimalConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim");
+				regexMatch = decimalConstValueRegex.exec(line);
+		
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?.*/gim, "");
-				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
-				constants.set(
-					constantName, 
-					constantValue
-				);
-				lines.delete(lineNo);
-			} if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?.*/gim, "");
-				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
-				constants.set(
-					constantName, 
-					constantValue
-				);
-				lines.delete(lineNo);
+
+				let hexadecimalConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim");
+				regexMatch = hexadecimalConstValueRegex.exec(line);
+	
+			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
+			
+				let binaryConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim");
+				regexMatch = binaryConstValueRegex.exec(line);
+
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?".*/gim, "");
-				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?|"/gim, "") + "\0";
-				//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
+
+				let stringConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
+				regexMatch = stringConstValueRegex.exec(line);
+
+				if (regexMatch !== null) {
+					// Const found.
+					let value: string = regexMatch[0].toString();
+					let constantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
+					let constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
+
+					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
+					constants.set(
+						constantName, 
+						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+					);
+					//Calculate the size the string will use in memory including null termination and round up to the next size that
+					//is divisible by four. This insures the string always fits into multiple double words.
+					const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
+					programLocationCounter += stringMemSize + 12;
+
+					regexMatch = null;
+				}
+			} else if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim")) === null){
+				programLocationCounter += 12;
+			}
+
+			if (regexMatch !== null) {
+				// Const found.
+				let value: string = regexMatch[0].toString();
+				let constantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
+				let constantValue = value.substring(value.indexOf("=") + 1).trim();
+
 				constants.set(
 					constantName, 
-					"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+					constantValue
 				);
-				//Calculate the size the string will use in memory including null termination and round up to the next size that
-				//is divisible by four. This insures the string always fits into multiple double words.
-				const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
-				programLocationCounter += stringMemSize + 12;
-			} else {
-				programLocationCounter += 12;
+				lines.delete(lineNo);
 			}
 		}
 		return constants;
@@ -337,11 +375,11 @@ export class Assembler {
 	 * @param lines The lines of code to search for constants.
 	 * @returns The lines of code without jump labels.
 	 */
-	private replaceConstants(lines: Map<number, string>, integerConstants: Map<string, string>): Map<number, string> {
+	private replaceConstants(lines: Map<number, string>, constants: Map<string, string>): Map<number, string> {
 		for (const [lineNo, line] of lines.entries()) {	
 			if (line.match(new RegExp(this.languageDefinition.constant_formats.usage, "gim"))) {
 				//Test if constant name is included in line and replace it with its value
-				integerConstants.forEach((constantValue, constantName) => {
+				constants.forEach((constantValue, constantName) => {
 					const regex = new RegExp("[$%@]" + constantName , "m");
 					if (line.match(regex) !== null) {
 						const replacedLine = line.replace(constantName,constantValue);
@@ -363,71 +401,59 @@ export class Assembler {
 	 */
 	private encodeString(lineNo: number, line: string, jumpLabels: Map<string, string>, constants: Map<string, string>) : DoubleWord[] {
 		const encodedInstructions: DoubleWord[] = [];
-		const stringConstantName = line.replace(/const[ ]|[ ]?=[ ]?".*/gim, "");
-		const stringConstantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?|"/gim, "") + "\0";
-		let stringEncoded = false;
-		if (constants.has(stringConstantName)) {
-			const stringStartAddress: string = constants.get(stringConstantName)!.replace(/^0b/gim, "");
-			const stringMemSize = Math.ceil((Buffer.byteLength(stringConstantValue) / 4)) * 4;
-			//The memory address after the string array with the next instruction
-			const jumpAddress:string = VirtualAddress.fromInteger(parseInt(stringStartAddress, 2) + stringMemSize).toString();
-			const jumpInstruction:string = "JMP @0b" + jumpAddress;
-			const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels, constants);
-			encodedInstructions.push(...encodedInstruction);
-			//Create a buffer from the string in utf8 encoding and calculate some important values.
-			const stringBuffer = Buffer.from(stringConstantValue, "utf8");
-			const stringByteLength = stringBuffer.length;
-			const continousBufferSegmentSize = stringByteLength - (stringByteLength % 4);
-			const restOfBufferSize = stringByteLength % 4;
-			//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
-			//and encode each segment into binary values.
-			if (continousBufferSegmentSize > 0) {
-				for (let i = 0; i <= stringByteLength - 4; i += 4) {
-					const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
-					const binaryString = parseInt(bufferSegment, 16).toString(2).padStart(32, "0");
-					const bitArray: Array<Bit> = new Array<Bit>(
-						0, 0, 0, 0,
-						0, 0, 0, 0,
-						0, 0, 0, 0,
-						0, 0, 0, 0,
-						0, 0, 0, 0,
-						0, 0, 0, 0,
-						0, 0, 0, 0,
-						0, 0, 0, 0
-					)
-					binaryString.split("").forEach((bit, index) => {
-						bitArray[index] = (bit === "0") ? 0 : 1;
-					})
-					const encodedStringPart = new DoubleWord(bitArray);
+
+		let stringConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
+		const regexMatch = stringConstValueRegex.exec(line);
+
+		if (regexMatch !== null) {
+			// Const found.
+			let value: string = regexMatch[0].toString();
+			const stringConstantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
+			const stringConstantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
+
+			let stringEncoded = false;
+			if (constants.has(stringConstantName)) {
+				const stringStartAddress: string = constants.get(stringConstantName)!.replace(/^0b/gim, "");
+				const stringMemSize = Math.ceil((Buffer.byteLength(stringConstantValue) / 4)) * 4;
+				//The memory address after the string array with the next instruction
+				const jumpAddress:string = VirtualAddress.fromInteger(parseInt(stringStartAddress, 2) + stringMemSize).toString();
+				const jumpInstruction:string = "JMP @0b" + jumpAddress;
+				const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, jumpInstruction, jumpLabels, constants);
+				encodedInstructions.push(...encodedInstruction);
+				//Create a buffer from the string in utf8 encoding and calculate some important values.
+				const stringBuffer = Buffer.from(stringConstantValue, "utf8");
+				const stringByteLength = stringBuffer.length;
+				const continousBufferSegmentSize = stringByteLength - (stringByteLength % 4);
+				const restOfBufferSize = stringByteLength % 4;
+				//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
+				//and encode each segment into binary values.
+				if (continousBufferSegmentSize > 0) {
+					for (let i = 0; i <= stringByteLength - 4; i += 4) {
+						const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
+						const encodedStringPart = DoubleWord.fromInteger(parseInt(bufferSegment, 16));
+						encodedInstructions.push(encodedStringPart);
+					}
+				}
+				//Get the last bytes from the buffer
+				if (restOfBufferSize > 0) {
+					let bufferSegment = stringBuffer.toString("hex", continousBufferSegmentSize, stringByteLength);
+					for (let i = 0; i < 4 - restOfBufferSize; i++) 
+					{
+						bufferSegment += "00";
+					}
+					const encodedStringPart = DoubleWord.fromInteger(parseInt(bufferSegment, 16));
 					encodedInstructions.push(encodedStringPart);
 				}
+				stringEncoded = true;
 			}
-			//Get the last bytes from the buffer
-			if (restOfBufferSize > 0) {
-				const bufferSegment = stringBuffer.toString("hex", continousBufferSegmentSize, stringByteLength);
-				const binaryString = parseInt(bufferSegment, 16).toString(2).padStart((8 * restOfBufferSize), "0");
-				const bitArray: Array<Bit> = new Array<Bit>(
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0
-				)
-				binaryString.split("").forEach((bit, index) => {
-					bitArray[index] = (bit === "0") ? 0 : 1;
-				})
-				const encodedStringPart = new DoubleWord(bitArray);
-				encodedInstructions.push(encodedStringPart);
+			if (!stringEncoded) {
+				throw new Error(`Error encoding string constant in line: ${lineNo + 1}: ${line}`);
 			}
-			stringEncoded = true;
+			
+			return encodedInstructions;
 		}
-		if (!stringEncoded) {
-			throw new Error(`Error encoding string constant in line: ${lineNo + 1}: ${line}`);
-		}
-		return encodedInstructions;
+
+		throw new Error(`Error encoding string constant in line: ${lineNo + 1}: ${line}`);
 	}
 
 	/**

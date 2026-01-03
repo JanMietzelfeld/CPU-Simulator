@@ -443,7 +443,6 @@ export class CPUCore {
         
         // Debug prints
 
-        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());
         try {
             if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
                 const physicalAddress: PhysicalAddress = this.mmu.translate(this.esp.content, false, false, true);
@@ -454,8 +453,8 @@ export class CPUCore {
         catch(e) {
             console.log("Stack value: Not Mapped");
         }
-
         
+        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());        
 
         let jumpPerformed = false;
         switch (operation) {
@@ -566,6 +565,18 @@ export class CPUCore {
                 break;
             case EncodedOperations.JE:
                 jumpPerformed = this.je(this._decodedInstruction.operands![0]);
+                break;
+            case EncodedOperations.JA:
+                jumpPerformed = this.ja(this._decodedInstruction.operands![0]);
+                break;
+            case EncodedOperations.JAE:
+                jumpPerformed = this.jae(this._decodedInstruction.operands![0]);
+                break;
+            case EncodedOperations.JB:
+                jumpPerformed = this.jb(this._decodedInstruction.operands![0]);
+                break;
+            case EncodedOperations.JBE:
+                jumpPerformed = this.jle(this._decodedInstruction.operands![0]);
                 break;
             case EncodedOperations.JG:
                 jumpPerformed = this.jg(this._decodedInstruction.operands![0]);
@@ -1704,7 +1715,7 @@ export class CPUCore {
             secondOperandsValue = this.readRegister(target);
         }
         // Perform the CMP operation
-        this.alu.cmp(secondOperandsValue, firstOperandsValue);
+        this.alu.cmp(firstOperandsValue, secondOperandsValue);
         // Both operands are read-only, so no need to write the result back.
         return;
     }
@@ -1928,6 +1939,180 @@ export class CPUCore {
             if (error instanceof UnsupportedOperandTypeError) {
                 throw new UnsupportedOperandTypeError(error.message.replace("JNZ", "JNE"));
             }
+        }
+        return jumpPerformed;
+    }
+
+    /**
+     * This method performs a conditional jump. This means that the jump is only executed if a certain 
+     * condition is met. In this case, the jump is only executed if the carry and zero flag
+     * is 0.  This result in turn means that the first 
+     * compared value was above the second. This method takes a binary value from the location defined 
+     * by the specified operand. The binary value is interpreted as a virtual address.
+     * @param target An operand used as an argument for the operation.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     * @returns True, if a jump was performed, false otherwise.
+     */
+    private ja(target: InstructionOperand): boolean {
+        let jumpPerformed = false;
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "JA")
+            );
+        }
+        // Check if exactly one operand is present.
+        if (target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "one operand").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        /*
+         * Check if: 
+         *      1. The carry flag is cleared to (0)_2
+         *      2. The zero flag is cleared to (0)_2
+         */
+        if (this.eflags.carry === 0 && this.eflags.zero === 0) {
+            // Load the given virtual address into the instruction pointer in order to perform the jump.
+            this.eip.content = target.value;
+            jumpPerformed = true;
+        }
+        return jumpPerformed;
+    }
+
+    /**
+     * This method performs a conditional jump. This means that the jump is only executed if a certain 
+     * condition is met. In this case, the jump is only executed if the carry flag
+     * is 0.  This result in turn means that the first 
+     * compared value was above or equal to the second. This method takes a binary value from the location defined 
+     * by the specified operand. The binary value is interpreted as a virtual address.
+     * @param target An operand used as an argument for the operation.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     * @returns True, if a jump was performed, false otherwise.
+     */
+    private jae(target: InstructionOperand): boolean {
+        let jumpPerformed = false;
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "JAE")
+            );
+        }
+        // Check if exactly one operand is present.
+        if (target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "one operand").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        /*
+         * Check if: 
+         *      1. The carry flag is cleared to (0)_2
+         */
+        if (this.eflags.carry === 0) {
+            // Load the given virtual address into the instruction pointer in order to perform the jump.
+            this.eip.content = target.value;
+            jumpPerformed = true;
+        }
+        return jumpPerformed;
+    }
+
+    /**
+     * This method performs a conditional jump. This means that the jump is only executed if a certain 
+     * condition is met. In this case, the jump is only executed if the carry flag
+     * is 1.  This result in turn means that the first 
+     * compared value was below the second. This method takes a binary value from the location defined 
+     * by the specified operand. The binary value is interpreted as a virtual address.
+     * @param target An operand used as an argument for the operation.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     * @returns True, if a jump was performed, false otherwise.
+     */
+    private jb(target: InstructionOperand): boolean {
+        let jumpPerformed = false;
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "JB")
+            );
+        }
+        // Check if exactly one operand is present.
+        if (target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "one operand").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        /*
+         * Check if: 
+         *      1. The carry flag is set to (1)_2
+         */
+        if (this.eflags.carry === 1) {
+            // Load the given virtual address into the instruction pointer in order to perform the jump.
+            this.eip.content = target.value;
+            jumpPerformed = true;
+        }
+        return jumpPerformed;
+    }
+
+    /**
+     * This method performs a conditional jump. This means that the jump is only executed if a certain 
+     * condition is met. In this case, the jump is only executed if the carry flag
+     * is 1.  This result in turn means that the first 
+     * compared value was below or equal to the second. This method takes a binary value from the location defined 
+     * by the specified operand. The binary value is interpreted as a virtual address.
+     * @param target An operand used as an argument for the operation.
+     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
+     * @throws {MissingOperandError} If one of the operands is missing.
+     * @returns True, if a jump was performed, false otherwise.
+     */
+    private jbe(target: InstructionOperand): boolean {
+        let jumpPerformed = false;
+        // Check if the target operand is of type IMMEDIATE.
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
+            const msg: string = CPUCore._ERROR_MESSAGE_INVALID_OPERANDTYPE;
+            throw new UnsupportedOperandTypeError(
+                msg.replace("__OPERAND_TYPE__", "IMMEDIATE").replace("__INSTRUCTION__", "JBE")
+            );
+        }
+        // Check if exactly one operand is present.
+        if (target.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (target.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "one operand").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+        /*
+         * Check if: 
+         *      1. The carry flag is set to (1)_2
+         *      2. The zero flag is set to (1)_2
+         */
+        if (this.eflags.carry === 1 && this.eflags.zero === 1) {
+            // Load the given virtual address into the instruction pointer in order to perform the jump.
+            this.eip.content = target.value;
+            jumpPerformed = true;
         }
         return jumpPerformed;
     }

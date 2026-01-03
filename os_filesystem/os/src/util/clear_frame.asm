@@ -7,16 +7,10 @@
 
     PUSH %ebx
 
-    ; push "os/util/zero_frame.bin\0" onto stack
- 
-    PUSH $0x696E0000
-    PUSH $0x6D652E62
-    PUSH $0x5F667261
-    PUSH $0x7A65726F
-    PUSH $0x74696C2F
-    PUSH $0x6F732F75
+    const _UTIL_CLEAR_FRAME_CONST_ZERO_FRAME_FILE_PATH = "os/util/zero_frame.bin"
 
-    MOV %esp, %ebx
+
+    MOV $_UTIL_CLEAR_FRAME_CONST_ZERO_FRAME_FILE_PATH, %ebx
 
     ; SYSCALLS_FILE_OPEN
     ; Parameters (ebx is a pointer to the start of an ASCII filename):
@@ -34,13 +28,6 @@
     ; TODO stop the simulator
 
     ._UTIL_CLEAR_FRAME_FILE_OPEN:
-
-    POP %ebx
-    POP %ebx
-    POP %ebx
-    POP %ebx
-    POP %ebx
-    POP %ebx
 
     POP %ebx ; Pointer to the frame base address
 

@@ -1,10 +1,10 @@
 {
     "constant_formats" : {
-        "declarationDecimal" : "^[ ]*(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
-        "declarationHexadecimal" : "^(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
-        "declarationBinary" : "^[ ]*(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0b[01]+$",
-        "declarationString" : "^[ ]*(const)[ ]+[a-zA-Z][a-zA-Z\\-_0-9]*[ ]*=[ ]*\"[a-zA-Z0-9]*\"$",
-        "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
+        "declarationDecimal" :      "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
+        "declarationHexadecimal" :  "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
+        "declarationBinary" :       "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0b[01]+$",
+        "declarationString" :       "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*(\")[a-zA-Z\\-_/.0-9]*(\")$",
+        "usage" : "[$%@][a-zA-Z\\-_][a-zA-Z\\-_0-9]*"
     },
     "comment_format" : "[ ]*;.*",
     "include_format" : "^[ ]*(include)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
@@ -611,6 +611,82 @@
             "opcode" : "0001101",
             "type" : "J",
             "regex" : "(JNE)[ ]+(__TARGET__)",
+            "operands" : [
+                {
+                    "name" : "__TARGET__",
+                    "allowed_types" : [
+                        "REGISTER_DIRECT",
+                        "REGISTER_INDIRECT",
+                        "MEMORY_ADDRESS_DECIMAL",
+                        "MEMORY_ADDRESS_HEXADECIMAL",
+                        "MEMORY_ADDRESS_BINARY",
+                        "LABEL"
+                    ]
+                }
+            ]
+        },
+        {
+            "mnemonic" : "JA",
+            "opcode" : "0101100",
+            "type" : "J",
+            "regex" : "(JA)[ ]+(__TARGET__)",
+            "operands" : [
+                {
+                    "name" : "__TARGET__",
+                    "allowed_types" : [
+                        "REGISTER_DIRECT",
+                        "REGISTER_INDIRECT",
+                        "MEMORY_ADDRESS_DECIMAL",
+                        "MEMORY_ADDRESS_HEXADECIMAL",
+                        "MEMORY_ADDRESS_BINARY",
+                        "LABEL"
+                    ]
+                }
+            ]
+        },
+         {
+            "mnemonic" : "JAE",
+            "opcode" : "0101101",
+            "type" : "J",
+            "regex" : "(JAE)[ ]+(__TARGET__)",
+            "operands" : [
+                {
+                    "name" : "__TARGET__",
+                    "allowed_types" : [
+                        "REGISTER_DIRECT",
+                        "REGISTER_INDIRECT",
+                        "MEMORY_ADDRESS_DECIMAL",
+                        "MEMORY_ADDRESS_HEXADECIMAL",
+                        "MEMORY_ADDRESS_BINARY",
+                        "LABEL"
+                    ]
+                }
+            ]
+        },
+         {
+            "mnemonic" : "JB",
+            "opcode" : "0101110",
+            "type" : "J",
+            "regex" : "(JB)[ ]+(__TARGET__)",
+            "operands" : [
+                {
+                    "name" : "__TARGET__",
+                    "allowed_types" : [
+                        "REGISTER_DIRECT",
+                        "REGISTER_INDIRECT",
+                        "MEMORY_ADDRESS_DECIMAL",
+                        "MEMORY_ADDRESS_HEXADECIMAL",
+                        "MEMORY_ADDRESS_BINARY",
+                        "LABEL"
+                    ]
+                }
+            ]
+        },
+         {
+            "mnemonic" : "JBE",
+            "opcode" : "0101111",
+            "type" : "J",
+            "regex" : "(JBE)[ ]+(__TARGET__)",
             "operands" : [
                 {
                     "name" : "__TARGET__",

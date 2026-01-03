@@ -39,7 +39,7 @@
     ; %eax = timer id
 
     CMP $255, %eax
-    JG _INTERRUPTS_TIMER_RETURN ; error invalid id
+    JA _INTERRUPTS_TIMER_RETURN ; error invalid id
 
 
     MOV $CONST_OS_PROCESS_BLOCKED_QUEUE_START, %ebx

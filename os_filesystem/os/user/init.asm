@@ -1,18 +1,9 @@
-; push "os/util/new_process_name.bin\0" onto stack
 
-PUSH $0x0
-
-PUSH $0x2E62696E
-PUSH $0x6E616D65
-PUSH $0x6573735F
-PUSH $0x70726F63
-PUSH $0x6E65775F
-PUSH $0x74696C2F
-PUSH $0x6F732F75
+const _INIT_START_CONST_PROCES_NAME_FILE_PATH = "os/util/new_process_name.bin"
 
 ._INIT_START:
 
-MOV %esp, %ebx
+MOV $_INIT_START_CONST_PROCES_NAME_FILE_PATH, %ebx
 
 ; SYSCALLS_FILE_STAT
 ; Parameters (ebx is a pointer to the start of an ASCII filename):
@@ -24,7 +15,7 @@ INT $0x80
 CMP $2, %eax ; if SYSCALLS_FILE_STAT reurns error or file does not contain a valid file name (file length > 1) no new process needs to be created
 JL _INIT_SET_TIMER
 
-MOV %esp, %ebx
+MOV $_INIT_START_CONST_PROCES_NAME_FILE_PATH, %ebx
 
 ; create new process
 PUSH %eax ; push lenght
@@ -163,8 +154,6 @@ PUSH %eax ; file descriptor
     ; just ignore any error for now
 
     POP %ebx ; file length
-
-NOP
 
 ._INIT_SET_TIMER:
     MOV $10, %ebx

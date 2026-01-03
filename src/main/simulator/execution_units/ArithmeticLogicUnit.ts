@@ -334,7 +334,18 @@ export class ArithmeticLogicUnit {
              */
             subtrahend = this.neg(subtrahend);
         }
-        return this.add(minuend, subtrahend);
+
+        let result = this.add(minuend, subtrahend);
+        
+        //Here, the carry represents the borrow and thus has the opposite meaning compared to the addition.
+        if (this._eflags.carry === 1) {
+            this._eflags.clearCarry();
+        }
+        else {
+            this._eflags.setCarry();
+        }
+
+        return result;
     }
 
     /**
@@ -615,7 +626,7 @@ export class ArithmeticLogicUnit {
      * @param secondOperand 
      */
     public cmp(firstOperand: DoubleWord, secondOperand: DoubleWord) {
-        this.sub(firstOperand, secondOperand);
+        this.sub(secondOperand, firstOperand);
         return;
     }
 
