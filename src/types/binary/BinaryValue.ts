@@ -1,5 +1,6 @@
 import { Bit } from "./Bit";
 import { DataSizes } from "../enumerations/DataSizes";
+import { Byte } from "./Byte";
 
 /**
  * This class represents a generic binary value.
@@ -9,32 +10,46 @@ export class BinaryValue {
     /**
      * An array of bits, representing a binary value.
      */
-    protected _value: Array<Bit>;
+    private _stringValue: string = "";
+    private _numberValue: number = 0;
+    private readonly _bits: number;
 
     /**
      * Constructs a new binary value from the given array of bits.
      * @param value An array of bits representing a binary value.
      */
-    public constructor(value: Array<Bit>) {
-        this._value = value.slice();
+    public constructor(value: number, numberOfBits: number) {
+
+        this._bits = numberOfBits;
+        this.value = value;
     }
+
+        /**
+	 * Accessor for reading the binary value.
+	 */
+	public get size(): number {
+		return this._bits;
+	}
+
 
     /**
 	 * Accessor for reading the binary value.
 	 */
-	public get value(): Array<Bit> {
-		return this._value;
+	public get value(): number {
+		return this._numberValue;
 	}
 
 	/**
 	 * Accessor for setting the binary value.
 	 * @param newValue The new value.
 	 */
-	public set value(newValue: Array<Bit>) {
-        if (newValue.length !== this._value.length) {
-            throw new Error(`The number of bits of the new value does not match that of the old value: ${newValue.length} vs. ${this._value.length}`);
-        }
-		this._value = newValue;
+	public set value(newValue: number) {
+
+        newValue = newValue >>> 0; 
+
+        this._numberValue = newValue;
+        this._stringValue = newValue.toString(2).padStart(this._bits, "0");
+        this._stringValue = this._stringValue.slice(this._stringValue.length - this._bits);
 	}
 
     /**
@@ -42,7 +57,7 @@ export class BinaryValue {
      * @returns The least significant bit.
      */
     public getLeastSignificantBit(): Bit {
-        return this._value[this._value.length - 1];
+        return (this.value & 1) as Bit;
     }
 
     /**
@@ -50,29 +65,7 @@ export class BinaryValue {
      * @returns The most significant bit.
      */
     public getMostSignificantBit(): Bit {
-        return this._value[0];
-    }
-
-    /**
-     * This method returns the least significant byte of this value.
-     * @returns The least significant byte.
-     */
-    public getLeastSignificantByte(): Array<Bit> {
-        if (this._value.length < 8) {
-            throw new Error("The value does not contain enough bits to retrieve a byte.");
-        }
-        return this._value.slice(-DataSizes.BYTE);
-    }
-
-    /**
-     * This method returns the least significant byte of this value.
-     * @returns The least significant byte.
-     */
-    public getMostSignificantByte(): Array<Bit> {
-        if (this._value.length < 8) {
-            throw new Error("The value does not contain enough bits to retrieve a byte.");
-        }
-        return this._value.slice(0, DataSizes.BYTE);
+        return ((this.value >>> (this._bits - 1)) & 1) as Bit;
     }
 
     /**
@@ -81,11 +74,8 @@ export class BinaryValue {
      * @param nbrOfBits 
      * @returns 
      */
-    public getLeastSignificantBits(nbrOfBits: number): Array<Bit> {
-        if (nbrOfBits > this._value.length) {
-            throw new Error(`The value does not contain enough bits to retrieve a subset of ${nbrOfBits} bits.`);
-        }
-        return this._value.slice(-nbrOfBits);
+    public getLeastSignificantBits(nbrOfBits: number): number {
+        return this.value & ((1 << nbrOfBits) - 1);
     }
 
     /**
@@ -94,28 +84,58 @@ export class BinaryValue {
      * @param nbrOfBits 
      * @returns 
      */
-    public getMostSignificantBits(nbrOfBits: number): Array<Bit> {
-        if (nbrOfBits > this._value.length) {
-            throw new Error(`The value does not contain enough bits to retrieve a subset of ${nbrOfBits} bits.`);
-        }
-        return this._value.slice(0, nbrOfBits);
-    }
-    
+    public getMostSignificantBits(nbrOfBits: number): number {
+        return (this.value >>> (this._bits - nbrOfBits)) & ((1 << nbrOfBits) - 1);
+    }    
+
     /**
-     * Interpret the bits as unsigned integer and returns the corresponding JavaScript number.
-     * This is precise for any 32 bit value, but does NOT support 64 bit values due to JavaScript number internals.
-     * @returns Unsigned integer as JavaScript number
-     * @author Laurin Gehlenborg
+     * This method gets a bit at a specified index, were index 0 is MSB and Index size - 1 is LSB.
+     * @param index The position of the bit to get.
+     * @returns 
      */
-    public toUnsignedNumber(): number {
-		const len = this._value.length;
-        let sum = 0;
+    public getBit(index: number): Bit {
         
-        for (let i = 0; i < len; i++) {
-            sum = sum * 2 + this._value[i];
+        return ((this.value >>> (this._bits - 1 - index)) & 1) as Bit;
+    }
+
+    /**
+     * This method gets a range of bits from a specified start index.
+     * @param start The zero-based index number indicating the beginning of the range.
+     * @param end Zero-based index number indicating the end of the range. The range includes the bit up to, but not including, the bit indicated by end.
+     * @returns 
+     */
+    public getBitRange(start: number, end: number = this._bits): number {
+        
+        return (this.value >>> (this._bits - end)) & ((1 << (end - start)) - 1);
+    }
+
+    /**
+     * This method sets or clears the a bit at a specified index, were index 0 is MSB and Index size - 1 is LSB.
+     * Clearing means setting the bit to a binary 0. Setting means setting the bit to a binary 1.
+     * @param index The position of the bit to set.
+     * @param bit The binary value to set the bit bit to.
+     * @returns 
+     */
+    public setBit(index: number, bit: Bit) {
+        const mask = 1 << (this._bits -1 - index); 
+
+        if (bit) {
+            // Set bit to 1
+            this.value |= mask;
+        } else {
+            // Set bit to 0
+            this.value &= ~mask;
         }
         
-        return sum;
+        return;
+    }
+
+    /**
+	 * Converts the binary value into a string representation.
+	 * @returns 
+	 */
+	public toString(): string {
+		return this._stringValue;
 	}
-    
+
 }

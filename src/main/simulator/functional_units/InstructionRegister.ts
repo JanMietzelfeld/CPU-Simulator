@@ -1,13 +1,11 @@
-import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
-import { Instruction } from "../../../types/binary/Instruction";
 import { Register } from "./Register";
 
 /**
  * This class represents the instruction register (EIR).
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
-export class InstructionRegister extends Register<Instruction> {
+export class InstructionRegister extends Register<DoubleWord> {
     /**
      * Constructs a new instance.
      * @constructor
@@ -30,9 +28,6 @@ export class InstructionRegister extends Register<Instruction> {
      * @param newValue The new value.
      */
     public set content(newValue: DoubleWord) {
-        if (newValue.value.length !== DataSizes.DOUBLEWORD) {
-			throw new Error(`A new value must have exactly ${DataSizes.DOUBLEWORD} bits: ${newValue.value.length} given.`);
-		}
         this._content = new DoubleWord(newValue.value);
     }
 }

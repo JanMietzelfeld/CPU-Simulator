@@ -2,8 +2,6 @@ import { Assembler } from "./Assembler";
 import { CPUCore } from "./execution_units/CPUCore";
 import { RAM } from "./functional_units/RAM";
 import { DoubleWord } from "../../types/binary/DoubleWord";
-import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
-import { VirtualAddress } from "../../types/binary/VirtualAddress";
 import { Bit } from "../../types/binary/Bit";
 import { MemoryManagementUnit } from "./execution_units/MemoryManagementUnit";
 import { DataSizes } from "../../types/enumerations/DataSizes";
@@ -14,7 +12,6 @@ import { InstructionOperand } from "../../types/binary/InstructionOperand";
 import { EncodedAddressingModes } from "../../types/enumerations/EncodedAdressingModes";
 import { AddressSpace } from "../../types/binary/AddressSpace";
 import { EncodedOperandTypes } from "../../types/enumerations/EncodedOperandTypes";
-import { Address } from "../../types/binary/Address";
 import { disassemble } from "./Disassembler";
 import { exit } from "process";
 import { PassthroughFilesystem } from "./os/PassthroughFilesystem";
@@ -47,10 +44,10 @@ export class SimulationController {
      * The size of the kernel space is exactly 1 gibibyte.
      * @readonly
      */
-    private static readonly KERNEL_SPACE:  AddressSpace<PhysicalAddress> = 
-        new AddressSpace<PhysicalAddress>(
-            PhysicalAddress.fromInteger(0xC0000000),
-            PhysicalAddress.fromInteger(0xFFFFFFFF)
+    private static readonly KERNEL_SPACE:  AddressSpace = 
+        new AddressSpace(
+            (0xC0000000),
+            (0xFFFFFFFF)
         );
 
     /**
@@ -126,7 +123,7 @@ export class SimulationController {
         // Enable real mode and disable memory virtualization.
         this.core.mmu.disableMemoryVirtualization();
 
-        const startOfKernelSpace = SimulationController.KERNEL_SPACE.lowAddressToDecimal();
+        const startOfKernelSpace = SimulationController.KERNEL_SPACE.lowAddress;
 
         // Load kernel code into memory 
         const kernelCodeStartAddress = startOfKernelSpace;
@@ -139,10 +136,10 @@ export class SimulationController {
         //disassemble(compiledOS, kernelCodeStartAddress) //For debugging
 
         for (let i = 0; i < compiledOS.length; i++) {
-            this.mainMemory.writeDoublewordTo(PhysicalAddress.fromInteger(kernelCodeStartAddress + i*DoubleWord.SIZE_IN_BYTES), compiledOS[i])
+            this.mainMemory.writeDoubleWordTo(new DoubleWord(kernelCodeStartAddress + i*DoubleWord.SIZE_IN_BYTES), compiledOS[i])
         }
         
-        this.core.setEIP(Address.fromInteger(kernelCodeStartAddress));
+        this.core.setEIP(new DoubleWord(kernelCodeStartAddress));
 
         //Assemble the init program (needed by the os)
         this.assembleProgram(process.cwd() + "/os_filesystem/os/user/init.asm");
@@ -216,10 +213,10 @@ export class SimulationController {
 
         compiledProgram.forEach(word => {
             
-            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
+            binaryProgram.push(word.getUpperWord().getUpperByte().value);
+            binaryProgram.push(word.getUpperWord().getLowerByte().value);
+            binaryProgram.push(word.getLowerWord().getUpperByte().value);
+            binaryProgram.push(word.getLowerWord().getLowerByte().value);
         });
 
         const buffer = Buffer.from(binaryProgram);
@@ -254,7 +251,7 @@ export class SimulationController {
             }
         
 
-            data.push(new DoubleWord(bits));
+            data.push(new DoubleWord(parseInt(bits.join(""), 2)));
         }
 
         return data;
@@ -277,17 +274,17 @@ export class SimulationController {
         let fileContents: Array<DoubleWord> = [];
 
         for (let i = 0; i < 4096; i++) {
-            fileContents.push(DoubleWord.fromInteger(0))
+            fileContents.push(new DoubleWord(0))
         }
 
         let binaryProgram: number[] = [];
 
         fileContents.forEach(word => {
             
-            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
+            binaryProgram.push(word.getUpperWord().getUpperByte().value);
+            binaryProgram.push(word.getUpperWord().getLowerByte().value);
+            binaryProgram.push(word.getLowerWord().getUpperByte().value);
+            binaryProgram.push(word.getLowerWord().getLowerByte().value);
         });
 
         let buffer = Buffer.from(binaryProgram);
@@ -297,7 +294,7 @@ export class SimulationController {
         fileContents = [];
 
         for (let i = 0; i < 786432; i++) {
-            fileContents.push(DoubleWord.fromInteger(1073741824)); //0x40000000 = 1073741824
+            fileContents.push(new DoubleWord(1073741824)); //0x40000000 = 1073741824
         }
 
         for (let i = 0; i < 262144; i++) {
@@ -305,13 +302,13 @@ export class SimulationController {
             {
                 let value = 2415919104;  //0xB0000000 = 2415919104
 
-                fileContents.push(DoubleWord.fromInteger(value + i + 786432));
+                fileContents.push(new DoubleWord(value + i + 786432));
             }
             else
             {
                 let value = 2952790016;  //0x90000000 = 2952790016
 
-                fileContents.push(DoubleWord.fromInteger(value + i + 786432));
+                fileContents.push(new DoubleWord(value + i + 786432));
             }
         }
 
@@ -319,10 +316,10 @@ export class SimulationController {
 
         fileContents.forEach(word => {
             
-            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
+            binaryProgram.push(word.getUpperWord().getUpperByte().value);
+            binaryProgram.push(word.getUpperWord().getLowerByte().value);
+            binaryProgram.push(word.getLowerWord().getUpperByte().value);
+            binaryProgram.push(word.getLowerWord().getLowerByte().value);
         });
 
         buffer = Buffer.from(binaryProgram);

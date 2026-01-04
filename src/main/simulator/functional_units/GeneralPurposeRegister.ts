@@ -30,9 +30,6 @@ export class GeneralPurposeRegister extends Register<DoubleWord> {
      * @param newValue The new value.
      */
     public set content(newValue: DoubleWord) {
-        if (newValue.value.length !== DataSizes.DOUBLEWORD) {
-			throw new Error(`A new value must have exactly ${DataSizes.DOUBLEWORD} bits: ${newValue.value.length} given.`);
-		}
         this._content = new DoubleWord(newValue.value);
     }
 }

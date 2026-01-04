@@ -53,9 +53,9 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): vo
     for (let i = 0; i < program.length; i += 3) {
         const address = startAddress + i * 4
         const instruction = encodedOperationNameByValue(program[i].toString().substring(5, 5+7))
-        const op1 = program[i+1].toUnsignedNumber()
+        const op1 = program[i+1].value
         //const addressingMode1 = encodedOperandTypesNameByValue(program[i].toString().substring(5, 30))
-        const op2 = program[i+2].toUnsignedNumber()
+        const op2 = program[i+2].value
 
         let seperator = "\t"
         if (op1 < 99999) {

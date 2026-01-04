@@ -1,11 +1,10 @@
-import { twosComplementToDecimal } from "../../helper";
 import { BinaryValue } from "./BinaryValue";
-import { Bit } from "./Bit";
-import { DataSizes } from "../enumerations/DataSizes";
+import { Byte } from "./Byte";
+import { Word } from "./Word";
 
 export class DoubleWord extends BinaryValue {
-	public static readonly MAXIMUM_NUMBER_DEC: number = 4_294_967_295;
-	public static readonly MINIMUM_NUMBER_DEC: number = -2_147_483_648;
+	public static readonly MAXIMUM_NUMBER_DEC: number = 2^32 - 1;
+	public static readonly MINIMUM_NUMBER_DEC: number = -2^31;
 	public static readonly NUMBER_OF_BITS_DEC: number = 32;
 	public static readonly SIZE_IN_BYTES: number = 4;
 
@@ -14,50 +13,24 @@ export class DoubleWord extends BinaryValue {
 	 * @param value The initial value of the doubleword.
 	 * @constructor
 	 */
-	public constructor(
-		value: Array<Bit> = new Array<Bit>(
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0
-		)
-	) {
-		super(new Array<Bit>(
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0
-		));
-		this.value = value;
+	public constructor(value: number = 0) {
+		super(value, DoubleWord.NUMBER_OF_BITS_DEC);
 	}
 
-	/**
-	 * Accessor for reading the binary value.
-	 * @override
-	 */
-	public get value(): Array<Bit> {
-		return this._value;
+	public static fromBytes(firstByte: Byte, secondByte: Byte, thirdByte: Byte, fourthByte: Byte) : DoubleWord {
+		return new DoubleWord(firstByte.value * 2**24 + secondByte.value * 2**6 + thirdByte.value * 2**8 + fourthByte.value)
+	}
+		public static fromByteValues(firstByte: number, secondByte: number, thirdByte: number, fourthByte: number) : DoubleWord {
+		return new DoubleWord(firstByte * 2**24 + secondByte * 2**16 + thirdByte * 2**8 + fourthByte)
 	}
 
-	/**
-	 * Accessor for setting the binary value.
-	 * @param newValue The new value.
-	 * @override
-	 */
-	public set value(newValue: Array<Bit>) {
-		if (newValue.length != DataSizes.DOUBLEWORD) {
-			throw new Error(`A new value must have exactly ${DataSizes.DOUBLEWORD} bits: ${newValue.length} given.`);
-		}
-		this._value = newValue.slice();
-	}
+	public getUpperWord(): Word {
+		return new Word(this.getMostSignificantBits(Word.NUMBER_OF_BITS_DEC));
+	} 
+
+	public getLowerWord(): Word {
+		return new Word(this.getLeastSignificantBits(Word.NUMBER_OF_BITS_DEC));
+	} 
 
 	/**
 	 * This method checks whethter the current binary value is equal to the given one or not.
@@ -67,101 +40,6 @@ export class DoubleWord extends BinaryValue {
 	 * @returns True, if both binary values are identical, false otherwise.
 	 */
 	public equal(other: DoubleWord): boolean {
-		return other.toString() === this.toString();
+		return this.value === other.value
 	}
-
-	/**
-	 * This method checks whether the current binary value is smaller than the given one.
-	 * @param other The binary value to compare to.
-	 * @returns True, if this value is less than the one compared to, false otherwise.
-	 */
-    public isSmallerThan(other: DoubleWord): boolean {
-		return twosComplementToDecimal(this) < twosComplementToDecimal(other);
-    }
-
-	/**
-	 * This method checks whether the current binary value is greater than the given one.
-	 * @param other The binary value to compare to.
-	 * @returns True, if this value is greater than the one compared to, false otherwise.
-	 */
-	public isGreaterThan(other: DoubleWord): boolean {
-		return twosComplementToDecimal(this) > twosComplementToDecimal(other);
-	}
-
-	/**
-	 * This method checks whether the current binary value is a binary zero or not.
-	 * @returns True, if the binary value is zero, false otherwise.
-	 */
-	public isZero(): boolean {
-		return this.equal(new DoubleWord());
-	}
-
-	/**
-	 * This method checks whether the current binary value is not a binary zero or not.
-	 * @returns True, if the binary value is not zero, false otherwise.
-	 */
-	public isNotZero(): boolean {
-		return !this.isZero();
-	}
-
-	/**
-	 * This method checks whether this binary value represents a negative number.
-	 * @returns True, if the most significant bit is set to 1, false otherwise.
-	 */
-	public isNegative(): boolean {
-		return this._value[0] === 1;
-	}
-
-	/**
-	 * This method checks whether this binary value represents a positive number.
-	 * @returns True, if the most significant bit is set to 0, false otherwise.
-	 */
-	public isPositive(): boolean {
-		return this._value[0] === 0;
-	}
-
-	/**
-	 * Converts the binary value into a string representation.
-	 * @param [groupBytes=false] If set to true, the string representation of the binary value is grouped into bytes.
-	 * @returns The string representation of the binary value.
-	 */
-	public toString(groupBytes = false): string {
-		let result = "";
-		if (groupBytes) {
-			result = `${this.value[0]}${this.value[1]}${this._value[2]}${this._value[3]}${this.value[4]}${this.value[5]}${this._value[6]}${this._value[7]} ${this.value[8]}${this.value[9]}${this._value[10]}${this._value[11]}${this.value[12]}${this.value[13]}${this._value[14]}${this._value[15]} ${this.value[16]}${this.value[17]}${this._value[18]}${this._value[19]}${this.value[20]}${this.value[21]}${this._value[22]}${this._value[23]} ${this.value[24]}${this.value[25]}${this._value[26]}${this._value[27]}${this.value[28]}${this.value[29]}${this._value[30]}${this._value[31]}`;
-		} else {
-			result = this._value.join("");
-		}
-		return result;
-	}
-
-	/**
-	 * This method creates an instance from the given number. 
-	 * Throws an error, if the given number is not an integer.
-	 * @param integer The number to initialize the new instances value with.
-	 * @returns A new instance.
-	 */
-	public static fromInteger(integer: number): DoubleWord {
-		if (!Number.isInteger(integer)) {
-			throw new Error("Given number is not an integer.");
-		}
-
-		if (integer < DoubleWord.MINIMUM_NUMBER_DEC || integer > DoubleWord.MAXIMUM_NUMBER_DEC) {
-			throw new Error(`The given number cannot be expressed using ${DataSizes.DOUBLEWORD} bits`);
-		}
-
-		const doubleword: DoubleWord = new DoubleWord();
-
-		// A bit shift converts the given number to a signed 32-bit value.
-		const binaryNumber: string = (integer < 0) ? 
-			(integer >>> 0).toString(2) : 
-			integer.toString(2).padStart(DataSizes.DOUBLEWORD, "0");
-
-		binaryNumber.split("").forEach((bit, index) => {
-			doubleword._value[index] = (bit === "0") ? 0 : 1;
-		});
-
-		return doubleword;
-	}
-
 }

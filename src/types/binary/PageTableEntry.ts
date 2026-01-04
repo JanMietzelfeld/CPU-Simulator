@@ -1,3 +1,4 @@
+import { BinaryValue } from "./BinaryValue";
 import { Bit } from "./Bit";
 import { DoubleWord } from "./DoubleWord";
 
@@ -19,12 +20,12 @@ export class PageTableEntry {
     /**
      * This field stores the flag bits of the page table entry.
      */
-    public readonly flagBits: Array<Bit>;
+    public readonly flagBits: BinaryValue;
 
     /**
      * This field stores the number of the associated page frame.
      */
-    public readonly frameNbr: Array<Bit>;
+    public readonly frameNbr: BinaryValue;
     
     /**
      * This constructor creates a new page table entry with the given flag bits, page number and frame number.
@@ -32,12 +33,12 @@ export class PageTableEntry {
      * @param frameNbr The number of the associated page frame.
      * @constructor
      */
-    public constructor(flagBits: Array<Bit>, frameNbr: Array<Bit>) {
-        if (flagBits.length !== PageTableEntry.NUMBER_OF_BITS_FOR_FLAGS_DEC) {
-            throw new Error(`The number of flag bits must be exactly ${PageTableEntry.NUMBER_OF_BITS_FOR_FLAGS_DEC}: ${flagBits.length} given.`);
+    public constructor(flagBits: BinaryValue, frameNbr: BinaryValue) {
+        if (flagBits.size !== PageTableEntry.NUMBER_OF_BITS_FOR_FLAGS_DEC) {
+            throw new Error(`The number of flag bits must be exactly ${PageTableEntry.NUMBER_OF_BITS_FOR_FLAGS_DEC}: ${flagBits.size} given.`);
         }
-        if (frameNbr.length !== PageTableEntry.NUMBER_OF_BITS_FOR_PAGE_FRAME_NUMBER_DEC) {
-            throw new Error(`The number of bits for the page frame number must be exactly ${PageTableEntry.NUMBER_OF_BITS_FOR_PAGE_FRAME_NUMBER_DEC}: ${frameNbr.length} given.`);
+        if (frameNbr.size !== PageTableEntry.NUMBER_OF_BITS_FOR_PAGE_FRAME_NUMBER_DEC) {
+            throw new Error(`The number of bits for the page frame number must be exactly ${PageTableEntry.NUMBER_OF_BITS_FOR_PAGE_FRAME_NUMBER_DEC}: ${frameNbr.size} given.`);
         }
         this.flagBits = flagBits;
         this.frameNbr = frameNbr;
@@ -48,7 +49,7 @@ export class PageTableEntry {
      * @returns A string representation of the page table entry.
      */
     public toString(): string {
-        return this.flagBits.concat(this.frameNbr).join("").toString();
+        return this.flagBits.toString().concat(this.frameNbr.toString());
     }
 
     /**
@@ -56,14 +57,14 @@ export class PageTableEntry {
      * @returns A doubleword representing the page table entry.
      */
     public toDoubleword(): DoubleWord {
-        return new DoubleWord(this.flagBits.concat(this.frameNbr));
+        return new DoubleWord((this.flagBits.value << PageTableEntry.NUMBER_OF_BITS_FOR_FLAGS_DEC) + this.frameNbr.value);
     }
 
     /**
      * This method sets the present flag of the page table entry.
      */
     public setPresentFlag(): void {
-        this.flagBits[0] = 1;
+        this.flagBits.setBit(0, 1);
         return;
     }
 
@@ -71,7 +72,7 @@ export class PageTableEntry {
      * This method clears the present flag of the page table entry.
      */
     public clearPresentFlag(): void {
-        this.flagBits[0] = 0;
+        this.flagBits.setBit(0, 0);
         return;
     }
 
@@ -80,14 +81,15 @@ export class PageTableEntry {
      * @returns True if the page is present, false otherwise.
      */
     public isPresent(): boolean {
-        return this.flagBits[0] === 1;
+        return this.flagBits.getBit(0) === 1;
+
     }
 
     /**
      * This method sets the writable flag of the page table entry.
      */
     public setWritableFlag(): void {
-        this.flagBits[1] = 1;
+        this.flagBits.setBit(1, 1);
         return;
     }
 
@@ -95,7 +97,7 @@ export class PageTableEntry {
      * This method clears the writable flag of the page table entry.
      */
     public clearWritableFlag(): void {
-        this.flagBits[1] = 0;
+        this.flagBits.setBit(1, 0);
         return;
     }
 
@@ -104,14 +106,14 @@ export class PageTableEntry {
      * @returns True if the page is writable, false otherwise.
      */
     public isWritable(): boolean {
-        return this.flagBits[1] === 1;
+        return this.flagBits.getBit(1) === 1;
     }
 
     /**
      * This method sets the executable flag of the page table entry.
      */
     public setExecutableFlag(): void {
-        this.flagBits[2] = 1;
+        this.flagBits.setBit(2, 0);        
         return;
     }
 
@@ -119,7 +121,7 @@ export class PageTableEntry {
      * This method clears the executable flag of the page table entry.
      */
     public clearExecutableFlag(): void {
-        this.flagBits[2] = 0;
+        this.flagBits.setBit(2, 0);        
         return;
     }
 
@@ -128,14 +130,14 @@ export class PageTableEntry {
      * @returns True if the page is executable, false otherwise.
      */
     public isExecutable(): boolean {
-        return this.flagBits[2] === 1;
+        return this.flagBits.getBit(2) === 1;
     }
 
     /**
      * This method sets the flag that indicates that this page can only be accessed in kernel mode.
      */
     public setAccessableOnlyInKernelModeFlag(): void {
-        this.flagBits[3] = 1;
+        this.flagBits.setBit(3, 0);        
         return;
     }
 
@@ -143,7 +145,7 @@ export class PageTableEntry {
      * This method clears the flag that indicates that this page can only be accessed in kernel mode.
      */
     public clearAccessableOnlyInKernelModeFlag(): void {
-        this.flagBits[3] = 0;
+        this.flagBits.setBit(3, 0);        
         return;
     }
 
@@ -152,14 +154,14 @@ export class PageTableEntry {
      * @returns True if the page is accessable only in kernel mode, false otherwise.
      */
     public isAccessableOnlyInKernelMode(): boolean {
-        return this.flagBits[3] === 1;
+        return this.flagBits.getBit(3) === 1;
     }
 
     /**
      * This method sets the pinned flag of the page table entry.
      */
     public setPinnedFlag(): void {
-        this.flagBits[4] = 1;
+        this.flagBits.setBit(4, 0);        
         return;
     }
 
@@ -167,7 +169,7 @@ export class PageTableEntry {
      * This method clears the pinned flag of the page table entry.
      */
     public clearPinnedFlag(): void {
-        this.flagBits[4] = 0;
+        this.flagBits.setBit(4, 0);        
         return;
     }
 
@@ -176,14 +178,14 @@ export class PageTableEntry {
      * @returns True if the page is pinned, false otherwise.
      */
     public isPinned(): boolean {
-        return this.flagBits[4] === 1;
+        return this.flagBits.getBit(4) === 1;
     }
 
     /**
      * This method sets the changed flag of the page table entry.
      */
     public setChangedFlag(): void {
-        this.flagBits[5] = 1;
+        this.flagBits.setBit(5, 0);        
         return;
     }
 
@@ -191,7 +193,7 @@ export class PageTableEntry {
      * This method clears the changed flag of the page table entry.
      */
     public clearChangedFlag(): void {
-        this.flagBits[5] = 0;
+        this.flagBits.setBit(5, 0);        
         return;
     }
 
@@ -200,6 +202,6 @@ export class PageTableEntry {
      * @returns True if the page was changed, false otherwise.
      */
     public wasChanged(): boolean {
-        return this.flagBits[5] === 1;
+        return this.flagBits.getBit(5) === 1;
     }
 }

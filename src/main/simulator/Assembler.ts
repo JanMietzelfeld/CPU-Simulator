@@ -4,7 +4,6 @@ import { Bit } from "../../types/binary/Bit";
 import { AssemblyLanguageDefinition } from "./compiler/AssemblyLanguageDefinition";
 import { DataSizes } from "../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../types/binary/DoubleWord";
-import { VirtualAddress } from "../../types/binary/VirtualAddress";
 
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
@@ -265,7 +264,7 @@ export class Assembler {
 
 					jumpLabels.set(
 						jumpLabel, 
-						VirtualAddress.fromInteger(programLocationCounter).toString()
+						new DoubleWord(programLocationCounter).toString()
 					);
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
@@ -341,7 +340,7 @@ export class Assembler {
 					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
 					constants.set(
 						constantName, 
-						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+						"0b" + new DoubleWord(programLocationCounter+12).toString()
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
@@ -416,7 +415,7 @@ export class Assembler {
 				const stringStartAddress: string = constants.get(stringConstantName)!.replace(/^0b/gim, "");
 				const stringMemSize = Math.ceil((Buffer.byteLength(stringConstantValue) / 4)) * 4;
 				//The memory address after the string array with the next instruction
-				const jumpAddress:string = VirtualAddress.fromInteger(parseInt(stringStartAddress, 2) + stringMemSize).toString();
+				const jumpAddress:string = new DoubleWord(parseInt(stringStartAddress, 2) + stringMemSize).toString();
 				const jumpInstruction:string = "JMP @0b" + jumpAddress;
 				const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, jumpInstruction, jumpLabels, constants);
 				encodedInstructions.push(...encodedInstruction);
@@ -430,7 +429,7 @@ export class Assembler {
 				if (continousBufferSegmentSize > 0) {
 					for (let i = 0; i <= stringByteLength - 4; i += 4) {
 						const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
-						const encodedStringPart = DoubleWord.fromInteger(parseInt(bufferSegment, 16));
+						const encodedStringPart = new DoubleWord(parseInt(bufferSegment, 16));
 						encodedInstructions.push(encodedStringPart);
 					}
 				}
@@ -441,7 +440,7 @@ export class Assembler {
 					{
 						bufferSegment += "00";
 					}
-					const encodedStringPart = DoubleWord.fromInteger(parseInt(bufferSegment, 16));
+					const encodedStringPart = new DoubleWord(parseInt(bufferSegment, 16));
 					encodedInstructions.push(encodedStringPart);
 				}
 				stringEncoded = true;
@@ -518,11 +517,15 @@ export class Assembler {
 			encodedOperandValue1 = this.encodeOperandValue("", line, jumpLabels);
 		}
 
-		encodedInstruction.value = [
+		let finalInstruction: Array<Bit> = new Array<Bit>();
+		finalInstruction = [ 
 			...instructionType, ... delimeter, ... opcode, ... delimeter, 
 			... addressingModeOperand1, ... typeOperand1, 
 			... addressingModeOperand2, ... typeOperand2
 		];
+
+
+		encodedInstruction.value = parseInt(finalInstruction.join(""), 2);
 		
 		return [encodedInstruction, encodedOperandValue1, encodedOperandValue2];
 	}
@@ -563,7 +566,7 @@ export class Assembler {
 			operand32BitEncoded = new DoubleWord();
 		} else if (jumpLabels.has(operand)) {
 			// Operand is jump label.
-			operand32BitEncoded = VirtualAddress.fromInteger(parseInt(jumpLabels.get(operand)!, 2));
+			operand32BitEncoded = new DoubleWord(parseInt(jumpLabels.get(operand)!, 2));
 		} else if (operand.startsWith("$0b")) {
 			// Binary immediate found.
 			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$0b", ""), line);
@@ -608,7 +611,7 @@ export class Assembler {
 		operand = operand.padStart(DataSizes.DOUBLEWORD, operand.charAt(0));
 		const binaryValue: DoubleWord = new DoubleWord();
 		operand.split("").map((bit, index) => {
-			binaryValue.value[index] = (bit === "0") ? 0 : 1;
+			binaryValue.setBit(index, (bit === "0") ? 0 : 1);
 		})
 		return binaryValue;
 	}
@@ -628,7 +631,7 @@ export class Assembler {
 			// Positive hex value.
 			operandDec = parseInt(operand, 16);
 		}
-		return DoubleWord.fromInteger(operandDec);
+		return new DoubleWord(operandDec);
 	}
 
 	/**
@@ -646,7 +649,7 @@ export class Assembler {
 			// Positive dec value.
 			operandDec = parseInt(operand, 10);
 		}
-		return DoubleWord.fromInteger(operandDec);
+		return new DoubleWord(operandDec);
 	}
 
 	/**
@@ -656,13 +659,13 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given virtual memory address.
 	 * @throws An error if the given operands binary memory address is invalid.
 	 */
-	private encodeBinaryAddress(operand: string, line: number): VirtualAddress {
+	private encodeBinaryAddress(operand: string, line: number): DoubleWord {
 		if (operand.length > DataSizes.DOUBLEWORD) {
 			throw Error(`In line ${line + 1}: Binary memory address consists of more than ${DataSizes.DOUBLEWORD} bits.`);
 		}
 		// Extend binary address with zeros if necessary.
 		operand = operand.padStart(DataSizes.DOUBLEWORD, "0");
-		return VirtualAddress.fromInteger(parseInt(operand, 2));
+		return new DoubleWord(parseInt(operand, 2));
 	}
 
 	/**
@@ -672,10 +675,10 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given virtual memory address.
 	 * @throws An error if the given operands hexadecimal memory address is invalid.
 	 */
-	private encodeHexadecimalAddress(operand: string, line: number): VirtualAddress {
-		let virtualAddress: VirtualAddress;
+	private encodeHexadecimalAddress(operand: string, line: number): DoubleWord {
+		let virtualAddress: DoubleWord;
 		try {
-			virtualAddress = VirtualAddress.fromInteger(parseInt(operand, 16));
+			virtualAddress = new DoubleWord(parseInt(operand, 16));
 		} catch (error) {
 			throw Error(`In line ${line + 1}: Invalid hexadecimal memory address.`);
 		}
@@ -689,10 +692,10 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given virtual memory address.
 	 * @throws An error if the given operands decimal memory address is invalid.
 	 */
-	private encodeDecimalAddress(operand: string, line: number): VirtualAddress {
-		let virtualAddress: VirtualAddress;
+	private encodeDecimalAddress(operand: string, line: number): DoubleWord {
+		let virtualAddress: DoubleWord;
 		try {
-			virtualAddress = VirtualAddress.fromInteger(parseInt(operand, 10));
+			virtualAddress = new DoubleWord(parseInt(operand, 10));
 		} catch (error) {
 			throw Error(`In line ${line + 1}: Invalid hexadecimal memory address.`);
 		}
@@ -737,7 +740,7 @@ export class Assembler {
 				const tmp: string = reg.code.padStart(DataSizes.DOUBLEWORD, "0");
 				const encodedRegister: DoubleWord = new DoubleWord();
 				tmp.split("").forEach((bit, index) => {
-					encodedRegister.value[index] = (bit === "0") ? 0 : 1;
+					encodedRegister.setBit(index, (bit === "0") ? 0 : 1);
 				});
 				return encodedRegister;
 			}

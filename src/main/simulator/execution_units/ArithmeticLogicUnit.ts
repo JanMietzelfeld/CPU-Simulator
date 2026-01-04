@@ -4,6 +4,7 @@ import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
 import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
 import { EFLAGS } from "../functional_units/EFLAGS";
+import { Byte } from "../../../types/binary/Byte";
 
 /**
  * @author Erik Burmester <erik.burmester@nextbeam.net>
@@ -31,7 +32,7 @@ export class ArithmeticLogicUnit {
      * @returns
      */
     private checkForZero(operand: DoubleWord) {
-        if (operand.value.every(bit => (bit === 0))) {
+        if (operand.value === 0) {
             this._eflags.setZero();
         } else {
             this._eflags.clearZero();
@@ -47,8 +48,8 @@ export class ArithmeticLogicUnit {
      */
     private checkForParity(operand: DoubleWord) {
         let noSetBits = 0;
-        operand.value.slice(-DataSizes.BYTE).forEach(bit => {
-            if (bit === 1) {
+        operand.getLeastSignificantBits(Byte.NUMBER_OF_BITS_DEC).toString().split("").forEach(bit => {
+            if (bit === "1") {
                 ++noSetBits
             }
         });
@@ -68,7 +69,7 @@ export class ArithmeticLogicUnit {
      * @returns
      */
     private checkForSigned(operand: DoubleWord) {
-        if (operand.value[0] === 1) {
+        if (operand.getMostSignificantBit() === 1) {
             this._eflags.setSigned();
         } else {
             this._eflags.clearSigned();
@@ -81,8 +82,8 @@ export class ArithmeticLogicUnit {
      * An overflow occurs, if the two highest bits of the carry are unequal.
      * @param carry The carry bits to check.
      */
-    private checkForOverflow(carry: Array<Bit>) {
-        if (carry[carry.length - 1] !== carry[carry.length - 2]) {
+    private checkForOverflow(carry: boolean, sign: boolean) {
+        if (carry !== sign) {
             this._eflags.setOverflow();
         } else {
             this._eflags.clearOverflow();
@@ -94,8 +95,8 @@ export class ArithmeticLogicUnit {
      * This method checks whether to set or clear the **carry** flag after an operation.
      * @param carry The carry bits to check.
      */
-    private checkCarry(carry: Array<Bit>) {
-        if (carry[carry.length - 1] === 1) {
+    private checkCarry(carry: boolean) {
+        if (carry === true) {
             this._eflags.setCarry();
         } else {
             this._eflags.clearCarry();
@@ -111,12 +112,8 @@ export class ArithmeticLogicUnit {
      * @param operand The doubleword sized binary value to invert.
      * @returns The inverted binary value.
      */
-    public not(operand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord(operand.value.slice());
-        operand.value.forEach((bit, index) => {
-            result.value[index] = (bit === 1) ? 0 : 1;
-        });
-        return result;
+    public not(operand: DoubleWord): DoubleWord {        
+        return new DoubleWord(~operand.value);
     }
 
     /**
@@ -137,13 +134,10 @@ export class ArithmeticLogicUnit {
      * @returns The resulting binary value.
      */
     public and(firstOperand: DoubleWord, secondOperand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord();
+        const result: DoubleWord = new DoubleWord(firstOperand.value & secondOperand.value);
         this._eflags.clearCarry();
         this._eflags.clearOverflow();
-        firstOperand.value.forEach((bitFirstOperand, index) => {
-            const bitSecondOperand: Bit = secondOperand.value[index];
-            result.value[index] = (bitFirstOperand === 1 && bitSecondOperand === 1) ? 1 : 0;
-        });
+    
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -168,13 +162,9 @@ export class ArithmeticLogicUnit {
      * @returns The resulting binary value.
      */
     public or(firstOperand: DoubleWord, secondOperand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord();
+        const result: DoubleWord = new DoubleWord(firstOperand.value | secondOperand.value);
         this._eflags.clearCarry();
         this._eflags.clearOverflow();
-        firstOperand.value.forEach((bitFirstOperand, index) => {
-            const bitSecondOperand: Bit = secondOperand.value[index];
-            result.value[index] = (bitFirstOperand === 0 && bitSecondOperand === 0) ? 0 : 1;
-        });
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -199,16 +189,9 @@ export class ArithmeticLogicUnit {
      * @returns The resulting binary value.
      */
     public xor(firstOperand: DoubleWord, secondOperand: DoubleWord) {
-        const result: DoubleWord = new DoubleWord();
+        const result: DoubleWord = new DoubleWord(firstOperand.value ^ secondOperand.value);
         this._eflags.clearCarry();
         this._eflags.clearOverflow();
-        firstOperand.value.forEach((bitFirstOperand, index) => {
-            const bitSecondOperand: Bit = secondOperand.value[index];
-            result.value[index] = (
-                (bitFirstOperand === 1 && bitSecondOperand === 0) || 
-                (bitFirstOperand === 0 && bitSecondOperand === 1)
-            ) ? 1 : 0;
-        });
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -224,8 +207,13 @@ export class ArithmeticLogicUnit {
      * @returns The two's complement.
      */
     public neg(operand: DoubleWord): DoubleWord {
-        operand = this.not(operand);
-        return this.add(operand, DoubleWord.fromInteger(1));
+        const result: DoubleWord = new DoubleWord(~operand.value + 1);
+        this._eflags.clearCarry();
+        this._eflags.clearOverflow();
+        this.checkForZero(result);
+        this.checkForParity(result);
+        this.checkForSigned(result);
+        return result;
     }
 
     /**
@@ -237,36 +225,19 @@ export class ArithmeticLogicUnit {
      * @returns The sum of both operands/summands.
      */
     public add(firstSummand: DoubleWord, secondSummand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord();
-        const carry: Array<Bit> = [0];
 
-        for (let index = DataSizes.DOUBLEWORD - 1; index >= 0; --index) {
-            const bitFirstOperand: Bit = firstSummand.value[index];
-            const bitSecondOperand: Bit = secondSummand.value[index];
-            const carryBit: Bit = carry[carry.length - 1];
-            if (
-                (bitFirstOperand === 1 && bitSecondOperand === 1) || 
-                (bitFirstOperand === 1 && carryBit === 1) || 
-                (bitSecondOperand === 1 && carryBit === 1) 
-            ){
-                carry.push(1);
-            } else {
-                carry.push(0);
-            }
-            const partialResult: Bit = (
-                (bitFirstOperand === 1 && bitSecondOperand === 0) || 
-                (bitFirstOperand === 0 && bitSecondOperand === 1)
-            ) ? 1 : 0;
-            result.value[index] = (
-                (partialResult === 1 && carryBit === 0) || 
-                (partialResult === 0 && carryBit === 1)
-            ) ? 1 : 0;
-        }
-        this.checkForOverflow(carry);
-        this.checkCarry(carry);
-        this.checkForZero(result);
+        let numericResult = firstSummand.value + secondSummand.value;
+
+        const carry: boolean = numericResult > DoubleWord.MAXIMUM_NUMBER_DEC;
+        const result: DoubleWord = new DoubleWord(numericResult);
+
+
         this.checkForParity(result);
         this.checkForSigned(result);
+        this.checkForZero(result);
+
+        this.checkForOverflow(carry, this._eflags.sign === 1);
+        this.checkCarry(carry);
         return result;
     }
 
@@ -279,37 +250,18 @@ export class ArithmeticLogicUnit {
      * @returns The sum of both operands/summands.
      */
     public adc(firstSummand: DoubleWord, secondSummand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord();
-        const carry: Array<Bit> = (this._eflags.carry === 1) ? [1] : [0];
-        for (let index = DataSizes.DOUBLEWORD - 1; index >= 0; --index) {
-            const bitFirstOperand: Bit = firstSummand.value[index];
-            const bitSecondOperand: Bit = secondSummand.value[index];
-            const carryBit: Bit = carry[carry.length - 1];
-            if (
-                (bitFirstOperand === 1 && bitSecondOperand === 1) || 
-                (bitFirstOperand === 1 && carryBit === 1) || 
-                (bitSecondOperand === 1 && carryBit === 1) 
-            ){
-                carry.push(1);
-            } else {
-                carry.push(0);
-            }
-            const partialResult: Bit = (
-                (bitFirstOperand === 1 && bitSecondOperand === 0) || 
-                (bitFirstOperand === 0 && bitSecondOperand === 1)
-            ) ? 1 : 0;
-            result.value[index] = (
-                (partialResult === 1 && carryBit === 0) || 
-                (partialResult === 0 && carryBit === 1)
-            ) ? 1 : 0;
-        }
-        this.checkForOverflow(carry);
         
+        let numericResult = firstSummand.value + secondSummand.value + this._eflags.carry;
 
+        const carry: boolean = numericResult > DoubleWord.MAXIMUM_NUMBER_DEC;
+        const result: DoubleWord = new DoubleWord(numericResult);
 
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
+
+        this.checkForOverflow(carry, this._eflags.sign === 1);
+        this.checkCarry(carry);
         return result;
     }
 
@@ -322,34 +274,24 @@ export class ArithmeticLogicUnit {
      * @returns The difference of the first operand (minuend) and the second operand (subtrahend).
      */
     public sub(minuend: DoubleWord, subtrahend: DoubleWord): DoubleWord {
-        if (subtrahend.value[0] === 1) {
-            /**
-             * - -(x) <=> + (x)
-             */
-            subtrahend = this.sub(subtrahend, DoubleWord.fromInteger(1));
-            subtrahend = this.not(subtrahend);
-        } else {
-            /**
-             * - (+ x) <=> - (x)
-             */
-            subtrahend = this.neg(subtrahend);
-        }
-
-        let result = this.add(minuend, subtrahend);
         
-        //Here, the carry represents the borrow and thus has the opposite meaning compared to the addition.
-        if (this._eflags.carry === 1) {
-            this._eflags.clearCarry();
-        }
-        else {
-            this._eflags.setCarry();
-        }
+        let numericResult = minuend.value - subtrahend.value;
+
+        const barrow: boolean = numericResult < 0;
+        const result: DoubleWord = new DoubleWord(numericResult);
+
+        this.checkForParity(result);
+        this.checkForSigned(result);
+        this.checkForZero(result);
+
+        minuend.getMostSignificantBit() !== subtrahend.getMostSignificantBit() && minuend.getMostSignificantBit() !== result.getMostSignificantBit() ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        this.checkCarry(barrow);
 
         return result;
     }
 
     /**
-     * This method subtracts two given binary numbers without taking the carry into account.
+     * This method subtracts two given binary numbers with taking the carry into account.
      * 
      * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
      * @param minuend The binary value to subtract from.
@@ -357,44 +299,22 @@ export class ArithmeticLogicUnit {
      * @returns The difference of the first operand (minuend) and the second operand (subtrahend).
      */
     public sbb(minuend: DoubleWord, subtrahend: DoubleWord): DoubleWord {
-        const carryFlag: Bit = this._eflags.carry;
-        if (subtrahend.value[0] === 1) {
-            /**
-             * - -(x) <=> + (x)
-             */
-            subtrahend = this.sub(subtrahend, DoubleWord.fromInteger(1));
-            this._eflags.clearCarry();
-            subtrahend = this.not(subtrahend);
-        } else {
-            /**
-             * + -(x) <=> - (x)
-             */
-            subtrahend = this.neg(subtrahend);
-        }
-        if (carryFlag === 1) {
-            this._eflags.setCarry();
-        }
-        return this.adc(minuend, subtrahend);
+
+        let numericResult = minuend.value - subtrahend.value - this._eflags.carry;
+
+        const barrow: boolean = numericResult < 0;
+        const result: DoubleWord = new DoubleWord(numericResult);
+
+        this.checkForZero(result);
+        this.checkForParity(result);
+        this.checkForSigned(result);
+
+        minuend.getMostSignificantBit() !== subtrahend.getMostSignificantBit() && minuend.getMostSignificantBit() !== result.getMostSignificantBit() ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        this.checkCarry(barrow);
+
+        return result;
     }
 
-    /**
-     * This method sign extends a given binary value to the specified length.
-     * @param operand A binary value to sign extend.
-     * @param maxLength The lenght to sign extend the operand to.
-     */
-    public signExtend<T extends BinaryValue>(operand: T, maxLength: number) {
-        if (!Number.isInteger(maxLength)) {
-			throw new Error("Given number is not an integer.");
-		}
-        if (maxLength <= operand.value.length) {
-            return;
-        }
-        const isNegative: boolean = operand.value[0] === 1;
-        for (let i = 0; i < maxLength - operand.value.length; ++i) {
-            operand.value.unshift((isNegative) ? 1 : 0);
-        }
-        return;
-    }
 
     /**
      * This method performs a logical shift on the given binary value one bit to the right.
@@ -402,15 +322,11 @@ export class ArithmeticLogicUnit {
      * @returns The bit right shifted.
      */
     public logicalRightShift<T extends BinaryValue>(operand: T): Bit {
-        // 1011 COPY
-        // 0101 RESULT
-        const copy: Array<Bit> = operand.value.slice();
-        const removedBit: Bit = copy[copy.length - 1];
-        let bitToShift: Bit = 0;
-        for (let index = 0; index < copy.length; ++index) {
-            operand.value[index] = bitToShift;
-            bitToShift = copy[index];
-        }
+        
+        const removedBit: Bit = operand.getLeastSignificantBit();
+
+        operand.value = operand.value >>> 1;
+
         return removedBit;
     }
 
@@ -420,15 +336,14 @@ export class ArithmeticLogicUnit {
      * @returns The bit right shifted.
      */
     public arithmeticRightShift<T extends BinaryValue>(operand: T): Bit {
-        // 1011 COPY
-        // 1101 RESULT
-        const copy: Array<Bit> = operand.value.slice();
-        const removedBit: Bit = copy[copy.length - 1];
-        let bitToShift: Bit = copy[0];
-        for (let index = 0; index < copy.length; ++index) {
-            operand.value[index] = bitToShift;
-            bitToShift = copy[index];
-        }
+        const removedBit: Bit = operand.getLeastSignificantBit();
+
+        const msb = operand.getMostSignificantBit();
+
+        // Arithmetic right shift by 1
+        operand.value = operand.value >>> 1
+        operand.setBit(0 , msb);
+
         return removedBit;
     }
 
@@ -438,15 +353,10 @@ export class ArithmeticLogicUnit {
      * @returns The bit left shifted.
      */
     public logicalLeftShift<T extends BinaryValue>(operand: T): Bit {
-        // 1011 COPY
-        // 0110 RESULT
-        const copy: Array<Bit> = operand.value.slice();
-        const removedBit: Bit = copy[0];
-        let bitToShift: Bit = 0;
-        for (let index = copy.length - 1; index >= 0; --index) {
-            operand.value[index] = bitToShift;
-            bitToShift = copy[index];
-        }
+        const removedBit: Bit = operand.getMostSignificantBit();
+
+        operand.value = operand.value << 1;
+
         return removedBit;
     }
 
@@ -459,18 +369,11 @@ export class ArithmeticLogicUnit {
      */
     public shl(value: DoubleWord, count: DoubleWord, ): DoubleWord {
 
-        const result: DoubleWord = new DoubleWord();
+        const carry: Bit = value.getBit(count.value - 1);
 
-        this._eflags.clearCarry()
+        const result: DoubleWord = new DoubleWord(value.value << count.value);
 
-
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
-            result.value = new Array<Bit>().concat(value.getLeastSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber())).concat(new Array<Bit>(count.toUnsignedNumber()).fill(0, 0, count.toUnsignedNumber()));
-
-            count.toUnsignedNumber() === 1 && value.value.at(0) !== value.value.at(1) ? this._eflags.setOverflow() : this._eflags.clearOverflow();
-            value.value.at(0) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
-        }
-
+        this.checkCarry(carry === 1);
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -487,16 +390,19 @@ export class ArithmeticLogicUnit {
      */
     public shr(value: DoubleWord, count: DoubleWord): DoubleWord {
 
-        const result: DoubleWord = new DoubleWord();
+        let result: DoubleWord = value;
 
-        this._eflags.clearCarry()
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value) {
+            
+            const carry: Bit = value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value);
+            count.value == 1 && value.getBit(0) == 1 ? this._eflags.setOverflow() : this._eflags.clearOverflow();
 
+            result = new DoubleWord(value.value >>> count.value);
+            this.checkCarry(carry === 1);
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
-            result.value = new Array<Bit>(count.toUnsignedNumber()).fill(0, 0, count.toUnsignedNumber()).concat(value.getMostSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()));
-
-            value.value.at(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry();
-            count.toUnsignedNumber() == 1 && value.value.at(0) == 1 ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        } else {
+            this._eflags.clearCarry()
+            result = new DoubleWord();
         }
 
         this.checkForZero(result);
@@ -515,15 +421,17 @@ export class ArithmeticLogicUnit {
      */
     public sar(value: DoubleWord, count: DoubleWord): DoubleWord {
 
-        const result: DoubleWord = new DoubleWord();
-
-        this._eflags.clearCarry()
+        let result: DoubleWord = value;
 
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
-            result.value = new Array<Bit>(count.toUnsignedNumber()).fill(value.value.at(0)!, 0, count.toUnsignedNumber()).concat(value.getMostSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()));
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value) {
 
-            value.value.at(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+            result = new DoubleWord(value.value >> count.value);
+            value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+
+        } else {
+            result = new DoubleWord();
+            this._eflags.clearCarry()
         }
 
         this._eflags.clearOverflow();
@@ -539,81 +447,49 @@ export class ArithmeticLogicUnit {
      * This method multiplies both the given binary, doubleword sized values using Booths mulitplication algorithm, 
      * according to <https://medium.com/@jetnipit54/booth-algorithm-e6b8a6c5b8d>.
      * 
-     * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
+     * Affects the **carry** and **overflow** bit according to the result.
      * @param multiplier The operand, which determines, how often the first operand gets multiplied.
      * @param multiplicand The operand, which gets multiplied by the multiplicand.
      * @returns The resulting product.
      */
-    public mul(multiplier: DoubleWord, multiplicand: DoubleWord): DoubleWord {
-        let a: DoubleWord = new DoubleWord();
-        let q_1: Bit = 0;
-        const q: DoubleWord = new DoubleWord(multiplicand.value.slice());
-        let cnt: number = a.value.length;
-        const m: DoubleWord = new DoubleWord(multiplier.value.slice());
-        const tmp: BinaryValue = new BinaryValue(new Array<Bit>((a.value.length * 2) + 1).fill(0));
-        while (cnt >= 0) {
-            if (q.value[q.value.length - 1] === 1 && q_1 === 0) {
-                a = this.sub(a, m);
-            } else if (q.value[q.value.length - 1] === 0 && q_1 === 1) {
-                a = this.add(a, m);
-            }
-            tmp.value = a.value.slice().concat(q.value.slice()).concat(q_1);
-            this.arithmeticRightShift<BinaryValue>(tmp);
-            a.value = tmp.value.slice(0, DataSizes.DOUBLEWORD);
-            q.value = tmp.value.slice(DataSizes.DOUBLEWORD, DataSizes.QUADWORD);
-            q_1 = tmp.value[tmp.value.length - 1];
-            --cnt;
-        }
-        return new DoubleWord(tmp.value.slice(-DataSizes.DOUBLEWORD));
+    public imul(multiplier: DoubleWord, multiplicand: DoubleWord): DoubleWord {
+        
+        const result64 = BigInt(multiplier.value) * BigInt(multiplicand.value);
+
+        const low32 = Number(result64 & 0xFFFFFFFFn) >>> 0; 
+        const high32 = Number((result64 >> 32n) & 0xFFFFFFFFn);
+
+        const result = new DoubleWord(low32);
+
+        // Determine if high32 is proper sign extension of low32
+        const low32Signed = low32 | 0; // convert to signed
+        const properSignExtension =
+            (low32Signed >= 0 && high32 === 0) ||
+            (low32Signed < 0 && high32 === 0xFFFFFFFF);
+
+        const overflow = !properSignExtension;
+
+        overflow ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        overflow ? this._eflags.setCarry() : this._eflags.clearCarry();
+
+        return result;
     }
 
     /**
      * This method divides both the given binary, doubleword sized values.
      * 
-     * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
+     * Status flags are not Affected.
      * @param dividend The first operand, which gets divided by the divisor.
      * @param divisor The second operand, which divides the dividend.
      * @returns The resulting quotient.
      */
-    public div(dividend: DoubleWord, divisor: DoubleWord): DoubleWord {
-        let quotient: DoubleWord = new DoubleWord();
-        let flipQuotientSign = false;
-        // Save the current flags.
-        const oldFlags: Bit[] = this._eflags.content.value.slice();
-        this.checkForZero(divisor);
-        if (this._eflags.zero === 1) {
+    public idiv(dividend: DoubleWord, divisor: DoubleWord): DoubleWord {
+        if (divisor.value === 0) {
             throw new DivisionByZeroError("Dividing by zero is not permittet.");
         }
-        if (dividend.value[0] === 1 && divisor.value[0] === 1) {
-            dividend = this.sub(dividend, DoubleWord.fromInteger(1));
-            dividend = this.not(dividend);
-            divisor = this.sub(divisor, DoubleWord.fromInteger(1));
-            divisor = this.not(divisor);
-        }
-        if (divisor.value[0] === 1) {
-            // Calc the absolute value of the negative divisor first.
-            divisor = this.sub(divisor, DoubleWord.fromInteger(1));
-            divisor = this.not(divisor);
-            flipQuotientSign = true;
-        }
-        if (dividend.value[0] === 1) {
-            // Calc the absolute value of the negative divisor first.
-            dividend = this.sub(dividend, DoubleWord.fromInteger(1));
-            dividend = this.not(dividend);
-            flipQuotientSign = true;
-        }
-        this.cmp(dividend, divisor);
-        while (this._eflags.sign === this._eflags.overflow) {
-            dividend = this.sub(dividend, divisor);
-            quotient = this.add(quotient, DoubleWord.fromInteger(1));
-            this.cmp(dividend, divisor);
-        }
-        if (flipQuotientSign) {
-            quotient = this.neg(quotient);
-        }
-        // Restore the old flags.
-        this._eflags.content.value = oldFlags;
-        return quotient;
+        let result = (dividend.value | 0) / (divisor.value | 0);
+
+        return new DoubleWord(result);
     }
 
     /**
@@ -640,8 +516,6 @@ export class ArithmeticLogicUnit {
      * @param secondOperand 
      */
     public test(firstOperand: DoubleWord, secondOperand: DoubleWord) {
-        // Create a copy of the second operand.
-        const copy: DoubleWord = new DoubleWord(secondOperand.value.slice());
-        this.and(firstOperand, copy);
+        this.and(firstOperand, secondOperand);
     }
 }

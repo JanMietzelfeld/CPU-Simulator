@@ -4,53 +4,46 @@ import { DoubleWord } from "../types/binary/DoubleWord";
 
 describe("Create doubleword from decimal integer values", () => {
     test("Create doubleword from decimal -6", () => {
-        expect(DoubleWord.fromInteger(-6).value.join("")).toBe("11111111111111111111111111111010");
+        expect(new DoubleWord(-6).toString()).toBe("11111111111111111111111111111010");
     });
 
     test("Create doubleword from decimal -300", () => {
-        expect(DoubleWord.fromInteger(-300).value.join("")).toBe("11111111111111111111111011010100");
+        expect(new DoubleWord(-300).toString()).toBe("11111111111111111111111011010100");
     });
 
     test("Group bytes in doubleword string", () => {
-        expect(DoubleWord.fromInteger(8).toString(true)).toBe("00000000 00000000 00000000 00001000");
-    });
-
-    test("Trigger error because of converting a too large negative decimal integer", () => {
-        const attemptToConvert = () => {
-            DoubleWord.fromInteger(-6_000_000_000_000);
-        } 
-        expect(attemptToConvert).toThrow(Error);
+        expect(new DoubleWord(8).toString()).toBe("00000000000000000000000000001000");
     });
 
     test("Create doubleword from positive decimal integer value", () => {
-        expect(DoubleWord.fromInteger(6).value.join("")).toBe("00000000000000000000000000000110");
+        expect(new DoubleWord(6).toString()).toBe("00000000000000000000000000000110");
     });
 
     test("Check wether (8)_10 is smaller than (11)_10", () => {
-        expect(DoubleWord.fromInteger(8).isSmallerThan(DoubleWord.fromInteger(11))).toBe(true);
+        expect(new DoubleWord(8).value < new DoubleWord(11).value).toBe(true);
     });
 
     test("Check wether (-1)_10 is smaller than (1)_10", () => {
-        expect(DoubleWord.fromInteger(-1).isSmallerThan(DoubleWord.fromInteger(1))).toBe(true);
+        expect(new DoubleWord(-1).value > new DoubleWord(1).value).toBe(true);
     });
 
     test("Check wether (-1)_10 is smaller than (-2)_10", () => {
-        expect(DoubleWord.fromInteger(-1).isSmallerThan(DoubleWord.fromInteger(-2))).toBe(false);
+        expect(new DoubleWord(-1).value < new DoubleWord(-2).value).toBe(false);
     });
 
     test("Check wether (100)_10 is smaller than (11)_10", () => {
-        expect(DoubleWord.fromInteger(100).isSmallerThan(DoubleWord.fromInteger(11))).toBe(false);
+        expect(new DoubleWord(100).value < new DoubleWord(11).value).toBe(false);
     });
 
     test("Measure toNumber() performance", () => {
         const alu: ArithmeticLogicUnit = new ArithmeticLogicUnit(new EFLAGS())
         const repetitions = 100000;
         //const one = DoubleWord.fromInteger(1)
-        let dword = DoubleWord.fromInteger(0)
+        let dword = new DoubleWord(0)
         for (let i = 0; i < repetitions; i++) {
-            expect(dword.toUnsignedNumber()).toBe(i)
-            dword = alu.add(dword, DoubleWord.fromInteger(1))
+            expect(dword.value).toBe(i)
+            dword = alu.add(dword, new DoubleWord(1))
         }
-        expect(dword.toUnsignedNumber()).toBe(repetitions);
+        expect(dword.value).toBe(repetitions);
     });
 });

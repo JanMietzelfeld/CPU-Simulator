@@ -1,10 +1,10 @@
 import { PageTableEntry } from "../../../types/binary/PageTableEntry";
-import { VirtualAddress } from "../../../types/binary/VirtualAddress";
 import { Bit } from "../../../types/binary/Bit";
+import { DoubleWord } from "../../../types/binary/DoubleWord";
 
 
 export class TranslationLookasideBuffer {
-    private _data: [number, [Array<Bit>, PageTableEntry]][];
+    private _data: [number, [number, PageTableEntry]][];
     private _capacity: number;
 
     public constructor(capacity: number) {
@@ -12,7 +12,7 @@ export class TranslationLookasideBuffer {
         this._capacity = capacity;
     }
 
-    public insert(item: [virtualAddress: VirtualAddress, PageTableEntry]): void {
+    public insert(item: [DoubleWord, PageTableEntry]): void {
         if (this.has(item[0])) {
             return;
         }
@@ -24,7 +24,7 @@ export class TranslationLookasideBuffer {
         return;
     }
 
-    public get data(): [number, [Array<Bit>, PageTableEntry]][] {
+    public get data(): [number, [number, PageTableEntry]][] {
         return this._data;
     }
 
@@ -32,13 +32,13 @@ export class TranslationLookasideBuffer {
         this._data.sort((current, successor) => (current[0] < successor[0]) ? current[0] : successor[0]);
     }
 
-    public peek(): [number, [Array<Bit>, PageTableEntry]] | undefined {
+    public peek(): [number, [number, PageTableEntry]] | undefined {
         return (this._data.length === 0) 
             ? undefined
             : this._data[0];
     }
 
-    public pop(): [number, [Array<Bit>, PageTableEntry]] | undefined {
+    public pop(): [number, [number, PageTableEntry]] | undefined {
         return (this._data.length === 0) ? undefined : this._data.pop();
     }
     
@@ -50,22 +50,22 @@ export class TranslationLookasideBuffer {
         return this._data.length === 0;
     }
 
-    public has(virtualAddress: VirtualAddress): boolean {
+    public has(virtualAddress: DoubleWord): boolean {
         let includes = false;
         for (let i = 0; i < this._data.length; ++i) {
-            if (this._data[i][1][0].every((value, index) => value === virtualAddress.value[index])) {
+            if (this._data[i][1][0] === virtualAddress.getMostSignificantBits(20)) {
                 includes = true;
             }
         }
         return includes;
     }
 
-    public get(virtualAddress: VirtualAddress): PageTableEntry | undefined {
+    public get(virtualAddress: DoubleWord): PageTableEntry | undefined {
         let pageTableEntry: PageTableEntry | undefined = undefined;
         for (let i = 0; i < this._data.length; ++i) {
-            if (this._data[i][1][0].every((value, index) => value === virtualAddress.value[index])) {
+            if (this._data[i][1][0] === virtualAddress.getMostSignificantBits(20)) {
                 pageTableEntry = this._data[i][1][1];
-                this._data[i][0] += 1;
+                this._data[i][0]++;
             }
         }
         this.sort();

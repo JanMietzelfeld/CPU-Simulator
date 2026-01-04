@@ -6,15 +6,12 @@ import { InstructionDecoder } from "./../InstructionDecoder";
 import { EncodedAddressingModes} from "../../../types/enumerations/EncodedAdressingModes";
 import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
-import { VirtualAddress } from "../../../types/binary/VirtualAddress";
 import { Bit } from "../../../types/binary/Bit";
 import { ArithmeticLogicUnit } from "./ArithmeticLogicUnit";
 import { InstructionRegister } from "../functional_units/InstructionRegister";
 import { PointerRegister } from "../functional_units/PointerRegister";
-import { Instruction } from "../../../types/binary/Instruction";
 import { InstructionOperand } from "../../../types/binary/InstructionOperand";
 import { DecodedInstruction } from "../../../types/binary/DecodedInstruction";
-import { Address } from "../../../types/binary/Address";
 import { Byte } from "../../../types/binary/Byte";
 import { MissingOperandError } from "../../../types/errors/MissingOperandError";
 import { UnsupportedOperandTypeError } from "../../../types/errors/UnsupportedOperandTypeError";
@@ -23,7 +20,6 @@ import { RegisterNotWritableInUserModeError } from "../../../types/errors/Regist
 import { RegisterNotAvailableError } from "../../../types/errors/RegisterNotAvailableError";
 import { UnknownRegisterError } from "../../../types/errors/UnknownRegisterError";
 import { PrivilegeViolationError } from "../../../types/errors/PrivilegeViolationError";
-import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { EncodedReadableRegisters } from "../../../types/enumerations/EncodedReadableRegisters";
 import { EncodedWritableRegisters } from "../../../types/enumerations/EncodedWritableRegisters";
 import { encodedOperationNameByValue, EncodedOperations } from "../../../types/enumerations/EncodedOperations";
@@ -262,7 +258,7 @@ export class CPUCore {
                     this.triggertException(InterruptNumbers.PAGE_FAULT);
 
                     // Write the "bad" address onto the interrupt STACK.
-                    this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+                    this.esp.content = new DoubleWord(this.esp.content.value - 4);
                     this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
                 }
                 else
@@ -284,7 +280,7 @@ export class CPUCore {
                     this.triggertException(InterruptNumbers.PAGE_FAULT);
 
                     // Write the "bad" address onto the interrupt STACK.
-                    this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+                    this.esp.content =  new DoubleWord(this.esp.content.value - 4);
                     this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
                 }
                 else
@@ -328,7 +324,7 @@ export class CPUCore {
     private fetch(): void {
 
         // Read address of next instruction from EIP register.
-        const instructionAddress: VirtualAddress = this.eip.content;
+        const instructionAddress: DoubleWord = this.eip.content;
         // Read next instruction from mainMemory.
         const instruction: DoubleWord = this.mmu.readDoublewordFrom(instructionAddress, true);
         // Load instruction into EIR register.
@@ -341,14 +337,14 @@ export class CPUCore {
      */
     private decode(): void {
         // Read instruction from EIR register.
-        const instruction: Instruction = this.eir.content;
+        const instruction: DoubleWord = this.eir.content;
         // Split instruction into its components.
-        const binaryEncodedInstructionType: Bit[] = instruction.value.slice(0, 3);
-        const binaryEncodedOperation: Bit[] = instruction.value.slice(5, 12);
-        const binaryEncodedAddressingModeFirstOperand: Bit[] = instruction.value.slice(14, 16);
-        const binaryEncodedTypeFirstOperand: Bit[] = instruction.value.slice(16, 23);
-        const binaryEncodedAddressingModeSecondOperand: Bit[] = instruction.value.slice(23, 25);
-        const binaryEncodedTypeSecondOperand: Bit[] = instruction.value.slice(25);
+        const binaryEncodedInstructionType: number = instruction.getBitRange(0, 3);
+        const binaryEncodedOperation: number = instruction.getBitRange(5, 12);
+        const binaryEncodedAddressingModeFirstOperand: number = instruction.getBitRange(14, 16);
+        const binaryEncodedTypeFirstOperand: number = instruction.getBitRange(16, 23);
+        const binaryEncodedAddressingModeSecondOperand: number = instruction.getBitRange(23, 25);
+        const binaryEncodedTypeSecondOperand: number = instruction.getBitRange(25);
         // Decode instruction.
         // Decode instruction type.
         const decodedInstructionType: EncodedInstructionTypes = InstructionDecoder.decodeInstructionType(binaryEncodedInstructionType);
@@ -374,7 +370,7 @@ export class CPUCore {
         // Create a new instance of a DecodedInstruction to save the decoded instruction to.
         this._decodedInstruction = new DecodedInstruction(decodedInstructionType, decodedOperation);
         // Retrieve current instruction pointer and convert its binary value to a decimal value.
-        const addressOfCurrentInstructionDec: number = parseInt(this.eip.content.toString(), 2);
+        const addressOfCurrentInstructionDec: number = this.eip.content.value
         // Define variables for decoded operands.
         let decodedSecondOperand: InstructionOperand | undefined = undefined;
         let decodedFirstOperand: InstructionOperand | undefined = undefined;
@@ -386,7 +382,7 @@ export class CPUCore {
              * address of the instruction.
              */
             const encodedValueSecondOperand: DoubleWord = 
-                this.mmu.readDoublewordFrom(VirtualAddress.fromInteger(addressOfCurrentInstructionDec + 8), true);
+                this.mmu.readDoublewordFrom(new DoubleWord(addressOfCurrentInstructionDec + 8), true);
 
             /**
              * Create instance of an InstructionOperand for the second operand.
@@ -407,7 +403,7 @@ export class CPUCore {
              * address of the instruction.
              */
             const encodedValueFirstOperand: DoubleWord = 
-                this.mmu.readDoublewordFrom(VirtualAddress.fromInteger(addressOfCurrentInstructionDec + 4), true);
+                this.mmu.readDoublewordFrom(new DoubleWord(addressOfCurrentInstructionDec + 4), true);
 
             /**
              * Create instance of an InstructionOperand for the first operand.
@@ -444,8 +440,8 @@ export class CPUCore {
         // Debug prints
 
         try {
-            if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
-                const physicalAddress: PhysicalAddress = this.mmu.translate(this.esp.content, false, false, true);
+            if (this.esp.content.value <= 0xFFFFFFFC) {
+                const physicalAddress: DoubleWord = this.mmu.translate(this.esp.content, false, false, true);
                 let value = this.mainMemory.readDoublewordFrom(physicalAddress);
                 console.log("Stack value: " + value);
             }
@@ -454,7 +450,7 @@ export class CPUCore {
             console.log("Stack value: Not Mapped");
         }
         
-        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());        
+        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.value);        
 
         let jumpPerformed = false;
         switch (operation) {
@@ -670,7 +666,7 @@ export class CPUCore {
              * of the current instruction.
              */
             const flags: Byte = this.eflags.content;
-            this.eip.content = VirtualAddress.fromInteger(parseInt(this.eip.content.toString(), 2) + 12);
+            this.eip.content = new DoubleWord(this.eip.content.value + 12);
             this.eflags.content = flags;
         }
         return;
@@ -744,13 +740,13 @@ export class CPUCore {
         let op1: number;
         switch (command.type) {
             case EncodedOperandTypes.IMMEDIATE:
-                op1 = command.value.toUnsignedNumber();
+                op1 = command.value.value;
                 break;
             case EncodedOperandTypes.REGISTER:
-                op1 = this.readRegister(command).toUnsignedNumber();
+                op1 = this.readRegister(command).value;
                 break;
             case EncodedOperandTypes.MEMORY_ADDRESS:
-                op1 = this.mmu.readDoublewordFrom(command.value, false).toUnsignedNumber();
+                op1 = this.mmu.readDoublewordFrom(command.value, false).value;
                 break;
             default:
                 throw new BadOperandError("Could not parse first DEV operand.");
@@ -759,13 +755,13 @@ export class CPUCore {
         let op2: number;
         switch (data.type) {
             case EncodedOperandTypes.IMMEDIATE:
-                op2 = data.value.toUnsignedNumber();
+                op2 = data.value.value;
                 break;
             case EncodedOperandTypes.REGISTER:
-                op2 = this.readRegister(data).toUnsignedNumber();
+                op2 = this.readRegister(data).value;
                 break;
             case EncodedOperandTypes.MEMORY_ADDRESS:
-                op2 = this.mmu.readDoublewordFrom(data.value, false).toUnsignedNumber();
+                op2 = this.mmu.readDoublewordFrom(data.value, false).value;
                 break;
             default:
                 throw new BadOperandError("Could not parse second DEV operand.");
@@ -774,59 +770,59 @@ export class CPUCore {
         let filename: string;
         switch (op1) {
             case DevCommands.IO_SEEK: // 00000000 - io_seek (fd=op2, offset=stack, mode=stack) -> success=eax
-                const seekMode = this.internal_pop().toUnsignedNumber();
-                const seekOffset = this.internal_pop().toUnsignedNumber();
+                const seekMode = this.internal_pop().value;
+                const seekOffset = this.internal_pop().value;
                 const seek_result = this.fs.io_seek(op2, seekOffset, seekMode);
-                this.eax.content = DoubleWord.fromInteger(seek_result);
+                this.eax.content = new DoubleWord(seek_result);
                 break;
                 
             case DevCommands.IO_CLOSE:
-                this.eax.content =  DoubleWord.fromInteger(this.fs.io_close(op2))
+                this.eax.content =  new DoubleWord(this.fs.io_close(op2))
                 break;
                 
             case DevCommands.IO_READ_BUFFER: // 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
-                const bufferAddress = this.internal_pop().toUnsignedNumber();
-                const bufferSize = this.internal_pop().toUnsignedNumber();
+                const bufferAddress = this.internal_pop().value;
+                const bufferSize = this.internal_pop().value;
                 const buffer = new Uint8Array(bufferSize);
                 const bytesRead = this.fs.io_read_buffer(op2, buffer, bufferSize);
-                this.eax.content = DoubleWord.fromInteger(bytesRead);
+                this.eax.content = new DoubleWord(bytesRead);
                 if (bytesRead > 0) {
                     for (let index = 0; index < bytesRead; index++) {
-                        this.mmu.writeByteTo(VirtualAddress.fromInteger(bufferAddress + index), Byte.fromInteger(buffer[index]));
+                        this.mmu.writeByteTo(new DoubleWord(bufferAddress + index), new Byte(buffer[index]));
                     }
                 }
                 break;
             case DevCommands.IO_WRITE_BUFFER: // 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
-                const writeBufferAddress = this.internal_pop().toUnsignedNumber();
-                const writeBufferSize = this.internal_pop().toUnsignedNumber();
+                const writeBufferAddress = this.internal_pop().value;
+                const writeBufferSize = this.internal_pop().value;
                 const writeBuffer = new Uint8Array(writeBufferSize);
                 for (let index = 0; index < writeBufferSize; index++) {
-                    let byte = this.mmu.readByteFrom(VirtualAddress.fromInteger(writeBufferAddress + index))
-                    writeBuffer[index] = byte.toUnsignedNumber();
+                    let byte = this.mmu.readByteFrom(new DoubleWord(writeBufferAddress + index))
+                    writeBuffer[index] = byte.value;
                 }
                 const bytesWritten = this.fs.io_write_buffer(op2, writeBuffer, writeBufferSize);
-                this.eax.content = DoubleWord.fromInteger(bytesWritten);
+                this.eax.content = new DoubleWord(bytesWritten);
                 break;
             case DevCommands.FILE_CREATE: // 00000100 - file_create (filename_ptr=op2)
-                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
-                this.eax.content =  DoubleWord.fromInteger(this.fs.file_create(filename));
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(new DoubleWord(op2));
+                this.eax.content =  new DoubleWord(this.fs.file_create(filename));
                 break;
             case DevCommands.FILE_DELETE: // 00000101 file_delete (filename_ptr=op2) -> success=eax
-                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
-                this.eax.content = DoubleWord.fromInteger(this.fs.file_delete(filename));
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(new DoubleWord(op2));
+                this.eax.content = new DoubleWord(this.fs.file_delete(filename));
                 break;
             case DevCommands.FILE_OPEN: // 00000110 - file_open (filename_ptr=op2) -> fd=eax
                 // load the filename from the given address
-                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(new DoubleWord(op2));
                 let fd: number = this.fs.file_open(filename);
-                this.eax.content = DoubleWord.fromInteger(fd);
+                this.eax.content = new DoubleWord(fd);
                 break;
             case DevCommands.FILE_STAT: // 00000111 - file_stat (filename_ptr=op2) -> file_length=eax
-                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
-                this.eax.content = DoubleWord.fromInteger(this.fs.file_stat(filename));
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(new DoubleWord(op2));
+                this.eax.content = new DoubleWord(this.fs.file_stat(filename));
                 break;
             case DevCommands.CPU_IS_MEMORY_VIRTUALIZATION_ENABLED: //  00001010 isMemoryVirtualizationEnabled()
-                this.eax.content = DoubleWord.fromInteger(this.mmu.isMemoryVirtualizationEnabled());
+                this.eax.content = new DoubleWord(this.mmu.isMemoryVirtualizationEnabled());
                 break;
             case DevCommands.CPU_ENABLE_MEMORY_VIRTUALIZATION: //  00001011 enableMemoryVirtualization()
                 this.mmu.enableMemoryVirtualization();
@@ -835,10 +831,10 @@ export class CPUCore {
                 this.mmu.disableMemoryVirtualization();
                 break;
             case DevCommands.TIMER_GET_FINISHED: //  00001101 getReadyID() -> id=eax
-                this.eax.content = DoubleWord.fromInteger(this.timer.getReadyID());
+                this.eax.content = new DoubleWord(this.timer.getReadyID());
                 break;
             case DevCommands.TIMER_SET: //  00001110 addTimer()
-                const timeValue = this.internal_pop().toUnsignedNumber();
+                const timeValue = this.internal_pop().value;
 
                 this.timer.addTimer(op2, timeValue);
                 break;
@@ -1316,7 +1312,7 @@ export class CPUCore {
             secondOperandsValue = this.readRegister(target);
         }
         // Perform the MUL operation
-        const result: DoubleWord = this.alu.mul(secondOperandsValue, firstOperandsValue);
+        const result: DoubleWord = this.alu.imul(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
         if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
@@ -1377,7 +1373,7 @@ export class CPUCore {
         let result = new DoubleWord();
         // Perform the DIV operation.
         try {
-            result = this.alu.div(secondOperandsValue, firstOperandsValue);
+            result = this.alu.idiv(secondOperandsValue, firstOperandsValue);
         } catch (error) {
             if (error instanceof DivisionByZeroError) {
                 this.triggertException(InterruptNumbers.DIVIDE_ERROR);
@@ -2394,7 +2390,7 @@ export class CPUCore {
             );
         }
         // Define variable to write the (virtual) memory address to.
-        let address: Address = new Address();
+        let address: DoubleWord = new DoubleWord();
         // Read the (virtual) memory address from the location defined by the first operand.
         if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             address = source.value;
@@ -2494,9 +2490,9 @@ export class CPUCore {
         //     throw new StackUnderflowError("Could not perform PUSHF operation. STACK pointer reached top of the STACK.");
         // }
         // Allocate 4 bytes on STACK by decrementing the value in ESP.
-        this.esp.content = this.alu.sub(this.esp.content, DoubleWord.fromInteger(4));
+        this.esp.content = this.alu.sub(this.esp.content, new DoubleWord(4));
         // Write contents of flags register on STACK.
-        this.mmu.writeDoublewordTo(this.esp.content, Address.fromInteger(this.eflags.content.toUnsignedNumber()), false);
+        this.mmu.writeDoublewordTo(this.esp.content, new DoubleWord(this.eflags.content.value), false);
 
         return;
     }
@@ -2524,7 +2520,7 @@ export class CPUCore {
         // Deallocate four bytes from STACK by incrementing the value in ESP.
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
 
-        this.esp.content = this.alu.add(this.esp.content, DoubleWord.fromInteger(4));
+        this.esp.content = this.alu.add(this.esp.content, new DoubleWord(4));
 
         this.eflags.content = new Byte(content.getLeastSignificantBits(8));
         return;
@@ -2567,7 +2563,7 @@ export class CPUCore {
         const value: DoubleWord = this.mmu.readDoublewordFrom(this.esp.content, false);
         // Write the value to the location defined by the operand.
         if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
-            const address: Address = target.value;
+            const address: DoubleWord = target.value;
             this.mmu.writeDoublewordTo(address, value, false);
         } else {
             this.writeRegister(value, target);
@@ -2575,7 +2571,7 @@ export class CPUCore {
         // Deallocate one doubleword from STACK by incrementing the value in ESP.
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
         // TODO: Call interrupt handler for deallocation of page frame in page table.
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) + 4);
+        this.esp.content = new DoubleWord(this.esp.content.value + 4);
         return;
     }
 
@@ -2606,7 +2602,7 @@ export class CPUCore {
             );
         }
         // Allocate one doubleword (4 byte) on STACK by decrementing ESP.
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.esp.content = new DoubleWord(this.esp.content.value - 4);
         // Create a variable to store the value to write on STACK.
         let value: DoubleWord;
         // Depending on the operand type, the value is read from the main memory or a register.
@@ -2667,12 +2663,12 @@ export class CPUCore {
          * CALL instruction. Therefore, one doubleword ((4)_10 byte) needs to be allocated on the STACK 
          * by decrementing ESP first.
          */
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.esp.content = new DoubleWord(this.esp.content.value - 4);
         /*
          * The instruction following the CALL instruction is located at EIP (currently pointing at
          * the CALL instruction) plus (12)_10 ((3)_10 * (4)_10 byte per instruction).
          */
-        const returnAddress: DoubleWord = this.alu.add(this.eip.content, DoubleWord.fromInteger(12));
+        const returnAddress: DoubleWord = this.alu.add(this.eip.content, new DoubleWord(12));
         // Write the return address to the STACK.
         this.mmu.writeDoublewordTo(this.esp.content, returnAddress, false);
         // Transfer control to the subroutine by loading the subroutines base address into EIP register.
@@ -2695,7 +2691,7 @@ export class CPUCore {
         // Deallocate one doubleword from the STACK by incrementing ESP.
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
 
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) + 4);
+        this.esp.content = new DoubleWord(this.esp.content.value + 4);
         return true;
     }
 
@@ -2744,29 +2740,29 @@ export class CPUCore {
         }
 
         // Only allow INT for interrupt index 0 to 255
-        if (0 > target.value.toUnsignedNumber() || 255 < target.value.toUnsignedNumber()) {
+        if (0 > target.value.value || 255 < target.value.value) {
             throw new BadOperandError("Interrupt operand must be between 0 and 255.")
         }
 
-        let eflagsValue = DoubleWord.fromInteger(this.eflags.content.toUnsignedNumber());
+        let eflagsValue = new DoubleWord(this.eflags.content.value);
         // Switch to kernel mode.
         this.eflags.enterKernelMode();
         this.eflags.clearInterrupt();
 
         // Switch to the interrupt stack
         let stackPointer = this.esp.content;
-        this.esp.content = Address.fromInteger(0x0);
+        this.esp.content = new DoubleWord(0x0);
         
         // Write the user stack address to the interrupt STACK.
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.esp.content = new DoubleWord(this.esp.content.value - 4);
         this.mmu.writeDoublewordTo(this.esp.content, stackPointer, false);
 
         // Push the current EFLAGS onto the STACK to save them for later.
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.esp.content = new DoubleWord(this.esp.content.value - 4);
         this.mmu.writeDoublewordTo(this.esp.content, eflagsValue, false);
   
         // Add the number of the interrupt handler to the interrupt tables base address, which is stored in the ITP register.
-        const interruptHandlerTableEntry: Address = Address.fromInteger(this.itp.content.toUnsignedNumber() + target.value.toUnsignedNumber()*4);
+        const interruptHandlerTableEntry: DoubleWord = new DoubleWord(this.itp.content.value + target.value.value*4);
         // Load interrupt handler address
         const interruptHandler = this.mmu.readDoublewordFrom(interruptHandlerTableEntry, true)
         /*
@@ -2776,12 +2772,12 @@ export class CPUCore {
          * CALL instruction. Therefore, one doubleword ((4)_10 byte) needs to be allocated on the STACK 
          * by decrementing ESP first.
          */
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+        this.esp.content = new DoubleWord(this.esp.content.value - 4);
         /*
          * The instruction following the CALL instruction is located at EIP (currently pointing at
          * the CALL instruction) plus (12)_10 ((3)_10 * (4)_10 byte per instruction).
          */
-        const returnAddress: DoubleWord = this.alu.add(this.eip.content, DoubleWord.fromInteger(12));
+        const returnAddress: DoubleWord = new DoubleWord(this.eip.content.value + 12);
         // Write the return address to the STACK.
         this.mmu.writeDoublewordTo(this.esp.content, returnAddress, false);
         // Jump into subroutine at the interrupt handlers address.
@@ -2806,9 +2802,9 @@ export class CPUCore {
         // Return from the interrupt handler by calling the RET operation.
         this.ret();
         // Restore the old EFLAGS contents from the STACK.
-        let eflagsValue = this.mmu.readDoublewordFrom(Address.fromInteger(this.esp.content.toUnsignedNumber()), false);
+        let eflagsValue = this.mmu.readDoublewordFrom(new DoubleWord(this.esp.content.value), false);
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
-        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) + 4);
+        this.esp.content = new DoubleWord(this.esp.content.value + 4);
 
         // Restore the old STACK value.
         this.esp.content = this.mmu.readDoublewordFrom(this.esp.content, false);
@@ -3034,7 +3030,7 @@ export class CPUCore {
      */
     private readRegisterIndirect(operand: InstructionOperand): DoubleWord {
         // Decode the register defined by the operand and read its value.
-        const address: Address = this.decodeReadableRegister(operand).content;
+        const address: DoubleWord = this.decodeReadableRegister(operand).content;
         // Read the doubleword from the referenced (virtual) memory address.
         return this.mmu.readDoublewordFrom(address, false);
     }
@@ -3080,7 +3076,7 @@ export class CPUCore {
             case EncodedReadableRegisters.ESP:
                 register = this.esp;
                 break;
-            case EncodedReadableRegisters.GPTP:
+            case EncodedReadableRegisters.PTP:
                 register = this.ptp;
                 break;
             case EncodedReadableRegisters.ITP:
@@ -3125,7 +3121,7 @@ export class CPUCore {
             case EncodedWritableRegisters.ESP:
                 register = this.esp;
                 break;
-            case EncodedWritableRegisters.GPTP:
+            case EncodedWritableRegisters.PTP:
                 register = this.ptp;
                 break;
             case EncodedWritableRegisters.ITP:
@@ -3150,12 +3146,12 @@ export class CPUCore {
      * @returns ASCII string of the content
      * @author Laurin Gehlenborg
      */
-    private loadZeroTerminatedASCIIStringFromMemory(address: VirtualAddress): string {
+    private loadZeroTerminatedASCIIStringFromMemory(address: DoubleWord): string {
         let str: string = "";
         let currentByte: Byte = this.mmu.readByteFrom(address)
-        while (currentByte.toUnsignedNumber() != 0) { // read until null byte
-            str += String.fromCharCode(currentByte.toUnsignedNumber());
-            address = VirtualAddress.fromInteger(address.toUnsignedNumber() + 1) // address++
+        while (currentByte.value != 0) { // read until null byte
+            str += String.fromCharCode(currentByte.value);
+            address = new DoubleWord(address.value + 1) // address++
             currentByte = this.mmu.readByteFrom(address)
         }
         return str
@@ -3168,7 +3164,7 @@ export class CPUCore {
      */
     private internal_pop(): DoubleWord {
         const oldEAX = this.eax.content.value;
-        this.pop(new InstructionOperand(EncodedAddressingModes.DIRECT, EncodedOperandTypes.REGISTER, DoubleWord.fromInteger(0))) // 0 for EAX
+        this.pop(new InstructionOperand(EncodedAddressingModes.DIRECT, EncodedOperandTypes.REGISTER, new DoubleWord(0))) // 0 for EAX
         const poppedValue = this.eax.content;
         this.eax.content.value = oldEAX;
         return poppedValue;
@@ -3177,7 +3173,7 @@ export class CPUCore {
     /**
      * Set instruction pointer. Used during boot to start the kernel code. 
      */
-    public setEIP(address: Address) {
+    public setEIP(address: DoubleWord) {
         this.eip.content = address;
     }
 
@@ -3197,7 +3193,7 @@ export class CPUCore {
         this.int(new InstructionOperand(
             EncodedAddressingModes.DIRECT,
             EncodedOperandTypes.IMMEDIATE,
-            DoubleWord.fromInteger(number)
+            new DoubleWord(number)
         ));
 
         //Make sure the current instruction is re-executed

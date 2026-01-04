@@ -1,30 +1,31 @@
-import { Address } from "./Address";
+import { BinaryValue } from "./BinaryValue";
 
 /**
  * This class represents an address space or a range of addresses.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
-export class AddressSpace<T extends Address> {
-    /**
-     * This member stores the upper boundry of the address space.
-     * @readonly
-     */
-    public readonly highAddress: T;
-
+export class AddressSpace {
+   
     /**
      * This member stores the lower boundry of the address space.
      * @readonly
      */
-    public readonly lowAddress: T;
+    private readonly _lowAddress: number;
+
+     /**
+     * This member stores the upper boundry of the address space.
+     * @readonly
+     */
+    private readonly _highAddress: number;
 
     /**
      * Constructs a new address space from the given boundries.
      * @param lowAddress The lower boundry of the address space.
      * @param highAddress The upper boundry of the address space.
      */
-    public constructor(lowAddress: T, highAddress: T) {
-        this.lowAddress = lowAddress;
-        this.highAddress = highAddress;
+    public constructor(lowAddress: number, highAddress: number) {
+        this._lowAddress = lowAddress;
+        this._highAddress = highAddress;
     }
 
     /**
@@ -32,33 +33,30 @@ export class AddressSpace<T extends Address> {
      * @param element The address to test.
      * @returns True, if the given address is in range, false otherwise.
      */
-    public inRange(address: T): boolean {
-        const upperBoundryDec: number = this.highAddress.toUnsignedNumber();
-        const lowerBoundryDec: number = this.lowAddress.toUnsignedNumber();
-        const addressDec: number = address.toUnsignedNumber();
-        return (lowerBoundryDec <= addressDec && addressDec <= upperBoundryDec);
-    }
-
-    /**
-     * This method returns the decimal representation of the address spaces highest address.
-     * @returns The decimal representation of the upper boundry.
-     */
-    public highAddressToDecimal(): number {
-        return this.highAddress.toUnsignedNumber();
+    public inRange(address: BinaryValue): boolean {
+        return (this._lowAddress <= address.value) && (address.value <= this._highAddress);
     }
 
     /**
      * This method returns the decimal representation of the address spaces lowest address.
      * @returns The decimal representation of the upper boundry.
      */
-    public lowAddressToDecimal(): number {
-        return this.lowAddress.toUnsignedNumber();
+    public get lowAddress(): number {
+        return this._lowAddress;
+    }
+
+    /**
+     * This method returns the decimal representation of the address spaces highest address.
+     * @returns The decimal representation of the upper boundry.
+     */
+    public get highAddress(): number {
+        return this._highAddress;
     }
 
     /**
      * This accessor calculates and returns the size of this range.
      */
     public get size(): number {
-        return this.highAddressToDecimal() - this.lowAddressToDecimal() + 1;
+        return this._highAddress - this._lowAddress + 1;
     }
 }
