@@ -85,7 +85,7 @@ export class RAM {
      * @throws AddressOutOfRangeError - If the physical memory address is out of range.
      * @param data Byte-sized data to write to the specified pyhsical memory address.
      */
-    private internalWriteByteTo(physicalAddress: number, data: number) {
+    public internalWriteByteTo(physicalAddress: number, data: number) {
         if (data === 0) {
             this.internalClearByte(physicalAddress);
             return;

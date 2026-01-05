@@ -45,7 +45,7 @@ export class BinaryValue {
 	 */
 	public set value(newValue: number) {
 
-        newValue = newValue >>> 0; 
+        newValue = (newValue >>> 0) % (2**this._bits); 
 
         this._numberValue = newValue;
         this._stringValue = newValue.toString(2).padStart(this._bits, "0");

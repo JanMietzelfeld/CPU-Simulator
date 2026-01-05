@@ -786,11 +786,21 @@ export class CPUCore {
                 const buffer = new Uint8Array(bufferSize);
                 const bytesRead = this.fs.io_read_buffer(op2, buffer, bufferSize);
                 this.eax.content = new DoubleWord(bytesRead);
-                if (bytesRead > 0) {
-                    for (let index = 0; index < bytesRead; index++) {
-                        this.mmu.writeByteTo(new DoubleWord(bufferAddress + index), new Byte(buffer[index]));
+
+                if (this.mmu.isMemoryVirtualizationEnabled()) {
+                    if (bytesRead > 0) {
+                        for (let index = 0; index < bytesRead; index++) {
+                            this.mmu.writeByteTo(new DoubleWord(bufferAddress + index), new Byte(buffer[index]));
+                        }
+                    }
+                } else {
+                    if (bytesRead > 0) {
+                        for (let index = 0; index < bytesRead; index++) {
+                            this.mainMemory.internalWriteByteTo((bufferAddress + index) >>> 0, (buffer[index] >>> 0) % (2**8));
+                        }
                     }
                 }
+                
                 break;
             case DevCommands.IO_WRITE_BUFFER: // 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
                 const writeBufferAddress = this.internal_pop().value;
