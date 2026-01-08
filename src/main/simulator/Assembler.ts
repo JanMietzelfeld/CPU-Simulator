@@ -189,7 +189,7 @@ export class Assembler {
 				encodedInstructions.push(...encodedInstruction);
 				lineEncoded = true;
 			}
-		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.integerVariable))) {
+		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.integerVariable, "gim"))) {
 			const variableName = line.replace(/^\.|[ ][0-9]*$/gim, "");
 			const variableValue = line.replace(/^\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]?/gim, "");
 			if (variables.has(variableName)) {
@@ -214,13 +214,17 @@ export class Assembler {
 	}
 
 	/**
-	 * Locates the jump labels, constants and variables in the assembly code.
-	 * For the jump labels, integer and string variables and string constants a map is created between their symbolic name and a (virtual) memory address.
-	 * For integer constants their symbolic name gets mapped to their value.
+	 * This method locates symbols in the assembly code and stores them in the appropriate map.
+	 * For jump labels a map between a jump label and a (virtual) memory address is created and the jump label is removed from the code,
+	 * since they won't be translated.
+	 * For symbolic integer constants their value is mapped to their symbolic name and for string constants the (virtual) memory start address gets
+	 * mapped to their symbolic name.
+	 * The lines with symbolic integer constants get removed, since their symbolic name gets replaced by their value later.
+	 * For symbolic variables their (virtual) memory start address gets mapped to their symbolic name.
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
-	 * @param jumpLabels A map for the jump labels and their associated (virtual) memory address.
-	 * @param constants A map for the constants and their associated (virtual) memory address or value in case of integers.
-	 * @param variables A map for the variables and their associated (virtual) memory address.
+	 * @param jumpLabels An empty map, which will be used to store jump labels and their associated (virtual) memory address.
+	 * @param constants An emty map, which will be used to store constants and their associated (virtual) memory address or value.
+	 * @param variables An empty map, which will be used to store variables and their associated (virtual) memory addresses.
 	 */
 	private locateSymbols(lines: Map<number, string>, jumpLabels: Map<string, string>, constants: Map<string, string>, variables: Map<string, string>) : void {
 		/**
@@ -252,7 +256,7 @@ export class Assembler {
 				//is divisible by four. This insures the string always fits into multiple double words.
 				const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
 				programLocationCounter += stringMemSize + 12;
-			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.integerVariable))) {
+			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.integerVariable, "gim"))) {
 				const variableName = line.replace(/^.|[ ][0-9]*$/gim, "");
 				//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 				variables.set(
@@ -261,7 +265,7 @@ export class Assembler {
 				);
 				//Size of jump instruction plus 32bit integer
 				programLocationCounter += 16;
-			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.stringVariable))) {
+			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.stringVariable, "gim"))) {
 				const variableName = line.replace(/^.|[ ]".*/gim, "");
 				const variableValue = line.replace(/^\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]"|"$/gim, "") + "\0";
 				variables.set(
@@ -286,12 +290,13 @@ export class Assembler {
 	}
 
 	/**
-	 * This method finds the usage of symbolic names for the constants and variables in the assembly code and replaces them.
-	 * Integer constants get replaced by their value while string constants, string variables and integer variables get replaced by their
-	 * (virtual) memory start address.
+	 * This method replaces the symbolic names of variables or constants in the assembly code with their associated value or 
+	 * (virtual) memory address.
+	 * Symbolic integer constants get replaced by their value.
+	 * Symbolic integer strings and symbolic variables get replaced by their associated (virtual) memory address.
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
-	 * @param constants A map for the constants and their associated (virtual) memory address or value in case of integers.
-	 * @param variables A map for the variables and their associated (virtual) memory address.
+	 * @param constants A map, which maps the symbolic name of constants to their value or (virtual) memory start address.
+	 * @param variables A map, which maps the symbolic name of variables to their (virtual) memory start address.
 	 * @returns 
 	 */
 	private replaceSymbols(lines: Map<number, string>, constants: Map<string, string>, variables: Map<string, string>) : Map<number, string> {
@@ -325,7 +330,8 @@ export class Assembler {
 	 * @param lineNo The original computer programs line number of code which is currently encoded.
 	 * @param line The original computer programs line of code which is currently encoded.
 	 * @param jumpLabels The jump labels found in the assembly code.
-	 * @param constants A map of the names of constants and their corresponding value in case of integer or (virtual) memory start address in case of strings.
+	 * @param stringValue The string content.
+	 * @param stringAddress The (virtual) memory start address of the string.
 	 * @returns An array containing the binary equivalent of the given instruction and its operand values.
 	 */
 	private encodeString(lineNo: number, line: string, jumpLabels: Map<string, string>, stringValue: string, stringAddress: string) : DoubleWord[] {
