@@ -93,7 +93,7 @@ NOP
 .CODE
 ```
 
-In the current implementation the string is encoded in UTF-8 and stored in a null terminated array in the code segment of the CPU-Simulator like the symbolic string constants. For more details see [1.1.2 Symbolic String Constants](#112-symbolic-string-constants) and the warning [above](#12-symbolic-variables).
+In the current implementation the string is encoded in UTF-8 and stored in a null terminated array in the code segment of the CPU-Simulator like the symbolic string constants. The `NOP` instruction is modified and needed to switch the program into kernel mode. For more details see [1.1.2 Symbolic String Constants](#112-symbolic-string-constants) and the warning [above](#12-symbolic-variables).
 
 The assembler replaces the symbolic name of the string variables in the assembly code with their virtual memory address. The virtual memory address is the start address of the string array. The symbolic name can be used like a normal memory address.
 
