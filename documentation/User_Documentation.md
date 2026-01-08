@@ -45,7 +45,7 @@ The symbolic name of the string constant can then be used like a memory address 
 Here is an example of writing the (start) virtual memory address of the previously defined string constant into the EAX register:
 
 ``` Assembly
-MOV $myStringConst, %EAX
+MOV $myStringConst, %eax
 ```
 
 In the current implementation the constants can be misused as variables, see the warning [below](#12-symbolic-variables).
