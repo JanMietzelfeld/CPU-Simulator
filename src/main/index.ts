@@ -282,9 +282,14 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 
 	ipcMain.handle("readFromVirtualMemory", async (event: Electron.IpcMainInvokeEvent, virtualAddressHexString: string): Promise<string> => {
 		const virtualAddressDec: number = parseInt(virtualAddressHexString, 16);
-		const physicalAddress:PhysicalAddress = simulator.core.mmu.translate(VirtualAddress.fromInteger(virtualAddressDec), false, false, true, true);
-		const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
-		return byte.toString();
+		try {
+			const physicalAddress:PhysicalAddress = simulator.core.mmu.translate(VirtualAddress.fromInteger(virtualAddressDec), false, false, true, true);
+			const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
+			return byte.toString();
+		} catch (e) {
+			return "Not Mapped"
+		}
+		
 	});
 
 	ipcMain.handle("retrieveMainMemoryCells", async (): Promise<Map<number, string>> => {
