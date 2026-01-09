@@ -6,7 +6,7 @@
 
 ### 1.1.1 Symbolic Integer Constants
 
-Symbolic integer constants can store a 32-Bit integer value and can be defined as follows:
+Symbolic integer constants can store a 32 bit integer value and can be defined as follows:
 
 ``` Assembly
 const myIntConst = 5
@@ -33,13 +33,13 @@ const myStringConst = "I am a string."
 const myStringConst="I am a string."
 ```
 
-The given string is stored as UTF-8 encoded and null terminated array in the code segment of the CPU-Simulator.
+The given string is stored as a UTF-8 encoded and null terminated array in the code segment of the CPU-Simulator.
 
-In case that the encoded string is not divisible by four byte, an additional four byte are used for the rest of the string. This is due to the current CPU-Simulator design using fixed 32-Bit instructions and operands. The rest of the four byte that are unused get filled by zeroes, so some memory overhead is expected.
+In case that the length of the encoded string is not divisible by four bytes, its storage is rounded up to a multiple of four bytes. This is due to the current CPU simulator design using fixed 32 bit instructions and operands. The unused rest of the four bytes storage at the end of such a string is filled by bytes with a zero value, so some memory overhead is expected.
 
-Being stored in the code segment makes the string constant as the code segment is write protected in user mode and only writeable in kernel mode. To not interrupt the code execution a jump instruction is automatically placed in front of the string array. The target of the jump instruction is the first virtual memory address after the string array.
+Being stored in the code segment makes the string constant as the code segment is write protected in user mode and only writeable in kernel mode. To not interrupt the code execution, a jump instruction is automatically placed in front of the string array. The target of the jump instruction is the first virtual memory address after the string array.
 
-The assembler replaces the symbolic name of the string constant with the virtual memory start address of the string array. The array goes from the lowest virtual memory address to the highest virtual memory address.
+The assembler replaces the symbolic name of the string constant with the virtual memory start address of the string array. The encoding of the first character in the string starts at the lowest virtual memory address.
 
 The symbolic name of the string constant can then be used like a memory address in the assembly code.
 Here is an example of writing the (start) virtual memory address of the previously defined string constant into the EAX register:
@@ -52,7 +52,7 @@ In the current implementation the constants can be misused as variables, see the
 
 ## 1.2 Symbolic Variables
 
-:warning:**Caution:** In the current implementation the symbolic integer and string variables are stored in the code segment. The code segment is write protected in user mode and only writeable in kernel mode. To assign different values to the variables during program runtime, the program has to switch into kernel mode. Under normal circumstances the program should not be able to to switch into kernel mode directly. To make the variables work correctly a modified NOP instruction has bee included, which switches the program into kernel mode. The NOP instruction has to be used once before variables can be assigned a new value (see the examples below). The modified NOP instruction is needed until a data segment or something of similar function is implemented.
+:warning:**Caution:** In the current implementation the symbolic integer and string variables are stored in the code segment. The code segment is write protected in user mode and only writeable in kernel mode. To assign different values to the variables during program runtime, the program has to switch into kernel mode. Under normal circumstances the program should not be able to switch into kernel mode directly. To make the variables work correctly, a modified NOP instruction has been implemented as a work-around, which switches the program into kernel mode. This NOP instruction has to be used once before variables can be assigned a new value (see the examples below). The modified NOP instruction is needed until a (writable) data segment or some other way of holding the variables in writable storage is implemented. 
 
 Using the modified NOP instruction also makes constants behave like variables, so caution is advised.
 
@@ -68,9 +68,9 @@ NOP
 .CODE
 ```
 
-Defining and declaring symbolic integer variables always has to be done between the `.DATA` and the `.CODE` blocks. The variable gets initialized with zero internally if no value is given, like shown for the first variable above, otherwise it gets initialized with the given numerical value.
-The assembler encodes the integer variable as 32-Bit integer and stores it in the code segment of the CPU-Simulator. To not interrupt the program flow a jump instruction is automatically added by the assembler in front of the integer variable in virtual memory. The jump target is the first virtual memory address after the integer variable.
-The assembler replaces all occurrences of the symbolic name of the integer variable with their virtual memory address.
+Defining and declaring symbolic integer variables always has to be done between the `.DATA` and the `.CODE` blocks. The variable is initialized with zero internally if no value is given, like shown for the first variable above, otherwise it is initialized with the given numerical value.
+The assembler encodes the integer variable as a 32 bit integer and stores it in the code segment of the CPU simulator. To not interrupt the program flow, a jump instruction is automatically added by the assembler in front of the integer variable in virtual memory. The jump target is the first virtual memory address after the integer variable.
+The assembler replaces all occurrences of the symbolic name of the integer variable with its virtual memory address.
 The `NOP` instruction switches the program into kernel mode, see the warning [above](#12-symbolic-variables).
 
 Reassigning the value of a symbolic integer variable can be done as follows:
@@ -84,7 +84,7 @@ The symbolic name can be used like a normal memory address.
 
 ### 1.2.2 Symbolic String Variables
 
-Symbolic string variables are used to store a string as a null terminated array in memory. They can be defined as follows:
+Symbolic string variables are used to store a string in memory. They can be defined as follows:
 
 ``` Assembly
 NOP
@@ -93,15 +93,15 @@ NOP
 .CODE
 ```
 
-In the current implementation the string is encoded in UTF-8 and stored in a null terminated array in the code segment of the CPU-Simulator like the symbolic string constants. The `NOP` instruction is modified and needed to switch the program into kernel mode. For more details see [1.1.2 Symbolic String Constants](#112-symbolic-string-constants) and the warning [above](#12-symbolic-variables).
+In the current implementation the string is encoded in UTF-8 and stored in a null terminated array of bytes in the code segment of the CPU-Simulator like the symbolic string constants. Again, the `NOP` instruction is modified and needed to switch the program into kernel mode. For more details see [1.1.2 Symbolic String Constants](#112-symbolic-string-constants) and the warning [above](#12-symbolic-variables).
 
-The assembler replaces the symbolic name of the string variables in the assembly code with their virtual memory address. The virtual memory address is the start address of the string array. The symbolic name can be used like a normal memory address.
+The assembler replaces the symbolic name of the string variables in the assembly code with their virtual memory address. The virtual memory address is the start address of the array of bytes that encodes the string. The symbolic name can be used like a normal memory address.
 
 ```Assembly
 MOV $stringVariable, %eax
 ```
 
-In the above example the virtual memory start address of the `stringVariable` gets written into the EAX register.
+In the above example the virtual memory start address of the `stringVariable` is written into the EAX register.
 
 ## 2 GUI
 
@@ -110,7 +110,7 @@ In the above example the virtual memory start address of the `stringVariable` ge
 ### 2.1.1 Clickable Registers
 
 Some registers can hold memory addresses either for the virtual or for the physical memory. A feature has been implemented that allows the user to jump to those memory addresses by clicking on the GUI element of the register. The memory cell in the virtual or physical memory gets highlighted after the jump. This minimizes the scrolling necessary and makes it easier to find those memory address easier.
-Following registers implement the jump on click feature:
+The following registers implement the jump on click feature:
 
 - EAX
 - EBX
