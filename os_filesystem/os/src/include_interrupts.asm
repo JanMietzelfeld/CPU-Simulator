@@ -11,5 +11,5 @@
 
     ; collect all the ISRs for external interrupts here
 
-    include "os/src/interrupts/external/timer/timer"             ; 0x20
+    include "os/src/interrupts/hardware/timer/timer"             ; 0x20
     include "os/src/interrupts/syscalls/syscalls"                ; 0x80

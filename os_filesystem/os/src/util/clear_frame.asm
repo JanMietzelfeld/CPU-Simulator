@@ -7,10 +7,10 @@
 
     PUSH %ebx
 
-    const _UTIL_CLEAR_FRAME_CONST_ZERO_FRAME_FILE_PATH = "os/util/zero_frame.bin"
+    const _UTIL_CLEAR_FRAME_CONST_EMPTY_FRAME_FILE_PATH = "os/util/empty_frame.bin"
 
 
-    MOV $_UTIL_CLEAR_FRAME_CONST_ZERO_FRAME_FILE_PATH, %ebx
+    MOV $_UTIL_CLEAR_FRAME_CONST_EMPTY_FRAME_FILE_PATH, %ebx
 
     ; SYSCALLS_FILE_OPEN
     ; Parameters (ebx is a pointer to the start of an ASCII filename):

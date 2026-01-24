@@ -2,8 +2,8 @@ JMP _OS_ENTRY ; start of the os
 
 ; include dependencies
 include "os/src/constants"
-include "os/src/interupts"
-include "os/src/util"
+include "os/src/include_interrupts"
+include "os/src/include_util"
 
 ._OS_ENTRY:
     ; This is the entry point of the OS
