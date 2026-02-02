@@ -9,8 +9,7 @@
 Symbolic integer constants can store a 32 bit integer value and can be defined as follows:
 
 ``` Assembly
-const myIntConst = 5
-const myIntConst=5
+.CONST myIntConst 5
 ```
 
 The assembler stores the integer value and replaces all occurrences of the symbolic integer constant in the assembly code with their actual value.
@@ -29,8 +28,7 @@ This writes the value 5 into the EAX register.
 Symbolic string constants are treated a bit differently than symbolic integer constants and can be defined as follows:
 
 ``` Assembly
-const myStringConst = "I am a string."
-const myStringConst="I am a string."
+.CONST myStringConst "I am a string."
 ```
 
 The given string is stored as a UTF-8 encoded and null terminated array in the code segment of the CPU-Simulator.
