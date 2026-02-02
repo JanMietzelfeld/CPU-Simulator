@@ -223,7 +223,7 @@ export class Assembler {
 	 * For symbolic variables their (virtual) memory start address gets mapped to their symbolic name.
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
 	 * @param jumpLabels An empty map, which will be used to store jump labels and their associated (virtual) memory address.
-	 * @param constants An emty map, which will be used to store constants and their associated (virtual) memory address or value.
+	 * @param constants An empty map, which will be used to store constants and their associated (virtual) memory address or value.
 	 * @param variables An empty map, which will be used to store variables and their associated (virtual) memory addresses.
 	 */
 	private locateSymbols(lines: Map<number, string>, jumpLabels: Map<string, string>, constants: Map<string, string>, variables: Map<string, string>) : void {
@@ -237,16 +237,16 @@ export class Assembler {
 			if (line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentStart)) || line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentEnd))) {
 				lines.delete(lineNo);
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationInteger, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?[0-9]*/gim, "");
-				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?/gim, "");
+				const constantName = line.replace(/.CONST[ ]|[ ][0-9]*/gim, "");
+				const constantValue = line.replace(/.CONST[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]/gim, "");
 				constants.set(
 					constantName, 
 					constantValue
 				);
 				lines.delete(lineNo);
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-				const constantName = line.replace(/const[ ]|[ ]?=[ ]?".*/gim, "");
-				const constantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?|"/gim, "") + "\0";
+				const constantName = line.replace(/.CONST[ ]|[ ]".*/gim, "");
+				const constantValue = line.replace(/.CONST[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]|"/gim, "") + "\0";
 				//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
 				constants.set(
 					constantName, 
@@ -347,11 +347,11 @@ export class Assembler {
 		//Create a buffer from the string in utf8 encoding and calculate some important values.
 		const stringBuffer = Buffer.from(stringValue, "utf8");
 		const stringByteLength = stringBuffer.length;
-		const continousBufferSegmentSize = stringByteLength - (stringByteLength % 4);
+		const continuousBufferSegmentSize = stringByteLength - (stringByteLength % 4);
 		const restOfBufferSize = stringByteLength % 4;
 		//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
 		//and encode each segment into binary values.
-		if (continousBufferSegmentSize > 0) {
+		if (continuousBufferSegmentSize > 0) {
 			for (let i = 0; i <= stringByteLength - 4; i += 4) {
 				const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
 				const binaryString = parseInt(bufferSegment, 16).toString(2).padStart(32, "0");
@@ -374,7 +374,7 @@ export class Assembler {
 		}
 		//Get the last bytes from the buffer
 		if (restOfBufferSize > 0) {
-			const bufferSegment = stringBuffer.toString("hex", continousBufferSegmentSize, stringByteLength);
+			const bufferSegment = stringBuffer.toString("hex", continuousBufferSegmentSize, stringByteLength);
 			const binaryString = parseInt(bufferSegment, 16).toString(2).padStart((8 * restOfBufferSize), "0");
 			const bitArray: Array<Bit> = new Array<Bit>(
 				0, 0, 0, 0,
