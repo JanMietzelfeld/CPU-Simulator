@@ -1643,9 +1643,11 @@ export class Renderer {
     }
 
     public async showLog(): Promise<void> {
-        const log: HTMLElement | null = document.getElementById("log-section");
-        if (log !== null) {
-            log.style.display = "block";
+        const logSection: HTMLElement | null = document.getElementById("log-section");
+        const log: HTMLElement | null = document.getElementById("log");
+        if (logSection && log !== null) {
+            logSection.style.display = "block";
+            log.children.namedItem("log-content")!.scrollTop = log.children.namedItem("log-content")!.scrollHeight;
         }
         return;
     }
