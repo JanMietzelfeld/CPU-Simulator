@@ -86,5 +86,13 @@ window.simulator.onEnableAutoScrollForPageTable(() => {
 });
 
 window.windowUpdate.onUpdateLog((value: string) => {
-	renderer.updateLog(value)
+	renderer.updateLog(value);
+});
+
+window.windowUpdate.onHideLog(() => {
+	renderer.hideLog();
+});
+
+window.windowUpdate.onShowLog(() => {
+	renderer.showLog();
 });

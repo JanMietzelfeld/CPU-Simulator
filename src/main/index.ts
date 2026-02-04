@@ -126,6 +126,28 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 									}
 								}
 							]
+						},
+						{
+							label: "Output",
+							submenu : [
+								{
+									label: "Logging",
+									submenu : [
+										{
+											label: "Disable Logging",
+											click() {
+												win.webContents.send("hide_log");
+											}
+										},
+										{
+											label: "Enable Logging",
+											click() {
+												win.webContents.send("show_log");
+											}
+										}
+									]
+								}
+							]
 						}
 					]
 				}

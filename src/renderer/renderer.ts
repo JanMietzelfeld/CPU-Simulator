@@ -1625,9 +1625,27 @@ export class Renderer {
      * @param message The message that gets appended to the log-widget. 
      */
     public async updateLog(message: string): Promise<void> {
-        const logTest: HTMLElement | null = document.getElementById("logTest");
-        if (logTest !== null) {
-            logTest.children.namedItem("log-content")!.textContent += message + "\r\n";
+        const log: HTMLElement | null = document.getElementById("log");
+        if (log !== null) {
+            log.children.namedItem("log-content")!.insertAdjacentElement("beforeend", document.createElement("br"));
+            log.children.namedItem("log-content")!.insertAdjacentText("beforeend", message);
+            log.children.namedItem("log-content")!.scrollTop = log.children.namedItem("log-content")!.scrollHeight;
+        }
+        return;
+    }
+
+    public async hideLog(): Promise<void> {
+        const log: HTMLElement | null = document.getElementById("log-section");
+        if (log !== null) {
+            log.style.display = "none";
+        }
+        return;
+    }
+
+    public async showLog(): Promise<void> {
+        const log: HTMLElement | null = document.getElementById("log-section");
+        if (log !== null) {
+            log.style.display = "block";
         }
         return;
     }

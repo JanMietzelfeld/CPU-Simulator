@@ -375,18 +375,18 @@ export class CPUCore {
         const currentInstructionAddress:number = this.eip.content.toUnsignedNumber();
         const currentOperation:string = encodedOperationNameByValue(operation.toString());
         this.log("Executing next instruction");
-        this.log("Instruction address: " + currentInstructionAddress);
+        this.log("Instruction address: " + "0x" + currentInstructionAddress.toString(16));
         this.log("Instruction name: " + currentOperation);
         if (this._decodedInstruction !== undefined) {
             if (0 in this._decodedInstruction.operands!) {
                 const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
                 const hexOperand = parseInt(stringOperand, 2).toString(16);
-                this.log("First operand: " + hexOperand);
+                this.log("First operand: " + "0x" + hexOperand);
             }
             if (1 in this._decodedInstruction.operands!) {
                 const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
                 const hexOperand = parseInt(stringOperand, 2).toString(16);
-                this.log("Second operand: " + hexOperand);
+                this.log("Second operand: " + "0x" + hexOperand);
             }
         }
 
@@ -2665,6 +2665,6 @@ export class CPUCore {
      * @param message The message that gets appended to the log-widget.
      */
     private log(message: string): void {
-        this._mainWindow.webContents.send('update-log', message);
+        this._mainWindow.webContents.send('update_log', message);
     }
 }
