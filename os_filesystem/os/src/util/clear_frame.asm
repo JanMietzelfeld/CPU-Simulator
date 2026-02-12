@@ -7,7 +7,7 @@
 
     PUSH %ebx
 
-    const _UTIL_CLEAR_FRAME_CONST_EMPTY_FRAME_FILE_PATH = "os/util/empty_frame.bin"
+    .CONST _UTIL_CLEAR_FRAME_CONST_EMPTY_FRAME_FILE_PATH "os/util/empty_frame.bin"
 
 
     MOV $_UTIL_CLEAR_FRAME_CONST_EMPTY_FRAME_FILE_PATH, %ebx

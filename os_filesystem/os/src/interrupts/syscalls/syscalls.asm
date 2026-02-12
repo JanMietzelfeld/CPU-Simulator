@@ -111,18 +111,18 @@
 
 ; collect all the syscall handlers here
 
-    include "os/src/interrupts/syscalls/process/create"
-    include "os/src/interrupts/syscalls/process/exit"
-    include "os/src/interrupts/syscalls/process/yield"
+    .INCLUDE "os/src/interrupts/syscalls/process/create"
+    .INCLUDE "os/src/interrupts/syscalls/process/exit"
+    .INCLUDE "os/src/interrupts/syscalls/process/yield"
 
-    include "os/src/interrupts/syscalls/file/close"
-    include "os/src/interrupts/syscalls/file/create"
-    include "os/src/interrupts/syscalls/file/delete"
-    include "os/src/interrupts/syscalls/file/open"
-    include "os/src/interrupts/syscalls/file/read"
-    include "os/src/interrupts/syscalls/file/seek"
-    include "os/src/interrupts/syscalls/file/stat"
-    include "os/src/interrupts/syscalls/file/write"
+    .INCLUDE "os/src/interrupts/syscalls/file/close"
+    .INCLUDE "os/src/interrupts/syscalls/file/create"
+    .INCLUDE "os/src/interrupts/syscalls/file/delete"
+    .INCLUDE "os/src/interrupts/syscalls/file/open"
+    .INCLUDE "os/src/interrupts/syscalls/file/read"
+    .INCLUDE "os/src/interrupts/syscalls/file/seek"
+    .INCLUDE "os/src/interrupts/syscalls/file/stat"
+    .INCLUDE "os/src/interrupts/syscalls/file/write"
     
-    include "os/src/interrupts/syscalls/timer/start"
+    .INCLUDE "os/src/interrupts/syscalls/timer/start"
 

@@ -1,5 +1,5 @@
 
-const _INIT_START_CONST_PROCES_NAME_FILE_PATH = "os/util/new_process_name.bin"
+.CONST _INIT_START_CONST_PROCES_NAME_FILE_PATH "os/util/new_process_name.bin"
 
 ._INIT_START:
 
@@ -162,4 +162,4 @@ PUSH %eax ; file descriptor
     JMP _INIT_START
 
 
-include "os/include/syscalls"
+.INCLUDE "os/include/syscalls"

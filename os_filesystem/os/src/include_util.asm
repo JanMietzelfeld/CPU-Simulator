@@ -1,19 +1,19 @@
 
 ; collect all utility functions here
 
-include "os/src/util/allocate_frame"
+.INCLUDE "os/src/util/allocate_frame"
 
-include "os/src/util/create_pcb"
+.INCLUDE "os/src/util/create_pcb"
 
-include "os/src/util/initialize_page_table"
+.INCLUDE "os/src/util/initialize_page_table"
 
-include "os/src/util/load_program"
+.INCLUDE "os/src/util/load_program"
 
-include "os/src/util/scheduler"
+.INCLUDE "os/src/util/scheduler"
 
-include "os/src/util/assert"
+.INCLUDE "os/src/util/assert"
 
-include "os/src/util/clear_frame"
+.INCLUDE "os/src/util/clear_frame"
 
 
 

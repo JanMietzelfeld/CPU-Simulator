@@ -334,8 +334,8 @@ export class Assembler {
 
 				if (regexMatch !== null) {
 					// Const found.
-					let value: string = regexMatch[0].toString();
-					let constantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
+					let value: string = regexMatch[0].toString().trim();
+					let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
 					let constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 
 					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
@@ -356,9 +356,9 @@ export class Assembler {
 
 			if (regexMatch !== null) {
 				// Const found.
-				let value: string = regexMatch[0].toString();
-				let constantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
-				let constantValue = value.substring(value.indexOf("=") + 1).trim();
+				let value: string = regexMatch[0].toString().trim();
+				let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+				let constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 
 				constants.set(
 					constantName, 
@@ -407,8 +407,8 @@ export class Assembler {
 
 		if (regexMatch !== null) {
 			// Const found.
-			let value: string = regexMatch[0].toString();
-			const stringConstantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
+			let value: string = regexMatch[0].toString().trim();
+			const stringConstantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
 			const stringConstantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 
 			let stringEncoded = false;

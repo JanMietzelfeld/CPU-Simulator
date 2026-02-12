@@ -825,6 +825,14 @@ export class CPUCore {
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
                 this.eax.content = DoubleWord.fromInteger(this.fs.file_stat(filename));
                 break;
+            case DevCommands.CONSOLE_PRINT_NUMBER: // 00001000 - console_print_number(number=op2)
+                this.fs.console_print_number(op2);
+                break;
+            case DevCommands.CONSOLE_READ_NUMBER: //  00001001 - console_read_number() -> number=eax, error=ebx
+                const [num, err] = this.fs.console_read_number();
+                this.eax.content = DoubleWord.fromInteger(num);
+                this.ebx.content = DoubleWord.fromInteger(err);
+                break;
             case DevCommands.CPU_IS_MEMORY_VIRTUALIZATION_ENABLED: //  00001010 isMemoryVirtualizationEnabled()
                 this.eax.content = DoubleWord.fromInteger(this.mmu.isMemoryVirtualizationEnabled());
                 break;
