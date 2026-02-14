@@ -304,9 +304,7 @@ export class ArithmeticLogicUnit {
             ) ? 1 : 0;
         }
         this.checkForOverflow(carry);
-        
-
-
+        this.checkCarry(carry);
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -349,7 +347,7 @@ export class ArithmeticLogicUnit {
     }
 
     /**
-     * This method subtracts two given binary numbers without taking the carry into account.
+     * This method subtracts two given binary numbers while taking the borrow into account.
      * 
      * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
      * @param minuend The binary value to subtract from.
@@ -358,23 +356,38 @@ export class ArithmeticLogicUnit {
      */
     public sbb(minuend: DoubleWord, subtrahend: DoubleWord): DoubleWord {
         const carryFlag: Bit = this._eflags.carry;
+
         if (subtrahend.value[0] === 1) {
             /**
              * - -(x) <=> + (x)
              */
             subtrahend = this.sub(subtrahend, DoubleWord.fromInteger(1));
-            this._eflags.clearCarry();
             subtrahend = this.not(subtrahend);
         } else {
             /**
-             * + -(x) <=> - (x)
+             * - (+ x) <=> - (x)
              */
             subtrahend = this.neg(subtrahend);
         }
+
         if (carryFlag === 1) {
             this._eflags.setCarry();
         }
-        return this.adc(minuend, subtrahend);
+        else  {
+            this._eflags.clearCarry();
+        }
+
+        let result = this.adc(minuend, subtrahend);
+        
+        //Here, the carry represents the borrow and thus has the opposite meaning compared to the addition.
+        if (this._eflags.carry === 1) {
+            this._eflags.clearCarry();
+        }
+        else {
+            this._eflags.setCarry();
+        }
+
+        return result;
     }
 
     /**
