@@ -321,7 +321,7 @@ describe("Test ALU", () => {
             .toEqual("11111111111111111111111111111110");
     });
 
-    test("Perform DIV on binary representation of decimal -256 and binary representation of decimal 128", () => {
+    test("Perform DIV on binary representation of decimal -2001 and binary representation of decimal 128", () => {
         const testDoubleword1: DoubleWord = DoubleWord.fromInteger(-2001);
         const testDoubleword2: DoubleWord = DoubleWord.fromInteger(128);
         expect(alu.div(testDoubleword1, testDoubleword2).toString())

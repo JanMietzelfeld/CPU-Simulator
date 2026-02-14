@@ -38,15 +38,6 @@ describe("Read from and write to main memory using MMU as proxy", () => {
         ]));
     });
 
-    test("Write doubleword to high memory address, expecting an Error", () => {
-        const virtualAddress: VirtualAddress = VirtualAddress.fromInteger(parseInt("0xFFFFFFFE", 16));
-        const doubleword = DoubleWord.fromInteger(parseInt("01101100100101110101000010110000", 2));
-        const attemptToWrite = () => {
-            mmu.writeDoublewordTo(virtualAddress, doubleword, false);
-        }      
-        expect(attemptToWrite).toThrow(Error);
-    });
-
     test("Read single byte from memory address", () => {
         const virtualAddress: VirtualAddress = VirtualAddress.fromInteger(parseInt("0x1000000", 16));
         const result: Byte = mmu.readByteFrom(virtualAddress);

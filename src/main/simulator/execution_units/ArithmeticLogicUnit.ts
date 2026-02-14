@@ -616,7 +616,7 @@ export class ArithmeticLogicUnit {
             flipQuotientSign = true;
         }
         this.cmp(dividend, divisor);
-        while (this._eflags.sign === this._eflags.overflow) {
+        while (this._eflags.sign !== this._eflags.overflow || this._eflags.zero === 1 as Bit) {
             dividend = this.sub(dividend, divisor);
             quotient = this.add(quotient, DoubleWord.fromInteger(1));
             this.cmp(dividend, divisor);
