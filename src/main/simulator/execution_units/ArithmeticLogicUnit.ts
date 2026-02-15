@@ -477,11 +477,11 @@ export class ArithmeticLogicUnit {
         this._eflags.clearCarry()
 
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber() && count.toUnsignedNumber() > 0) {
             result.value = new Array<Bit>().concat(value.getLeastSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber())).concat(new Array<Bit>(count.toUnsignedNumber()).fill(0, 0, count.toUnsignedNumber()));
 
             count.toUnsignedNumber() === 1 && value.value.at(0) !== value.value.at(1) ? this._eflags.setOverflow() : this._eflags.clearOverflow();
-            value.value.at(0) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+            value.value.at(count.toUnsignedNumber() - 1) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
         }
 
         this.checkForZero(result);
@@ -505,7 +505,7 @@ export class ArithmeticLogicUnit {
         this._eflags.clearCarry()
 
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber() && count.toUnsignedNumber() > 0) {
             result.value = new Array<Bit>(count.toUnsignedNumber()).fill(0, 0, count.toUnsignedNumber()).concat(value.getMostSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()));
 
             value.value.at(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry();
@@ -533,7 +533,7 @@ export class ArithmeticLogicUnit {
         this._eflags.clearCarry()
 
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber()) {
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.toUnsignedNumber() && count.toUnsignedNumber() > 0) {
             result.value = new Array<Bit>(count.toUnsignedNumber()).fill(value.value.at(0)!, 0, count.toUnsignedNumber()).concat(value.getMostSignificantBits(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()));
 
             value.value.at(DoubleWord.NUMBER_OF_BITS_DEC - count.toUnsignedNumber()) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
