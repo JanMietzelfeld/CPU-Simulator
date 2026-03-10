@@ -15,6 +15,8 @@ import { VirtualAddress } from "./../types/binary/VirtualAddress";
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
+let mainWindow: BrowserWindow;
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
 	app.quit();
@@ -124,6 +126,28 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 									}
 								}
 							]
+						},
+						{
+							label: "Output",
+							submenu : [
+								{
+									label: "Logging",
+									submenu : [
+										{
+											label: "Disable Logging",
+											click() {
+												win.webContents.send("hide_log");
+											}
+										},
+										{
+											label: "Enable Logging",
+											click() {
+												win.webContents.send("show_log");
+											}
+										}
+									]
+								}
+							]
 						}
 					]
 				}
@@ -188,7 +212,7 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 
 const createWindow = (): void => {
 	// Create the browser window.
-	const mainWindow = new BrowserWindow({
+	mainWindow = new BrowserWindow({
 		height: 600,
 		width: 800,
 		webPreferences: {
@@ -507,3 +531,7 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+export function getMainWindow(): BrowserWindow {
+	return mainWindow;
+}

@@ -1700,4 +1700,36 @@ export class Renderer {
         await this.readVMPTR(this.dataRepresentationVMPTR);
         return;
     }
+
+    /**
+     * This method updates the log-widget with a message.
+     * @param message The message that gets appended to the log-widget. 
+     */
+    public async updateLog(message: string): Promise<void> {
+        const log: HTMLElement | null = document.getElementById("log");
+        if (log !== null) {
+            log.children.namedItem("log-content")!.insertAdjacentElement("beforeend", document.createElement("br"));
+            log.children.namedItem("log-content")!.insertAdjacentText("beforeend", message);
+            log.children.namedItem("log-content")!.scrollTop = log.children.namedItem("log-content")!.scrollHeight;
+        }
+        return;
+    }
+
+    public async hideLog(): Promise<void> {
+        const log: HTMLElement | null = document.getElementById("log-section");
+        if (log !== null) {
+            log.style.display = "none";
+        }
+        return;
+    }
+
+    public async showLog(): Promise<void> {
+        const logSection: HTMLElement | null = document.getElementById("log-section");
+        const log: HTMLElement | null = document.getElementById("log");
+        if (logSection && log !== null) {
+            logSection.style.display = "block";
+            log.children.namedItem("log-content")!.scrollTop = log.children.namedItem("log-content")!.scrollHeight;
+        }
+        return;
+    }
 }

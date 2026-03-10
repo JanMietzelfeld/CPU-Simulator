@@ -26,20 +26,27 @@ import { PrivilegeViolationError } from "../../../types/errors/PrivilegeViolatio
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { EncodedReadableRegisters } from "../../../types/enumerations/EncodedReadableRegisters";
 import { EncodedWritableRegisters } from "../../../types/enumerations/EncodedWritableRegisters";
-import { EncodedOperations } from "../../../types/enumerations/EncodedOperations";
+import { encodedOperationNameByValue, EncodedOperations } from "../../../types/enumerations/EncodedOperations";
 import { EncodedInstructionTypes } from "../../../types/enumerations/EncodedInstructionTypes";
 import { EncodedOperandTypes } from "../../../types/enumerations/EncodedOperandTypes";
 import { devCommandNameByValue, DevCommands } from "../../../types/enumerations/DevOperationCommands";
 import { BadOperandError } from "../../../types/errors/BadOperandError";
 import { NotImplementedError } from "../../../types/errors/NotImplementedError";
 import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
-
+import { BrowserWindow } from "electron";
+import { getMainWindow } from "../../index"
 
 /**
  * This class represents a CPU core which is capable of executing instructions.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
 export class CPUCore {
+
+    /**
+     * This field stores a reference to the browser "window".
+     */
+    private readonly _mainWindow: BrowserWindow;
+
     /**
      * An error message template that is used when operands are missing.
      * @readonly
@@ -200,6 +207,7 @@ export class CPUCore {
         this.fs = new PassthroughFilesystem(process.cwd() + "/os_filesystem");
         this._decodedInstruction = null;
         this._processingWidth = processingWidth;
+        this._mainWindow = getMainWindow();
     }
 
     /**
@@ -363,6 +371,25 @@ export class CPUCore {
             throw new Error("No instruction is currently ready to be executed.");
         }
         const operation: EncodedOperations = this._decodedInstruction.operation;
+
+        const currentInstructionAddress:number = this.eip.content.toUnsignedNumber();
+        const currentOperation:string = encodedOperationNameByValue(operation.toString());
+        this.log("Executing next instruction");
+        this.log("Instruction address: " + "0x" + currentInstructionAddress.toString(16));
+        this.log("Instruction name: " + currentOperation);
+        if (this._decodedInstruction !== undefined) {
+            if (0 in this._decodedInstruction.operands!) {
+                const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
+                const hexOperand = parseInt(stringOperand, 2).toString(16);
+                this.log("First operand: " + "0x" + hexOperand);
+            }
+            if (1 in this._decodedInstruction.operands!) {
+                const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
+                const hexOperand = parseInt(stringOperand, 2).toString(16);
+                this.log("Second operand: " + "0x" + hexOperand);
+            }
+        }
+
         let jumpPerformed = false;
         switch (operation) {
             case EncodedOperations.NOT:
@@ -546,6 +573,8 @@ export class CPUCore {
             this.eip.content = VirtualAddress.fromInteger(parseInt(this.eip.content.toString(), 2) + 12);
             this.eflags.content = flags;
         }
+        this.log("Execution finished");
+        this.log("");
         return;
     }
 
@@ -2629,5 +2658,13 @@ export class CPUCore {
         const poppedValue = this.eax.content;
         this.eax.content.value = oldEAX;
         return poppedValue;
+    }
+
+    /**
+     * Send a message to be appended to the log-widget in the main window.
+     * @param message The message that gets appended to the log-widget.
+     */
+    private log(message: string): void {
+        this._mainWindow.webContents.send('update_log', message);
     }
 }
