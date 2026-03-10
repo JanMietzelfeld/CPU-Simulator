@@ -2404,6 +2404,8 @@ export class CPUCore {
      * This method does nothing.
      */
     private nop(): void {
+        //Patch to enter kernel mode. Only temporary.
+        this.eflags.enterKernelMode();
         return;
     }
 

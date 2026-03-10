@@ -1,7 +1,14 @@
-{
+{   
+    "variable_formats" : {
+        "dataSegmentStart" : "\\.DATA",
+        "dataSegmentEnd" : "\\.CODE",
+        "integerVariable" : "^\\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]?-?[0-9]*$",
+        "stringVariable" : "^\\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]\"[a-zA-Z0-9]*\"$",
+        "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
+    },
     "constant_formats" : {
-        "declarationInteger" : "^const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?[0-9]*$",
-        "declarationString" : "^const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?\"[a-zA-Z0-9]*\"$",
+        "declarationInteger" : "^.CONST[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]-?[0-9]+$",
+        "declarationString" : "^.CONST[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]\"[a-zA-Z0-9]*\"$",
         "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
     },
     "comment_format" : "[ ]*;.*",

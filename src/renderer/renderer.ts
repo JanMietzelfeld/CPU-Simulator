@@ -1011,7 +1011,7 @@ export class Renderer {
                 case "ebx":
                     eventListener = this.onChangeListenerEBX;
                     break;
-                case "edx":
+                case "ecx":
                     eventListener = this.onChangeListenerECX;
                     break;
                 case "vmptr":
