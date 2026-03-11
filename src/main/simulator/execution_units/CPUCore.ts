@@ -20,7 +20,6 @@ import { MissingOperandError } from "../../../types/errors/MissingOperandError";
 import { UnsupportedOperandTypeError } from "../../../types/errors/UnsupportedOperandTypeError";
 import { Register } from "../functional_units/Register";
 import { RegisterNotWritableInUserModeError } from "../../../types/errors/RegisterNotWritableInUserModeError";
-import { RegisterNotAvailableError } from "../../../types/errors/RegisterNotAvailableError";
 import { UnknownRegisterError } from "../../../types/errors/UnknownRegisterError";
 import { PrivilegeViolationError } from "../../../types/errors/PrivilegeViolationError";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
@@ -29,21 +28,27 @@ import { EncodedWritableRegisters } from "../../../types/enumerations/EncodedWri
 import { encodedOperationNameByValue, EncodedOperations } from "../../../types/enumerations/EncodedOperations";
 import { EncodedInstructionTypes } from "../../../types/enumerations/EncodedInstructionTypes";
 import { EncodedOperandTypes } from "../../../types/enumerations/EncodedOperandTypes";
-import { devCommandNameByValue, DevCommands } from "../../../types/enumerations/DevOperationCommands";
+import { DevCommands } from "../../../types/enumerations/DevOperationCommands";
 import { BadOperandError } from "../../../types/errors/BadOperandError";
-import { NotImplementedError } from "../../../types/errors/NotImplementedError";
 import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
-import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
-import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
+import { BrowserWindow } from "electron";
+import { getMainWindow } from "../../index"
 import { PageFaultError } from "../../../types/errors/PageFaultError";
+import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { Timer } from "./Timer";
-
+import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
 
 /**
  * This class represents a CPU core which is capable of executing instructions.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
 export class CPUCore {
+
+    /**
+     * This field stores a reference to the browser "window".
+     */
+    private readonly _mainWindow: BrowserWindow;
+
     /**
      * An error message template that is used when operands are missing.
      * @readonly
@@ -212,6 +217,7 @@ export class CPUCore {
         this.timer = new Timer(this);
         this._decodedInstruction = null;
         this._processingWidth = processingWidth;
+        this._mainWindow = getMainWindow();
     }
 
     /**
@@ -440,21 +446,27 @@ export class CPUCore {
             throw new Error("No instruction is currently ready to be executed.");
         }
         const operation: EncodedOperations = this._decodedInstruction.operation;
-        
-        // Debug prints
 
-        try {
-            if (this.esp.content.toUnsignedNumber() <= 0xFFFFFFFC) {
-                const physicalAddress: PhysicalAddress = this.mmu.translate(this.esp.content, false, false, true);
-                let value = this.mainMemory.readDoublewordFrom(physicalAddress);
-                console.log("Stack value: " + value);
+        if (this.eflags.isInUserMode()) {
+            const currentInstructionAddress:number = this.eip.content.toUnsignedNumber();
+            const currentOperation:string = encodedOperationNameByValue(operation.toString());
+            this.log(" ");
+            this.log("Executing next instruction");
+            this.log("Instruction address: " + "0x" + currentInstructionAddress.toString(16));
+            this.log("Instruction name: " + currentOperation);
+            if (this._decodedInstruction.operands !== undefined) {
+                if (0 in this._decodedInstruction.operands! && this._decodedInstruction.operands[0] !== undefined) {
+                    const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
+                    const hexOperand = parseInt(stringOperand, 2).toString(16);
+                    this.log("First operand: " + "0x" + hexOperand);
+                }
+                if (1 in this._decodedInstruction.operands! && this._decodedInstruction.operands[1] !== undefined) {
+                    const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
+                    const hexOperand = parseInt(stringOperand, 2).toString(16);
+                    this.log("Second operand: " + "0x" + hexOperand);
+                }
             }
         }
-        catch(e) {
-            console.log("Stack value: Not Mapped");
-        }
-        
-        console.log("Executing " + encodedOperationNameByValue(operation.toString()) + " at " + this.eip.content.toUnsignedNumber());        
 
         let jumpPerformed = false;
         switch (operation) {
@@ -673,6 +685,7 @@ export class CPUCore {
             this.eip.content = VirtualAddress.fromInteger(parseInt(this.eip.content.toString(), 2) + 12);
             this.eflags.content = flags;
         }
+
         return;
     }
 
@@ -3180,6 +3193,14 @@ export class CPUCore {
         const poppedValue = this.eax.content;
         this.eax.content.value = oldEAX;
         return poppedValue;
+    }
+
+    /**
+     * Send a message to be appended to the log-widget in the main window.
+     * @param message The message that gets appended to the log-widget.
+     */
+    private log(message: string): void {
+        this._mainWindow.webContents.send('update_log', message);
     }
 
     /**

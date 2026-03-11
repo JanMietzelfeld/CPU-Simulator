@@ -1,4 +1,14 @@
 export interface AssemblyLanguageDefinition {
+    variable_formats: {
+        dataSegmentStart: string;
+        dataSegmentEnd: string;
+        declarationDecimal: string;
+        declarationHexadecimal: string;
+        declarationBinary: string;
+        declarationString: string;
+        usage: string;
+    }
+    
     constant_formats: {
         declarationDecimal: string;
         declarationHexadecimal: string;
