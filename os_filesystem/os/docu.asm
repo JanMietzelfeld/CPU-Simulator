@@ -165,3 +165,43 @@
 ; 19-23 unused
 ;
 ; timer_start = 24
+
+
+
+
+
+
+
+
+
+; IDLE Process should get PID 0
+; and use a new HLT instruction
+;
+; The INIT Process should not be responsable for calling the sheduler
+; the Timer Interrupt should not wake the INIT Process
+;
+; INIT Process should only be responsible for creating a new Terminal Window if requested by the GUI
+;
+; INIT will start a new Ishell Process in the new Terminal Window
+;
+; We need an Ishell 
+;
+; Ishell features:
+;
+; - Starting programs.
+; - Passing program arguments?
+;
+; The GUI will display each Process in its own Terminal Window
+; 
+; We neet a Terminal window that can handle input and output using Interrupts
+; 
+; Documentation?
+; Performance?
+
+; Insted of using a Timer basen on the count of executed Instructions, 
+; scheduling should be happen wenn the User changes the Open Terminal Window (Tab)
+
+; To use Symbolic Variables correctly a Process needs a DATA segment 
+; This implies the Loader needs to identify variables in the source code and load them into the DATA segment
+; This implies we need to specify how variables are stored (declared) in the binary
+; What about program arguments
