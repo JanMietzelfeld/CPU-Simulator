@@ -146,9 +146,6 @@ export class SimulationController {
 
         //Assemble the init program (needed by the os)
         this.assembleProgram(process.cwd() + "/os_filesystem/os/user/init.asm");
-
-        //Assemble the idle program (needed by the os)
-        this.assembleProgram(process.cwd() + "/os_filesystem/os/user/idle.asm");
         
         this.createUtilityFiles();
 

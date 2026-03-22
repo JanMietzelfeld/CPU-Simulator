@@ -30,7 +30,6 @@ JMP _OS_ENTRY ; start of the os
 
     MOV $CONST_OS_INTERRUPT_STACK_END, %esp   ; initialize stack pointer
 
-
 ; Set Up Interrupt Table
     
     ; Interrupt Table layout
@@ -95,9 +94,7 @@ JMP _OS_ENTRY ; start of the os
     
     ; the code for init Program should be located in the file os/user/init (as bynary file)
 
-
     .CONST _OS_ENTRY_CONST_INIT_FILE_PATH "os/user/init.bin"
-
 
     MOV $_OS_ENTRY_CONST_INIT_FILE_PATH, %ebx
 
@@ -118,32 +115,6 @@ JMP _OS_ENTRY ; start of the os
 
     ._SOS_BOOT_INIT_PROCESS_CREATED:
 
-; Create the idle process
-
-    ; the code for idle Program should be located in the file os/user/idle (as bynary file)
-
-    .CONST _OS_ENTRY_CONST_IDLE_FILE_PATH "os/user/idle.bin"
-
-    MOV $_OS_ENTRY_CONST_IDLE_FILE_PATH, %ebx
-
-    ; SYSCALLS_PROCESS_CREATE
-    ; Parameters (ebx is a pointer to the start of an ASCII filename):
-    ;   (ebx)     Pointer to a ASCII filename
-    ; Return value:
-    ;   eax     success status (0 = success, -1 = error)
-    CALL SYSCALLS_PROCESS_CREATE
-    CMP $-1, %eax
-    JNE _OS_ENTRY_IDLE_PROCESS_CREATED
-
-    ; this should not be able to happen
-
-    ; panic
-
-    ; TODO stop the simulator
-
-    ._OS_ENTRY_IDLE_PROCESS_CREATED:
-
-
     ; set the init process to the running process
     MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
     MOV $CONST_OS_PCB_LIST_START, *%eax
@@ -159,13 +130,13 @@ JMP _OS_ENTRY ; start of the os
     AND $0xFFFFFF, *%eax
     OR $0x1000000, *%eax ;set status to to Running 
 
-
+NOP
 ; Activate Memory Virtualization
 DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
 
 PUSH $CONST_KERNEl_MEMORY_START ; push the esp value after iret for the user stack
 
-PUSH $0x20 ; flags
+PUSH $0xE0 ; flags
 
 PUSH $0 ; push the address to return to after iret
 

@@ -33,9 +33,14 @@
     ; Blocked    has the id 3
     ;
 
+    PUSH %eax ;save eax value
+    MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
+    CMP $CONST_OS_PCB_LIST_START, *%eax ; is the CONST_OS_CURRENT_PCB_POINTER invalid (were we Halted)
+    POP %eax
+    JE _UTIL_SCHEDULER_FIND_NEXT
+    
     PUSHF
     PUSH %eax ;save eax value
-
 
     MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
     MOV *%eax, %eax ; pcb pointer
@@ -117,14 +122,8 @@
 
     ; add current process to the waiting queue
 
-    CMP $1, %ebx ; init process should not be added to the waiting list
-    JE _UTIL_SCHEDULER_FIND_NEXT
-    CMP $2, %ebx ; idle process should not be added to the waiting list
-    JE _UTIL_SCHEDULER_FIND_NEXT
-
     SUB $1, %ecx
     SHL $24, %ebx
-
 
     ._UTIL_SCHEDULER_SEARCH_WAITING_LIST:
     ADD $1, %ecx
@@ -197,10 +196,12 @@
     CMP $0, %eax
     JNE _UTIL_SCHEDULER_FIND_PCB
 
-    ; no process is waiting, run the idle process 
+    ; no process is waiting, just Idle (Halt the CPU)
 
-    ; set eax to 2 (idle process)
-    MOV $2, %eax
+    MOV $CONST_OS_CURRENT_PCB_POINTER, %ebx
+    MOV $CONST_OS_PCB_LIST_START, *%ebx ; set the CONST_OS_CURRENT_PCB_POINTER to invalid
+    STI ; Activate Interrupts (just in case)
+    HLT ; Halt
 
     ; find the PCB for the pid
 

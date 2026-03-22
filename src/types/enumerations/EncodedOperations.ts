@@ -51,6 +51,7 @@ export enum EncodedOperations {
 	JAE = "0101101",
 	JB = "0101110",
 	JBE = "0101111",
+	HLT = "1111110",
 	NOP = "1111111"
 }
 

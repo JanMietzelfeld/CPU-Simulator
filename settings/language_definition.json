@@ -1191,6 +1191,12 @@
             "regex" : "(NOP)"
         },
         {
+            "mnemonic" : "HLT",
+            "opcode" : "1111110",
+            "type" : "R",
+            "regex" : "(HLT)"
+        },
+        {
             "mnemonic" : "INVTLB",
             "opcode" : "0101011",
             "type" : "R",

@@ -38,7 +38,7 @@
 ;
 ; Paging
 ;
-;         Level 1    Level 2     Offset 
+;              Level 1          Offset 
 ;  VA = 00000000000000000000 000000000000     (32 bits)
 ;             (20 bits)        (12 bits)
 ;                 |                |
@@ -174,11 +174,11 @@
 
 
 
-; IDLE Process should get PID 0
-; and use a new HLT instruction
+; IDLE Process should get PID 0   +
+; and use a new HLT instruction   +
 ;
-; The INIT Process should not be responsable for calling the sheduler
-; the Timer Interrupt should not wake the INIT Process
+; The INIT Process should not be responsable for calling the sheduler   +
+; the Timer Interrupt should not wake the INIT Process                  +
 ;
 ; INIT Process should only be responsible for creating a new Terminal Window if requested by the GUI
 ;

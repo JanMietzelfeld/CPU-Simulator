@@ -187,6 +187,9 @@ export class CPUCore {
 
     public mainMemory: RAM;
 
+    public isHalted: boolean = false;
+
+
     /**
      * Constructs an instance of a CPU core.
      * @param mainMemory The main memory of the system.
@@ -254,6 +257,18 @@ export class CPUCore {
      */
     public cycle(): void {
 
+        //Handle all pending interrupts
+        if (this.eflags.interrupt && this.interruptQueue.length !== 0) {
+            console.log("Interrupted");
+            this.triggertException(this.interruptQueue.shift() as InterruptNumbers)
+            this.isHalted = false;
+        }
+
+        if (this.isHalted)
+        {
+            return;
+        }
+
         if (this.eflags.isInUserMode())
         {
 
@@ -298,13 +313,6 @@ export class CPUCore {
                     console.log(error)
                 }
             }
-        }
-        
-        //Now handle all pending interrupts
-        if (this.eflags.interrupt && this.interruptQueue.length !== 0) {
-            console.log("Interrupted");
-            this.triggertException(this.interruptQueue.shift() as InterruptNumbers)
-            return;
         }
     }
 
@@ -619,6 +627,9 @@ export class CPUCore {
                 break;
             case EncodedOperations.NOP:
                 this.nop();
+                break;
+            case EncodedOperations.HLT:
+                this.hlt();
                 break;
             case EncodedOperations.CALL:
                 jumpPerformed = this.call(this._decodedInstruction.operands![0]);
@@ -2928,6 +2939,30 @@ export class CPUCore {
      * This method does nothing.
      */
     private nop(): void {
+        return;
+    }
+
+    /**
+     * This method Halts the CPU.
+     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode when this mehtod is called.
+     */
+    private hlt(): void {
+
+        // Check whether CPU is in kernel mode.
+        if (!this.eflags.isInKernelMode()) {
+            // CPU is not in kernel mode.
+            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            return;
+        }
+
+        if (!this.eflags.interrupt)
+        {
+            //This will lead to a deadlock (Panic)
+            this.reset();
+            return;
+        }
+
+        this.isHalted = true;
         return;
     }
 

@@ -257,6 +257,9 @@ export class InstructionDecoder {
             case EncodedOperations.NOP:
                 decodedRTypeOperation = EncodedOperations.NOP;
                 break;
+            case EncodedOperations.HLT:
+                decodedRTypeOperation = EncodedOperations.HLT;
+                break;
             case EncodedOperations.INVTLB:
                 decodedRTypeOperation = EncodedOperations.INVTLB;
                 break;
