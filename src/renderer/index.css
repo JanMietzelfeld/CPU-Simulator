@@ -68,7 +68,7 @@ main {
   margin: 0.5rem;
   padding: 0;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   justify-content: space-around;
   height: 100%;
   border-radius: 10px;
@@ -129,11 +129,43 @@ td {
   border-bottom: 2px solid var(--cadet-gray);
 }
 
+.simulator-widgets {
+  margin: 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  height: 100%;
+  border-radius: 10px;
+  overflow-y: auto;
+}
+
+.output {
+  margin: 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  border-radius: 10px;
+  gap: 1rem;
+}
+
+.logging {
+  width: 100%;
+  display: block;
+}
+
 .widget {
   padding: 1rem;
   background-color: var(--cadet-gray);
   border-radius: 10px;
   box-shadow: 10px 10px 10px 0px rgba(0, 0, 0, 0.75);
+}
+
+.control-module {
+  padding: 1rem;
+  background-color: var(--cadet-gray);
+  border-radius: 10px;
 }
 
 .header {
@@ -208,7 +240,8 @@ td {
   overflow-y: auto;
 }
 
-.register {
+.register,
+.search-module {
   margin: 0rem;
   padding: 1rem;
   min-width: 200px;
@@ -216,12 +249,14 @@ td {
 }
 
 .register-content,
-.ram-cell-content {
+.ram-cell-content,
+.ram-searchfield {
   margin: 0.5rem 0rem;
   padding: 0.5rem;
   font-weight: bold;
   font-size: large;
   border-radius: 10px;
+  color: white;
   background-color: var(--prussian-blue);
 }
 
@@ -273,6 +308,19 @@ td {
   margin: 0;
   padding: 1rem;
   background-color: var(--prussian-blue);
+}
+
+.log-content {
+  min-height: 200px;
+  max-height: 200px;
+  margin: 0.5rem 0rem;
+  padding: 0.5rem;
+  font-weight: bold;
+  font-size: large;
+  border-radius: 10px;
+  background-color: var(--prussian-blue);
+  overflow-y: auto;
+  white-space: normal;
 }
 
 @-webkit-keyframes pulse {

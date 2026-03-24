@@ -6,7 +6,7 @@ import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 
 export class RAM {
     public readonly capacity: number;
-    private readonly _cells: Map<string, Byte>;
+    private readonly _cells: Map<number, Byte>;
     private readonly _highAddressDec: number;
     private readonly _lowAddressDec: number;
 
@@ -15,7 +15,7 @@ export class RAM {
      * @param capacity The max. capacity of this instance of the RAM class.
      */
     public constructor(capacity: number) {
-        this._cells = new Map<string, Byte>();
+        this._cells = new Map<number, Byte>();
         this.capacity = capacity;
         this._highAddressDec = capacity;
         this._lowAddressDec = 0;
@@ -29,7 +29,7 @@ export class RAM {
      */
     public writeDoublewordTo(physicalAddress: PhysicalAddress, doubleword: DoubleWord) {
         this.validatePhysicalAddress(physicalAddress);
-        const startAddressDec: number = parseInt(physicalAddress.value.join(""), 2);
+        const startAddressDec: number = physicalAddress.toUnsignedNumber();
         // Bit 0 - 7
         const firstByte: Byte = new Byte(doubleword.value.slice(0, 8));
         // Bit 8 - 15
@@ -58,14 +58,12 @@ export class RAM {
      */
     public writeByteTo(physicalAddress: PhysicalAddress, data: Byte) {
         this.validatePhysicalAddress(physicalAddress);
-        if (data.equal(new Byte())) {
+        if (data.toUnsignedNumber() === 0) {
             this.clearByte(physicalAddress);
             return;
         }
-        const physicalAddressHex = 
-            `0x${parseInt(physicalAddress.value.join(""), 2).toString(16).toUpperCase()}`;
         // Write byte to "memory".
-        this._cells.set(physicalAddressHex, data);
+        this._cells.set(physicalAddress.toUnsignedNumber(), data);
         return;
     }
 
@@ -77,7 +75,7 @@ export class RAM {
      */
     public readDoublewordFrom(physicalAddress: PhysicalAddress): DoubleWord {
         this.validatePhysicalAddress(physicalAddress);
-        const startAddressDec: number = parseInt(physicalAddress.value.join(""), 2);
+        const startAddressDec: number = physicalAddress.toUnsignedNumber();
         const doubleword = new DoubleWord();
         const firstByte: Byte = this.readByteFrom(PhysicalAddress.fromInteger(startAddressDec));
         const secondByte: Byte = this.readByteFrom(PhysicalAddress.fromInteger(startAddressDec + 1));
@@ -99,10 +97,10 @@ export class RAM {
      */
     public readByteFrom(physicalAddress: PhysicalAddress): Byte {
         this.validatePhysicalAddress(physicalAddress);
-        const physicalAddressHex = `0x${parseInt(physicalAddress.value.join(""), 2).toString(16).toUpperCase()}`;
+        const addressDecimal: number = physicalAddress.toUnsignedNumber();
         let result: Byte;
-        if (this._cells.has(physicalAddressHex)) {
-            result = this._cells.get(physicalAddressHex)!;
+        if (this._cells.has(addressDecimal)) {
+            result = this._cells.get(addressDecimal)!;
         } else {
             result = new Byte()
         }
@@ -117,9 +115,9 @@ export class RAM {
      */
     public clearByte(physicalAddress: PhysicalAddress): void {
         this.validatePhysicalAddress(physicalAddress);
-        const physicalAddressHexString = `0x${parseInt(physicalAddress.toString(), 2).toString(16).toUpperCase()}`;
-        if (this._cells.has(physicalAddressHexString)) {
-            this._cells.delete(physicalAddressHexString);
+        const addressDecimal: number = physicalAddress.toUnsignedNumber();
+        if (this._cells.has(addressDecimal)) {
+            this._cells.delete(addressDecimal);
         }
         return;
     }
@@ -130,7 +128,7 @@ export class RAM {
      * @throws AddressOutOfRangeError - If the physical memory address is out of range.
      */
     private validatePhysicalAddress(physicalAddress: PhysicalAddress): void {
-        const physicalAddressDec = parseInt(physicalAddress.value.join(""), 2);
+        const physicalAddressDec = physicalAddress.toUnsignedNumber();
         if (physicalAddressDec > this._highAddressDec || physicalAddressDec < this._lowAddressDec) {
             throw new AddressOutOfRangeError(`Memory address out of range [${this._lowAddressDec.toString(2)}, ${this._highAddressDec.toString(2)}].`)
         }
@@ -143,7 +141,7 @@ export class RAM {
      * display the contents of the main memory.
      * @returns The current content of this RAM instance.
      */
-    public get cells(): Map<string, Byte> {
+    public get cells(): Map<number, Byte> {
         return this._cells;
     }
 }

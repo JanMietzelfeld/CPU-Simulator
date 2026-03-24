@@ -24,6 +24,8 @@ window.onload = async (event) => {
 		renderer.cycle();
 	});
 	renderer.registerChangeListener();
+	renderer.registerClickListener();
+	renderer.registerRAMSearchListener();
 	renderer.createPhysicalRAMView();
 };
 
@@ -41,6 +43,7 @@ window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
 	// TODO: Hide until a new place for the GUI element, representing the EIR register, is found.
 	// await renderer.readEIR();
 	await renderer.readESP(renderer.dataRepresentationESP);
+	await renderer.readPTP(renderer.dataRepresentationPTP);
 	await renderer.readGPTP(renderer.dataRepresentationGPTP);
 	await renderer.readITP(renderer.dataRepresentationITP);
 	await renderer.readNPTP(renderer.dataRepresentationNPTP);
@@ -81,4 +84,16 @@ window.simulator.onEnableAutoScrollForVirtualRAM(() => {
 window.simulator.onEnableAutoScrollForPageTable(() => {
 	renderer.autoScrollForPageTableEnabled = true;
 	return;
+});
+
+window.windowUpdate.onUpdateLog((value: string) => {
+	renderer.updateLog(value);
+});
+
+window.windowUpdate.onHideLog(() => {
+	renderer.hideLog();
+});
+
+window.windowUpdate.onShowLog(() => {
+	renderer.showLog();
 });

@@ -26,15 +26,27 @@ import { PrivilegeViolationError } from "../../../types/errors/PrivilegeViolatio
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { EncodedReadableRegisters } from "../../../types/enumerations/EncodedReadableRegisters";
 import { EncodedWritableRegisters } from "../../../types/enumerations/EncodedWritableRegisters";
-import { EncodedOperations } from "../../../types/enumerations/EncodedOperations";
+import { encodedOperationNameByValue, EncodedOperations } from "../../../types/enumerations/EncodedOperations";
 import { EncodedInstructionTypes } from "../../../types/enumerations/EncodedInstructionTypes";
 import { EncodedOperandTypes } from "../../../types/enumerations/EncodedOperandTypes";
+import { devCommandNameByValue, DevCommands } from "../../../types/enumerations/DevOperationCommands";
+import { BadOperandError } from "../../../types/errors/BadOperandError";
+import { NotImplementedError } from "../../../types/errors/NotImplementedError";
+import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
+import { BrowserWindow } from "electron";
+import { getMainWindow } from "../../index"
 
 /**
  * This class represents a CPU core which is capable of executing instructions.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
 export class CPUCore {
+
+    /**
+     * This field stores a reference to the browser "window".
+     */
+    private readonly _mainWindow: BrowserWindow;
+
     /**
      * An error message template that is used when operands are missing.
      * @readonly
@@ -164,6 +176,8 @@ export class CPUCore {
      *  The binary encoded type of the currently executed instruction.
      */
     private _decodedInstruction: DecodedInstruction | null;
+    
+    public fs: PassthroughFilesystem;
 
     /**
      * Constructs an instance of a CPU core.
@@ -190,8 +204,10 @@ export class CPUCore {
         this.alu = new ArithmeticLogicUnit(this.eflags);
         // TODO: Adopt MMU to be able to use different processing widths.
         this.mmu = new MemoryManagementUnit(mainMemory, this.ptp, this.alu, this.eflags);
+        this.fs = new PassthroughFilesystem(process.cwd() + "/os_filesystem");
         this._decodedInstruction = null;
         this._processingWidth = processingWidth;
+        this._mainWindow = getMainWindow();
     }
 
     /**
@@ -355,6 +371,25 @@ export class CPUCore {
             throw new Error("No instruction is currently ready to be executed.");
         }
         const operation: EncodedOperations = this._decodedInstruction.operation;
+
+        const currentInstructionAddress:number = this.eip.content.toUnsignedNumber();
+        const currentOperation:string = encodedOperationNameByValue(operation.toString());
+        this.log("Executing next instruction");
+        this.log("Instruction address: " + "0x" + currentInstructionAddress.toString(16));
+        this.log("Instruction name: " + currentOperation);
+        if (this._decodedInstruction !== undefined) {
+            if (0 in this._decodedInstruction.operands!) {
+                const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
+                const hexOperand = parseInt(stringOperand, 2).toString(16);
+                this.log("First operand: " + "0x" + hexOperand);
+            }
+            if (1 in this._decodedInstruction.operands!) {
+                const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
+                const hexOperand = parseInt(stringOperand, 2).toString(16);
+                this.log("Second operand: " + "0x" + hexOperand);
+            }
+        }
+
         let jumpPerformed = false;
         switch (operation) {
             case EncodedOperations.NOT:
@@ -519,6 +554,12 @@ export class CPUCore {
             case EncodedOperations.SYSEXIT:
                 this.sysexit();
                 break;
+            case EncodedOperations.DEV:
+                this.dev(
+                    this._decodedInstruction.operands![0],
+                    this._decodedInstruction.operands![1]!
+                );
+                break;
             default:
                 throw new Error("Unrecognized operation found.");
                 break;
@@ -532,8 +573,184 @@ export class CPUCore {
             this.eip.content = VirtualAddress.fromInteger(parseInt(this.eip.content.toString(), 2) + 12);
             this.eflags.content = flags;
         }
+        this.log("Execution finished");
+        this.log("");
         return;
     }
+
+    /*
+     * -------------------- DEV / IO --------------------
+     */
+
+    /**
+     * DEV instruction handles communication with the filesystem, console, and process API.
+     * DEV COMMAND DATA
+     * DEV operand_1                             operand_2
+     *     12345678 12345678 12345678 12345678   12345678 12345678 12345678 12345678
+     *     .........reserved......... command.   ...............data................
+     * 
+     * 
+     * command:
+     * 00000000 - io_seek (fd=op2, offset=stack, mode=stack) -> success=eax
+     *      mode:   0 - Seek from current position
+     *              1 - Seek from start of file
+     *              2 - Seek from end of file
+     * 00000001 - io_close (fd=op2)
+     * 00000010 - io_read_buffer (fd=op2, buffer_ptr=stack, buffer_size=stack) -> bytes_read=eax
+     * 00000011 - io_write_buffer (fd=op2, buffer_ptr=stack, buffer_size=stack) -> bytes_written=eax
+     * 00000100 - file_create (filename_ptr=op2)
+     * 00000101 - file_delete (filename_ptr=op2) -> success=eax
+     * 00000110 - file_open (filename_ptr=op2) -> fd=eax
+     * 00000111 - file_stat (filename_ptr=op2) -> file_length=eax
+     * 00001000 - console_print_number(number=op2)
+     * 00001001 - console_read_number() -> number=eax, error=ebx
+     * 00001010 - process_create(filename_ptr=op2) -> process_id=eax
+     * 00001011 - process_exit ()
+     * 00001100 - process_yield ()
+     * 
+     * 
+     * file descriptor (fd):
+     * fd = 0   -> console
+     * fd > 0   -> filesystem file descriptors
+
+     * @param command 
+     * @param data Command-dependend
+     * @throws {UnsupportedOperandTypeError}
+     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {PrivilegeViolationError} If called in user mode.
+     * @throws {BadOperandError} If command or data could not be interpreted correctly.
+     * @author Laurin Gehlenborg
+     */
+    private dev(command: InstructionOperand, data: InstructionOperand): void {
+        // Check whether CPU is in kernel mode.
+        if (!this.eflags.isInKernelMode()) {
+            // CPU is not in kernel mode.
+            throw new PrivilegeViolationError("DEV can only be called when CPU is in kernel mode.");
+        }
+
+        // Check if exactly two operands are present.
+        if (command.type === EncodedOperandTypes.NO || data.type === EncodedOperandTypes.NO) {
+            const msg: string = CPUCore._ERROR_MESSAGE_MISSING_OPERAND;
+            let nbrMissingOperands = 0;
+            if (command.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            if (data.type === EncodedOperandTypes.NO) {
+                ++nbrMissingOperands;
+            }
+            throw new MissingOperandError(
+                msg.replace("__NBR_REQUIRED__", "two operands").replace("__NBR_FOUND__", `${nbrMissingOperands} operand(s) found`)
+            );
+        }
+
+        let op1: number;
+        switch (command.type) {
+            case EncodedOperandTypes.IMMEDIATE:
+                op1 = command.value.toUnsignedNumber();
+                break;
+            case EncodedOperandTypes.REGISTER:
+                op1 = this.readRegister(command).toUnsignedNumber();
+                break;
+            case EncodedOperandTypes.MEMORY_ADDRESS:
+                op1 = this.mmu.readDoublewordFrom(command.value, false).toUnsignedNumber();
+                break;
+            default:
+                throw new BadOperandError("Could not parse first DEV operand.");
+        }
+
+        let op2: number;
+        switch (data.type) {
+            case EncodedOperandTypes.IMMEDIATE:
+                op2 = data.value.toUnsignedNumber();
+                break;
+            case EncodedOperandTypes.REGISTER:
+                op2 = this.readRegister(data).toUnsignedNumber();
+                break;
+            case EncodedOperandTypes.MEMORY_ADDRESS:
+                op2 = this.mmu.readDoublewordFrom(data.value, false).toUnsignedNumber();
+                break;
+            default:
+                throw new BadOperandError("Could not parse second DEV operand.");
+        }
+
+        let filename: string;
+        switch (op1) {
+            case DevCommands.IO_SEEK: // 00000000 - io_seek (fd=op2, offset=stack, mode=stack) -> success=eax
+                const seekMode = this.internal_pop().toUnsignedNumber();
+                const seekOffset = this.internal_pop().toUnsignedNumber();
+                const seek_result = this.fs.io_seek(op2, seekOffset, seekMode);
+                this.eax.content = DoubleWord.fromInteger(seek_result);
+                break;
+                
+            case DevCommands.IO_CLOSE:
+                this.fs.io_close(data.value.toUnsignedNumber())
+                break;
+                
+            case DevCommands.IO_READ_BUFFER: // 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
+                const bufferAddress = this.internal_pop().toUnsignedNumber();
+                const bufferSize = this.internal_pop().toUnsignedNumber();
+                const buffer = new Uint8Array(bufferSize);
+                const bytesRead = this.fs.io_read_buffer(op2, buffer, bufferSize);
+                this.eax.content = DoubleWord.fromInteger(bytesRead);
+                if (bytesRead > 0) {
+                    for (let index = 0; index < bytesRead; index++) {
+                        this.mmu.writeByteTo(VirtualAddress.fromInteger(bufferAddress + index), Byte.fromInteger(buffer[index]));
+                    }
+                }
+                break;
+            case DevCommands.IO_WRITE_BUFFER: // 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
+                const writeBufferAddress = this.internal_pop().toUnsignedNumber();
+                const writeBufferSize = this.internal_pop().toUnsignedNumber();
+                const writeBuffer = new Uint8Array(writeBufferSize);
+                for (let index = 0; index < writeBufferSize; index++) {
+                    let byte = this.mmu.readByteFrom(VirtualAddress.fromInteger(writeBufferAddress + index))
+                    writeBuffer[index] = byte.toUnsignedNumber();
+                }
+                const bytesWritten = this.fs.io_write_buffer(op2, writeBuffer, writeBufferSize);
+                this.eax.content = DoubleWord.fromInteger(bytesWritten);
+                break;
+            case DevCommands.FILE_CREATE: // 00000100 - file_create (filename_ptr=op2)
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
+                this.fs.file_create(filename);
+                break;
+            case DevCommands.FILE_DELETE: // 00000101 file_delete (filename_ptr=op2) -> success=eax
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
+                this.eax.content = DoubleWord.fromInteger(this.fs.file_delete(filename));
+                break;
+            case DevCommands.FILE_OPEN: // 00000110 - file_open (filename_ptr=op2) -> fd=eax
+                // load the filename from the given address
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
+                let fd: number = this.fs.file_open(filename);
+                this.eax.content = DoubleWord.fromInteger(fd);
+                break;
+            case DevCommands.FILE_STAT: // 00000111 - file_stat (filename_ptr=op2) -> file_length=eax
+                filename = this.loadZeroTerminatedASCIIStringFromMemory(VirtualAddress.fromInteger(op2));
+                this.eax.content = DoubleWord.fromInteger(this.fs.file_stat(filename));
+                break;
+            case DevCommands.CONSOLE_PRINT_NUMBER: // 00001000 - console_print_number(number=op2)
+                this.fs.console_print_number(op2);
+                break;
+            case DevCommands.CONSOLE_READ_NUMBER: //  00001001 - console_read_number() -> number=eax, error=ebx
+                const [num, err] = this.fs.console_read_number();
+                this.eax.content = DoubleWord.fromInteger(num);
+                this.ebx.content = DoubleWord.fromInteger(err);
+                break;
+            case DevCommands.PROCESS_CREATE:
+                throw new NotImplementedError("Operand " + devCommandNameByValue(op1) + " is not yet implemented for the DEV instruction.");
+                break;
+            case DevCommands.PROCESS_EXIT:
+                throw new NotImplementedError("Operand " + devCommandNameByValue(op1) + " is not yet implemented for the DEV instruction.");
+                break;
+            case DevCommands.PROCESS_YIELD:
+                throw new NotImplementedError("Operand " + devCommandNameByValue(op1) + " is not yet implemented for the DEV instruction.");
+                break;
+            default:
+                throw new BadOperandError("Unknown first operand " + op1 + " for DEV instruction.");
+        }
+
+        return;
+    }
+
 
     /*
      * -------------------- Arithmetic operations --------------------
@@ -2187,6 +2404,8 @@ export class CPUCore {
      * This method does nothing.
      */
     private nop(): void {
+        //Patch to enter kernel mode. Only temporary.
+        this.eflags.enterKernelMode();
         return;
     }
 
@@ -2411,5 +2630,43 @@ export class CPUCore {
                 break;
         }
         return register;
+    }
+
+    /**
+     * Read a buffer bytewise from memory until the first zero byte and return it as ASCII string
+     * @param address The start of the buffer.
+     * @returns ASCII string of the content
+     * @author Laurin Gehlenborg
+     */
+    private loadZeroTerminatedASCIIStringFromMemory(address: VirtualAddress): string {
+        let str: string = "";
+        let currentByte: Byte = this.mmu.readByteFrom(address)
+        while (currentByte.toUnsignedNumber() != 0) { // read until null byte
+            str += String.fromCharCode(currentByte.toUnsignedNumber());
+            address = VirtualAddress.fromInteger(address.toUnsignedNumber() + 1) // address++
+            currentByte = this.mmu.readByteFrom(address)
+        }
+        return str
+    }
+
+    /**
+     * Pop a value from stack and return it for CPU-internal usage.
+     * @returns 32 bit value from stack.
+     * @author Laurin Gehlenborg
+     */
+    private internal_pop(): DoubleWord {
+        const oldEAX = this.eax.content.value;
+        this.pop(new InstructionOperand(EncodedAddressingModes.DIRECT, EncodedOperandTypes.REGISTER, DoubleWord.fromInteger(0))) // 0 for EAX
+        const poppedValue = this.eax.content;
+        this.eax.content.value = oldEAX;
+        return poppedValue;
+    }
+
+    /**
+     * Send a message to be appended to the log-widget in the main window.
+     * @param message The message that gets appended to the log-widget.
+     */
+    private log(message: string): void {
+        this._mainWindow.webContents.send('update_log', message);
     }
 }

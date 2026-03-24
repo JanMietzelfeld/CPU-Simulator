@@ -1,4 +1,18 @@
 export interface AssemblyLanguageDefinition {
+    variable_formats: {
+        dataSegmentStart: string;
+        dataSegmentEnd: string;
+        integerVariable: string;
+        stringVariable: string;
+        usage: string;
+    }
+    
+    constant_formats: {
+        declarationInteger: string;
+        declarationString: string;
+        usage: string;
+    };
+
     comment_format: string;
     
     label_formats: {

@@ -458,9 +458,9 @@ export class SimulationController {
         // Create the page table entries.
         while (numberOfPageTableEntriesCreated < totalNumberOfPageTableEntries) {
             if (numberOfPageTableEntriesCreated > 0) {
-                const physicalAddressOfCurrentPageFrameDec: number = parseInt(physicalAddressOfCurrentPageFrame.toString(), 2);
+                const physicalAddressOfCurrentPageFrameDec: number = physicalAddressOfCurrentPageFrame.toUnsignedNumber();
                 physicalAddressOfCurrentPageFrame = PhysicalAddress.fromInteger(physicalAddressOfCurrentPageFrameDec + pageFrameSizeBytesDec);
-                const virtualAddressOfCurrentPageDec: number = parseInt(virtualAddressOfCurrentPage.toString(), 2);
+                const virtualAddressOfCurrentPageDec: number = virtualAddressOfCurrentPage.toUnsignedNumber();
                 virtualAddressOfCurrentPage = VirtualAddress.fromInteger(virtualAddressOfCurrentPageDec + pageSizeBytesDec);
             }
             let pageTableEntry: PageTableEntry;
@@ -581,6 +581,7 @@ export class SimulationController {
         try {
             resultOfCycle = this.core.cycle();
         } catch(error) {
+            console.log(error)
             if (error instanceof PageFaultError) {
                 /**
                  * Load the address of the page table entry into the EAX tab for 
