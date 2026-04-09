@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld("simulator", {
 });
 
 contextBridge.exposeInMainWorld("windowUpdate", {
+	onClearLog: (callback: () => void) => 
+		ipcRenderer.on('clear_log', () => callback()),
 	onUpdateLog: (callback: (message: string) => void) => 
 		ipcRenderer.on('update_log', (_event, message) => callback(message)),
 	onHideLog: (callback: () => void) =>
