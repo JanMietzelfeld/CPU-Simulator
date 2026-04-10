@@ -101,16 +101,16 @@ export class Assembler {
 	 */
 	private encode(lines: Map<number, string>, baseOffset: number = 0): DoubleWord[] {
 		const encodedInstructions: DoubleWord[] = [];
-		const constants: Map<string, string> = this.locateConstants(lines, baseOffset);
-		const replacedConstants: Map<number, string> = this.replaceConstants(lines, constants);
-		const jumpLabels: Map<string, string> = this.locateJumpLabels(replacedConstants, baseOffset);	
+		const constants: Map<string, string> = new Map();
+		const variables: Map<string, string> = new Map();
+		const jumpLabels: Map<string, string> = new Map();
 
-		// Remove jump labels as they will not be encoded.
-		lines = this.removeJumpLabels(lines);
+		this.locateSymbols(lines, jumpLabels, constants, variables);
+		this.replaceSymbols(lines, constants, variables);
 		
 		// Iterate lines of code.
 		for (const [lineNo, line] of lines.entries()) {
-			const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, line, jumpLabels, constants);
+			const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, line, jumpLabels, constants, variables);
 			encodedInstructions.push(...encodedInstruction);	
 		}
 		return encodedInstructions;
@@ -122,19 +122,14 @@ export class Assembler {
 	 * @param line The original computer programs line of code which is currently encoded.
 	 * @param jumpLabels The jump labels found in the assembly code.
 	 * @param constants The constants found in the assembly code.
+	 * @param variables The constants found in the assembly code.
 	 * @returns An array of doublewords representing the encoded instructions and their operands of the assembly program.
 	 */
-	private encodeLine(lineNo: number, line: string, jumpLabels: Map<string, string>, constants: Map<string, string>) : DoubleWord[] {
+	private encodeLine(lineNo: number, line: string, jumpLabels: Map<string, string>, constants: Map<string, string> = new Map(), variables: Map<string, string> = new Map()) : DoubleWord[] {
 		const encodedInstructions: DoubleWord[] = [];
 		let lineEncoded = false;
 		lineEncoded = false;
 		
-		if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-			const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, constants);
-			encodedInstructions.push(...encodedInstruction);
-			lineEncoded = true;
-			return encodedInstructions;
-		}
 		// For every line of code, search for a contained instruction.
 		for (const instruction of this.languageDefinition.instructions) {
 			const illegalCombosOfOperandTypes: {__SOURCE__: string, __TARGET__: string}[] | undefined 
@@ -230,7 +225,42 @@ export class Assembler {
 				}
 			}
 		}
-		
+		if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
+			const stringConstantName = line.replace(/const[ ]|[ ]?=[ ]?".*/gim, "");
+			const stringConstantValue = line.replace(/const[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]?=[ ]?|"/gim, "") + "\0";
+			if (constants.has(stringConstantName)) {
+				const stringConstantAddress = constants.get(stringConstantName)!;
+				const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, stringConstantValue, stringConstantAddress);
+				encodedInstructions.push(...encodedInstruction);
+				lineEncoded = true;
+			}
+		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.stringVariable, "gim"))) {
+			const stringVariableName = line.replace(/^\.|[ ]".*/gim, "");
+			const stringVariableValue = line.replace(/^\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]"|"$/gim, "") + "\0"; 
+			if (variables.has(stringVariableName)) {
+				const stringVariableAddress = variables.get(stringVariableName)!;
+				const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, stringVariableValue, stringVariableAddress);
+				encodedInstructions.push(...encodedInstruction);
+				lineEncoded = true;
+			}
+		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.integerVariable, "gim"))) {
+			const variableName = line.replace(/^\.|[ ][0-9]*$/gim, "");
+			const variableValue = line.replace(/^\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]?/gim, "");
+			if (variables.has(variableName)) {
+				const variableStartAddress: string = variables.get(variableName)!.replace(/^0b/gim, "");;
+				//The memory address after the Integer with the next instruction
+				const jumpAddress:string = (parseInt(variableStartAddress, 2) + 4).toString(2);
+				const jumpInstruction:string = "JMP @0b" + jumpAddress;
+				const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
+				if (variableValue !== "") {
+					encodedInstruction.push(this.encodeDecimalValue(variableValue, lineNo));
+				} else {
+					encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+				}
+				encodedInstructions.push(...encodedInstruction);
+				lineEncoded = true;
+			}
+		}
 		if (!lineEncoded) {
 			throw new UnrecognizedInstructionError(`Unrecognized or invalid instruction found in line ${lineNo + 1}: ${line}`);
 		}
@@ -238,13 +268,19 @@ export class Assembler {
 	}
 
 	/**
-	 * This method locates jump labels in the assembly code and creates a map between a jump label and a (virtual) memory address.
-	 * This map is later used to replace the label in instructions with their (virtual) memory address.
+	 * This method locates symbols in the assembly code and stores them in the appropriate map.
+	 * For jump labels a map between a jump label and a (virtual) memory address is created and the jump label is removed from the code,
+	 * since they won't be translated.
+	 * For symbolic integer constants their value is mapped to their symbolic name and for string constants the (virtual) memory start address gets
+	 * mapped to their symbolic name.
+	 * The lines with symbolic integer constants get removed, since their symbolic name gets replaced by their value later.
+	 * For symbolic variables their (virtual) memory start address gets mapped to their symbolic name.
 	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
-	 * @returns A map of jump labels and their associated (virtual) memory address.
+	 * @param jumpLabels An empty map, which will be used to store jump labels and their associated (virtual) memory address.
+	 * @param constants An empty map, which will be used to store constants and their associated (virtual) memory address or value.
+	 * @param variables An empty map, which will be used to store variables and their associated (virtual) memory addresses.
 	 */
-	private locateJumpLabels(lines: Map<number, string>, baseOffset: number = 0) : Map<string, string> {
-		const jumpLabels: Map<string, string> = new Map();
+	private locateSymbols(lines: Map<number, string>, jumpLabels: Map<string, string>, constants: Map<string, string>, variables: Map<string, string>, baseOffset: number = 0) : void {
 		/**
 		 * Use this variable in order to count the instructions, that need to be encoded
 		 * later, because the keys in the map do not have to be consecutive, as blank lines 
@@ -252,129 +288,72 @@ export class Assembler {
 		 */
 		let programLocationCounter = baseOffset;
 		for (const [lineNo, line] of lines.entries()) {
-			if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
-
-				let labelRegex = new RegExp(this.languageDefinition.label_formats.declaration, "gim");
-				const regexMatch: RegExpMatchArray | null = labelRegex.exec(line);
-
-				if (regexMatch !== null) {
-					// label found.
-					let stringValue: string = regexMatch[0].toString();
-					const jumpLabel = stringValue.substring(stringValue.indexOf(".") + 1, stringValue.lastIndexOf(":"));
-
-					jumpLabels.set(
-						jumpLabel, 
-						new DoubleWord(programLocationCounter).toString()
-					);
-				}
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-				//If a string constant is found, skip as many memory cells as needed to fit all characters plus null terminator 
-				//plus one instruction for the jump instruction.
-				let stringConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
-				const regexMatch: RegExpMatchArray | null = stringConstValueRegex.exec(line);
-
-				if (regexMatch !== null) {
-					// Const found.
-					let stringValue: string = regexMatch[0].toString();
-					const constValue = stringValue.substring(stringValue.indexOf("\"") + 1, stringValue.lastIndexOf("\"")) + "\0";
-
-					//Calculate the size the string will use in memory including null termination and round up to the next size that
-					//is divisible by four. This insures the string always fits into multiple double words.
-					const stringMemSize = Math.ceil((Buffer.byteLength(constValue) / 4)) * 4;
-					programLocationCounter += stringMemSize + 12;
-				}
-
-			} else {
-				programLocationCounter += 12;
-			}
-		}
-		return jumpLabels;
-	}
-
-	/**
-	 * This method finds constants and stores their value in a map with their constant name.
-	 * If the constant is a string then a (virtual) memory address is mapped to the constant name instead.
-	 * The created map is later used to replace constants by name with their actual value or (virtual) memory address.
-	 * The line that initializes an integer constant is deleted as it doesn't get translated.
-	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
-	 * @returns A map of integer constants and their value.
-	 */
-	private locateConstants(lines: Map<number, string>, baseOffset: number = 0) : Map<string, string> {
-		const constants: Map<string, string> = new Map();
-		/**
-		 * Use this variable in order to count the instructions, that need to be encoded
-		 * later, because the keys in the map do not have to be consecutive, as blank lines 
-		 * have been removed from the original source text.
-		 */
-		let programLocationCounter = baseOffset;
-		for (const [lineNo, line] of lines.entries()) {
-
-			let regexMatch: RegExpMatchArray | null = null;
-
-			if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
-
-				let decimalConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim");
-				regexMatch = decimalConstValueRegex.exec(line);
-		
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim"))) {
-
-				let hexadecimalConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim");
-				regexMatch = hexadecimalConstValueRegex.exec(line);
-	
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
-			
-				let binaryConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim");
-				regexMatch = binaryConstValueRegex.exec(line);
-
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-
-				let stringConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
-				regexMatch = stringConstValueRegex.exec(line);
-
-				if (regexMatch !== null) {
-					// Const found.
-					let value: string = regexMatch[0].toString();
-					let constantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
-					let constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
-
-					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
-					constants.set(
-						constantName, 
-						"0b" + new DoubleWord(programLocationCounter+12).toString()
-					);
-					//Calculate the size the string will use in memory including null termination and round up to the next size that
-					//is divisible by four. This insures the string always fits into multiple double words.
-					const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
-					programLocationCounter += stringMemSize + 12;
-
-					regexMatch = null;
-				}
-			} else if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim")) === null){
-				programLocationCounter += 12;
-			}
-
-			if (regexMatch !== null) {
-				// Const found.
-				let value: string = regexMatch[0].toString();
-				let constantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
-				let constantValue = value.substring(value.indexOf("=") + 1).trim();
-
+			if (line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentStart)) || line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentEnd))) {
+				lines.delete(lineNo);
+			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
+				const constantName = line.replace(/.CONST[ ]|[ ][0-9]*/gim, "");
+				const constantValue = line.replace(/.CONST[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]/gim, "");
 				constants.set(
 					constantName, 
 					constantValue
 				);
 				lines.delete(lineNo);
+			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
+				const constantName = line.replace(/.CONST[ ]|[ ]".*/gim, "");
+				const constantValue = line.replace(/.CONST[ ][a-zA-Z][a-zA-Z\\-_0-9]*[ ]|"/gim, "") + "\0";
+				//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
+				constants.set(
+					constantName, 
+					"0b" + (programLocationCounter+12).toString(2)
+				);
+				//Calculate the size the string will use in memory including null termination and round up to the next size that
+				//is divisible by four. This insures the string always fits into multiple double words.
+				const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
+				programLocationCounter += stringMemSize + 12;
+			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.integerVariable, "gim"))) {
+				const variableName = line.replace(/^.|[ ][0-9]*$/gim, "");
+				//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
+				variables.set(
+					variableName,
+					"0b" + (programLocationCounter+12).toString(2)
+				);
+				//Size of jump instruction plus 32bit integer
+				programLocationCounter += 16;
+			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.stringVariable, "gim"))) {
+				const variableName = line.replace(/^.|[ ]".*/gim, "");
+				const variableValue = line.replace(/^\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]"|"$/gim, "") + "\0";
+				variables.set(
+					variableName,
+					"0b" + (programLocationCounter+12).toString(2)
+				)
+				//Calculate the size the string will use in memory including null termination and round up to the next size that
+				//is divisible by four. This insures the string always fits into multiple double words.
+				const stringMemSize = Math.ceil((Buffer.byteLength(variableValue) / 4)) * 4;
+				programLocationCounter += stringMemSize + 12;
+			} else if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
+				const jumpLabel = line.replace(/\.|:/gim, "");
+				jumpLabels.set(
+					jumpLabel, 
+					(programLocationCounter).toString(2)
+				);
+				lines.delete(lineNo);
+			} else {
+				programLocationCounter += 12;
 			}
 		}
-		return constants;
 	}
 
 	/**
-	 * This method locates and removes the constants in the program code and replaces them with their value or with their (virtual) memory start address.
-	 * @param lines The lines of code to search for constants.
-	 * @returns The lines of code without jump labels.
+	 * This method replaces the symbolic names of variables or constants in the assembly code with their associated value or 
+	 * (virtual) memory address.
+	 * Symbolic integer constants get replaced by their value.
+	 * Symbolic integer strings and symbolic variables get replaced by their associated (virtual) memory address.
+	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
+	 * @param constants A map, which maps the symbolic name of constants to their value or (virtual) memory start address.
+	 * @param variables A map, which maps the symbolic name of variables to their (virtual) memory start address.
+	 * @returns 
 	 */
-	private replaceConstants(lines: Map<number, string>, constants: Map<string, string>): Map<number, string> {
+	private replaceSymbols(lines: Map<number, string>, constants: Map<string, string>, variables: Map<string, string>) : Map<number, string> {
 		for (const [lineNo, line] of lines.entries()) {	
 			if (line.match(new RegExp(this.languageDefinition.constant_formats.usage, "gim"))) {
 				//Test if constant name is included in line and replace it with its value
@@ -382,6 +361,16 @@ export class Assembler {
 					const regex = new RegExp("[$%@]" + constantName , "m");
 					if (line.match(regex) !== null) {
 						const replacedLine = line.replace(constantName,constantValue);
+						lines.set(lineNo, replacedLine);
+					}
+				});
+			}
+			if (line.match(new RegExp(this.languageDefinition.variable_formats.usage, "gim"))) {
+				//Test if variable name is included in line and replace it with its value
+				variables.forEach((variableValue, variableName) => {
+					const regex = new RegExp("[$%@]" + variableName , "m");
+					if (line.match(regex) !== null) {
+						const replacedLine = line.replace(variableName,variableValue);
 						lines.set(lineNo, replacedLine);
 					}
 				});
@@ -395,64 +384,46 @@ export class Assembler {
 	 * @param lineNo The original computer programs line number of code which is currently encoded.
 	 * @param line The original computer programs line of code which is currently encoded.
 	 * @param jumpLabels The jump labels found in the assembly code.
-	 * @param constants A map of the names of constants and their corresponding value in case of integer or (virtual) memory start address in case of strings.
+	 * @param stringValue The string content.
+	 * @param stringAddress The (virtual) memory start address of the string.
 	 * @returns An array containing the binary equivalent of the given instruction and its operand values.
 	 */
-	private encodeString(lineNo: number, line: string, jumpLabels: Map<string, string>, constants: Map<string, string>) : DoubleWord[] {
+	private encodeString(lineNo: number, line: string, jumpLabels: Map<string, string>, stringValue: string, stringAddress: string) : DoubleWord[] {
 		const encodedInstructions: DoubleWord[] = [];
-
-		let stringConstValueRegex = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
-		const regexMatch = stringConstValueRegex.exec(line);
-
-		if (regexMatch !== null) {
-			// Const found.
-			let value: string = regexMatch[0].toString();
-			const stringConstantName = value.substring(value.indexOf("const") + 5, value.indexOf("=")).trim();
-			const stringConstantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
-
-			let stringEncoded = false;
-			if (constants.has(stringConstantName)) {
-				const stringStartAddress: string = constants.get(stringConstantName)!.replace(/^0b/gim, "");
-				const stringMemSize = Math.ceil((Buffer.byteLength(stringConstantValue) / 4)) * 4;
-				//The memory address after the string array with the next instruction
-				const jumpAddress:string = new DoubleWord(parseInt(stringStartAddress, 2) + stringMemSize).toString();
-				const jumpInstruction:string = "JMP @0b" + jumpAddress;
-				const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, jumpInstruction, jumpLabels, constants);
-				encodedInstructions.push(...encodedInstruction);
-				//Create a buffer from the string in utf8 encoding and calculate some important values.
-				const stringBuffer = Buffer.from(stringConstantValue, "utf8");
-				const stringByteLength = stringBuffer.length;
-				const continousBufferSegmentSize = stringByteLength - (stringByteLength % 4);
-				const restOfBufferSize = stringByteLength % 4;
-				//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
-				//and encode each segment into binary values.
-				if (continousBufferSegmentSize > 0) {
-					for (let i = 0; i <= stringByteLength - 4; i += 4) {
-						const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
-						const encodedStringPart = new DoubleWord(parseInt(bufferSegment, 16));
-						encodedInstructions.push(encodedStringPart);
-					}
-				}
-				//Get the last bytes from the buffer
-				if (restOfBufferSize > 0) {
-					let bufferSegment = stringBuffer.toString("hex", continousBufferSegmentSize, stringByteLength);
-					for (let i = 0; i < 4 - restOfBufferSize; i++) 
-					{
-						bufferSegment += "00";
-					}
-					const encodedStringPart = new DoubleWord(parseInt(bufferSegment, 16));
-					encodedInstructions.push(encodedStringPart);
-				}
-				stringEncoded = true;
+		let stringEncoded = false; 
+		const stringStartAddress: string = stringAddress.replace(/^0b/gim, "");
+		const stringMemSize = Math.ceil((Buffer.byteLength(stringValue) / 4)) * 4;
+		//The memory address after the string array with the next instruction
+		const jumpAddress:string = (parseInt(stringStartAddress, 2) + stringMemSize).toString(2);
+		const jumpInstruction:string = "JMP @0b" + jumpAddress;
+		const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
+		encodedInstructions.push(...encodedInstruction);
+		//Create a buffer from the string in utf8 encoding and calculate some important values.
+		const stringBuffer = Buffer.from(stringValue, "utf8");
+		const stringByteLength = stringBuffer.length;
+		const continuousBufferSegmentSize = stringByteLength - (stringByteLength % 4);
+		const restOfBufferSize = stringByteLength % 4;
+		//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
+		//and encode each segment into binary values.
+		if (continuousBufferSegmentSize > 0) {
+			for (let i = 0; i <= stringByteLength - 4; i += 4) {
+				const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
+				const encodedStringPart = new DoubleWord(parseInt(bufferSegment));
+				encodedInstructions.push(encodedStringPart);
 			}
-			if (!stringEncoded) {
-				throw new Error(`Error encoding string constant in line: ${lineNo + 1}: ${line}`);
-			}
-			
-			return encodedInstructions;
 		}
-
-		throw new Error(`Error encoding string constant in line: ${lineNo + 1}: ${line}`);
+		//Get the last bytes from the buffer
+		if (restOfBufferSize > 0) {
+			const bufferSegment = stringBuffer.toString("hex", continuousBufferSegmentSize, stringByteLength);
+			const encodedStringPart = new DoubleWord(parseInt(bufferSegment));
+			encodedInstructions.push(encodedStringPart);
+		}
+		stringEncoded = true;
+		
+		if (!stringEncoded) {
+			throw new Error(`Error encoding string in line: ${lineNo + 1}: ${line}`);
+		}
+		return encodedInstructions;
 	}
 
 	/**

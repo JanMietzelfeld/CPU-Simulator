@@ -1,4 +1,11 @@
-{
+{   
+    "variable_formats" : {
+        "dataSegmentStart" : "\\.DATA",
+        "dataSegmentEnd" : "\\.CODE",
+        "integerVariable" : "^\\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]?-?[0-9]*$",
+        "stringVariable" : "^\\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]\"[a-zA-Z0-9]*\"$",
+        "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
+    },
     "constant_formats" : {
         "declarationDecimal" :      "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
         "declarationHexadecimal" :  "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
