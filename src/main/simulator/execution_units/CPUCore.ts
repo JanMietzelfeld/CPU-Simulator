@@ -34,7 +34,7 @@ import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
 import { BrowserWindow } from "electron";
 import { getMainWindow } from "../../index"
 import { PageFaultError } from "../../../types/errors/PageFaultError";
-import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
+import { interruptNameByValue, InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { Timer } from "./Timer";
 import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
 
@@ -257,12 +257,34 @@ export class CPUCore {
      */
     public cycle(): void {
 
-        //Handle all pending interrupts
-        if (this.eflags.interrupt && this.interruptQueue.length !== 0) {
-            console.log("Interrupted");
-            this.triggertException(this.interruptQueue.shift() as InterruptNumbers)
+        //Now handle all pending interrupts
+        while (this.eflags.interrupt && this.interruptQueue.length !== 0) {
+            let interruptNumber = this.interruptQueue.shift() as InterruptNumbers;
+            this.triggertInterrupt(interruptNumber);
             this.isHalted = false;
+
+            while (this.eflags.isInKernelMode())
+            {
+                try {
+
+                    this.internalCycle();
+
+                } catch(error) {
+                    if (error instanceof PageFaultError) {
+                        this.triggertInterrupt(InterruptNumbers.PAGE_FAULT);
+
+                        // Write the "bad" address onto the interrupt STACK.
+                        this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
+                        this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
+                    }
+                    else
+                    {
+                        console.log(error)
+                    }
+                }
+            }
         }
+
 
         if (this.isHalted)
         {
@@ -279,8 +301,7 @@ export class CPUCore {
 
             } catch(error) {
                 if (error instanceof PageFaultError) {
-                    console.log("Page Fault")
-                    this.triggertException(InterruptNumbers.PAGE_FAULT);
+                    this.triggertInterrupt(InterruptNumbers.PAGE_FAULT);
 
                     // Write the "bad" address onto the interrupt STACK.
                     this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
@@ -301,8 +322,7 @@ export class CPUCore {
 
             } catch(error) {
                 if (error instanceof PageFaultError) {
-                    console.log("Page Fault")
-                    this.triggertException(InterruptNumbers.PAGE_FAULT);
+                    this.triggertInterrupt(InterruptNumbers.PAGE_FAULT);
 
                     // Write the "bad" address onto the interrupt STACK.
                     this.esp.content = PhysicalAddress.fromInteger(parseInt(this.esp.content.toString(), 2) - 4);
@@ -327,8 +347,7 @@ export class CPUCore {
         }
         catch(e)
         {
-            console.log("Invalid Opcode");
-            this.triggertException(InterruptNumbers.INVALID_OPCODE);
+            this.triggertInterrupt(InterruptNumbers.INVALID_OPCODE);
             return;
         }
         this.execute();
@@ -456,24 +475,25 @@ export class CPUCore {
         const operation: EncodedOperations = this._decodedInstruction.operation;
 
         if (this.eflags.isInUserMode()) {
-            const currentInstructionAddress:number = this.eip.content.toUnsignedNumber();
             const currentOperation:string = encodedOperationNameByValue(operation.toString());
             this.log(" ");
-            this.log("Executing next instruction");
-            this.log("Instruction address: " + "0x" + currentInstructionAddress.toString(16));
-            this.log("Instruction name: " + currentOperation);
+            let log = "Executing:    ";
+            log += currentOperation;
+
             if (this._decodedInstruction.operands !== undefined) {
                 if (0 in this._decodedInstruction.operands! && this._decodedInstruction.operands[0] !== undefined) {
                     const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
                     const hexOperand = parseInt(stringOperand, 2).toString(16);
-                    this.log("First operand: " + "0x" + hexOperand);
+                    log += " 0x" + hexOperand;
                 }
                 if (1 in this._decodedInstruction.operands! && this._decodedInstruction.operands[1] !== undefined) {
                     const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
                     const hexOperand = parseInt(stringOperand, 2).toString(16);
-                    this.log("Second operand: " + "0x" + hexOperand);
+                    log += ", 0x" + hexOperand;
                 }
             }
+
+            this.log(log);
         }
 
         let jumpPerformed = false;
@@ -684,7 +704,7 @@ export class CPUCore {
                 break;
             default:
                 // Call interrupt handler for Invalid Opcode.
-                this.triggertException(InterruptNumbers.INVALID_OPCODE);
+                this.triggertInterrupt(InterruptNumbers.INVALID_OPCODE);
                 break;
         }
         if (!jumpPerformed) {
@@ -746,7 +766,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
 
@@ -1412,7 +1432,7 @@ export class CPUCore {
             result = this.alu.div(secondOperandsValue, firstOperandsValue);
         } catch (error) {
             if (error instanceof DivisionByZeroError) {
-                this.triggertException(InterruptNumbers.DIVIDE_ERROR);
+                this.triggertInterrupt(InterruptNumbers.DIVIDE_ERROR);
                 return;
             }
         }
@@ -2483,7 +2503,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         this.eflags.clearInterrupt();
@@ -2498,7 +2518,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         this.eflags.setInterrupt();
@@ -2517,7 +2537,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         // Check whether ESP reached lowest address (top) of STACK segment.
@@ -2542,7 +2562,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         // Check whether ESP reached highest address (bottom) of STACK segment.
@@ -2780,6 +2800,12 @@ export class CPUCore {
             throw new BadOperandError("Interrupt operand must be between 0 and 255.")
         }
 
+        if (this.eflags.isInUserMode())
+        {
+            this.log("");
+            this.log("Interrupted: " + interruptNameByValue(target.value.toUnsignedNumber() as InterruptNumbers));
+        }
+
         let eflagsValue = DoubleWord.fromInteger(this.eflags.content.toUnsignedNumber());
         // Switch to kernel mode.
         this.eflags.enterKernelMode();
@@ -2832,7 +2858,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return false;
         }
         // Return from the interrupt handler by calling the RET operation.
@@ -2846,6 +2872,12 @@ export class CPUCore {
         this.esp.content = this.mmu.readDoublewordFrom(this.esp.content, false);
 
         this.eflags.content = new Byte(eflagsValue.getLeastSignificantBits(8));
+
+        if (this.eflags.isInUserMode())
+        {
+            this.log("Interrupt Handler Finished");
+        }
+
         return true;
     }
 
@@ -2974,7 +3006,7 @@ export class CPUCore {
                // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
 
@@ -3249,7 +3281,7 @@ export class CPUCore {
     /**
      * Trigger an Exeption
      */
-    public triggertException(number: InterruptNumbers)
+    public triggertInterrupt(number: InterruptNumbers)
     {
         if (this.eflags.interrupt == 0) {
             this.reset(); //A CPU exception while interrupt are disabled -> panic, reset system
@@ -3276,10 +3308,11 @@ export class CPUCore {
     {
         //Add interrupt to list to be executed after current instruction finishes
         this.interruptQueue.push(number);
-        
     }
 
     public reset() {
         // TODO implement
+        this.log("");
+        this.log("KERNEL PANIC! RESETING SIMULATOR");
     }
 }
