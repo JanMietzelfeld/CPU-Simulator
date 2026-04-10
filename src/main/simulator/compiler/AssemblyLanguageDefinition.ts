@@ -2,8 +2,10 @@ export interface AssemblyLanguageDefinition {
     variable_formats: {
         dataSegmentStart: string;
         dataSegmentEnd: string;
-        integerVariable: string;
-        stringVariable: string;
+        declarationDecimal: string;
+        declarationHexadecimal: string;
+        declarationBinary: string;
+        declarationString: string;
         usage: string;
     }
     

@@ -2,19 +2,21 @@
     "variable_formats" : {
         "dataSegmentStart" : "\\.DATA",
         "dataSegmentEnd" : "\\.CODE",
-        "integerVariable" : "^\\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]?-?[0-9]*$",
-        "stringVariable" : "^\\.[a-zA-Z][a-zA-Z\\-_0-9]*[ ]\"[a-zA-Z0-9]*\"$",
-        "usage" : "[$%@][a-zA-Z][a-zA-Z\\-_0-9]*"
+        "declarationDecimal" :      "^\\.[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+-?(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
+        "declarationHexadecimal" :  "^\\.[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+-?0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
+        "declarationBinary" :       "^\\.[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+-?0b[01]+$",
+        "declarationString" :       "^\\.[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+\"[a-zA-Z\\-_/.0-9]*\"$",
+        "usage" : "[$%@][a-zA-Z\\-_][a-zA-Z\\-_0-9]*"
     },
     "constant_formats" : {
-        "declarationDecimal" :      "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
-        "declarationHexadecimal" :  "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
-        "declarationBinary" :       "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*-?[ ]*0b[01]+$",
-        "declarationString" :       "^[ ]*(const)[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]*=[ ]*(\")[a-zA-Z\\-_/.0-9]*(\")$",
+        "declarationDecimal" :      "^.CONST[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+-?(?<!0[\\w])\\b(?:0(?![1-9])|[1-9]\\d*)+$",
+        "declarationHexadecimal" :  "^.CONST[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+-?0x(?:0(?![0-9A-Fa-f]+)|(?:[1-9A-Fa-f][0-9A-Fa-f]*))$",
+        "declarationBinary" :       "^.CONST[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+-?0b[01]+$",
+        "declarationString" :       "^.CONST[ ]+[a-zA-Z\\-_][a-zA-Z\\-_0-9]*[ ]+\"[a-zA-Z\\-_/.0-9]*\"$",
         "usage" : "[$%@][a-zA-Z\\-_][a-zA-Z\\-_0-9]*"
     },
     "comment_format" : "[ ]*;.*",
-    "include_format" : "^[ ]*(include)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
+    "include_format" : "^[ ]*(.INCLUDE)[ ]+(\")[a-zA-Z][a-zA-Z\\-_/0-9]*(\")",
     "label_formats" : {
         "declaration" : "\\.[a-zA-Z\\-_][a-zA-Z\\-_0-9]*\\:",
         "usage" : "^[a-zA-Z\\-_][a-zA-Z\\-_0-9]*"
