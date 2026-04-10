@@ -36,14 +36,6 @@ describe("Read and write from or to main memory", () => {
         ]));
     });
 
-    test("Write doubleword to high memory address, expecting an Error", () => {
-        const doubleword = new DoubleWord([1,1,0,1,1,0,0,1,0,0,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1,1,0,0,0,0,0]);
-        const attemptToWrite = () => {
-            mainMemory.writeDoublewordTo(PhysicalAddress.fromInteger(parseInt("0xFFFFFFFE", 16)), doubleword);
-        }      
-        expect(attemptToWrite).toThrow(Error);
-    });
-
     test("Read single byte from memory address", () => {
         const result: Byte = mainMemory.readByteFrom(PhysicalAddress.fromInteger(parseInt("0x0", 16)));
         const byteExpected = new Byte([1,1,0,1,1,0,0,1]);

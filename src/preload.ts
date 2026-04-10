@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld("simulator", {
 	readPTP: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readPTP", radix),
 	onLoadedAssemblyProgram: (callback: (filePath: string[]) => void) => 
 		ipcRenderer.on("loaded_program", (_event, filePath: string[]) => callback(filePath)),
+	onassembledProgram: (callback: (filePath: string[]) => void) => 
+		ipcRenderer.on("assembled_program", (_event, filePath: string[]) => callback(filePath)),
 	onError: (callback: (errorDescription: string) => void) => 
 		ipcRenderer.on("on_error", (_event, errorDescription: string) => callback(errorDescription)),
 	onDisableAutoScrollForPhysicalRAM: (callback: () => void) => 
@@ -63,6 +65,8 @@ contextBridge.exposeInMainWorld("simulator", {
 });
 
 contextBridge.exposeInMainWorld("windowUpdate", {
+	onClearLog: (callback: () => void) => 
+		ipcRenderer.on('clear_log', () => callback()),
 	onUpdateLog: (callback: (message: string) => void) => 
 		ipcRenderer.on('update_log', (_event, message) => callback(message)),
 	onHideLog: (callback: () => void) =>

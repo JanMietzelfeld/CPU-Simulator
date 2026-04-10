@@ -131,6 +131,13 @@ export class MemoryManagementUnit {
         this._flags = eflags;
     }
 
+
+    /**
+     * This method retruns if memory virtualization is enabled 1 = eabled | 0 = disabled.
+     */
+    public isMemoryVirtualizationEnabled(): number {
+        return this._memoryVirtualizationEnabled ? 1 : 0;
+    }
     /**
      * This method enables memory virtualization.
      */
@@ -143,6 +150,13 @@ export class MemoryManagementUnit {
      */
     public disableMemoryVirtualization() {
         this._memoryVirtualizationEnabled = false;
+    }
+
+    /**
+     * This method invalidates the TLB.
+     */
+    public invalidateTLB() {
+        this._tlb.clear();
     }
 
     /**
@@ -271,10 +285,7 @@ export class MemoryManagementUnit {
             throw new PageFaultError(
                 `The page associated with the virtual memory address ${virtualAddress} is currently not present.`,
                 pageTableEntry.flagBits,
-                new PhysicalAddress(virtualAddress
-                    .getMostSignificantBits(MemoryManagementUnit.NUMBER_BITS_PAGE_FRAME_ADDRESS)
-                    .concat(new Array<Bit>(MemoryManagementUnit.NUMBER_BITS_OFFSET).fill(0))
-                )
+                new PhysicalAddress(virtualAddress.value)
             );
         }
         if (!ignorePermissionFlags) {
@@ -283,7 +294,7 @@ export class MemoryManagementUnit {
                 throw new PrivilegeViolationError("Process tries to access a page frame, which is accessible only in kernel mode.");
             }
             // Check if the page frames contents are executable.
-            if (attemptsToExecute && !pageTableEntry.isExecutable()) {
+            if (false){ //(attemptsToExecute && !pageTableEntry.isExecutable()) { // TODO remove workaround
                 throw new PageFrameNotExecutableError("The process tries to execute a page frames contents that are marked as not executable.");
             }
             // Check if the page frames contents are writable.
@@ -298,7 +309,7 @@ export class MemoryManagementUnit {
             // Copy the flag bits.
             const tmpFlagBits = pageTableEntry.flagBits.slice();
             // Update flag bits of page table entry in memory as well.
-            this._mainMemory.writeDoublewordTo(virtualAddress, new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
+            this._mainMemory.writeDoublewordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
         }
         // Page frame is present and operation is permitted.
         // Create a valid physical memory address from the page frame number and the offset extracted from the given virtual memory address.
@@ -363,4 +374,5 @@ export class MemoryManagementUnit {
         }
         return pageTableEntry;
     }
+
 }

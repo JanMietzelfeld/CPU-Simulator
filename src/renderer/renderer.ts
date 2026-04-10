@@ -977,7 +977,7 @@ export class Renderer {
         this.autoScrollForPhysicalRAMEnabled = true;
         this.autoScrollForVirtualRAMEnabled = true;
         this.autoScrollForPageTableEnabled = true;
-        this.programLoaded = false;
+        this.programLoaded = true;
         this._window = window;
     }
 
@@ -1679,7 +1679,7 @@ export class Renderer {
             return;
         }
         if (!await this._window.simulator.nextCycle()) {
-            alert("Programm finished execution.");
+            //alert("Programm finished execution.");
         }
         await this.reloadPhysicalRAMView();
         await this.reloadVirtualRAMView();
@@ -1698,6 +1698,17 @@ export class Renderer {
         await this.readITP(this.dataRepresentationITP);
         await this.readNPTP(this.dataRepresentationNPTP);
         await this.readVMPTR(this.dataRepresentationVMPTR);
+        return;
+    }
+
+
+
+    
+    public async clearLog(): Promise<void> {
+        const log: HTMLElement | null = document.getElementById("log");
+        if (log !== null) {
+            log.children.namedItem("log-content")!.textContent = "";
+        }
         return;
     }
 

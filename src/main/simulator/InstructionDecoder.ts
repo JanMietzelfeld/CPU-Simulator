@@ -134,6 +134,18 @@ export class InstructionDecoder {
             case EncodedOperations.JNE:
                 decodedJTypeOperation = EncodedOperations.JNE;
                 break;
+            case EncodedOperations.JA:
+                decodedJTypeOperation = EncodedOperations.JA;
+                break;
+            case EncodedOperations.JAE:
+                decodedJTypeOperation = EncodedOperations.JAE;
+                break;
+            case EncodedOperations.JB:
+                decodedJTypeOperation = EncodedOperations.JB;
+                break;
+            case EncodedOperations.JBE:
+                decodedJTypeOperation = EncodedOperations.JBE;
+                break;
             case EncodedOperations.JG:
                 decodedJTypeOperation = EncodedOperations.JG;
                 break;
@@ -191,6 +203,15 @@ export class InstructionDecoder {
             case EncodedOperations.SBB:
                 decodedRTypeOperation = EncodedOperations.SBB;
                 break;
+            case EncodedOperations.SHL:
+                decodedRTypeOperation = EncodedOperations.SHL;
+                break;
+            case EncodedOperations.SHR:
+                decodedRTypeOperation = EncodedOperations.SHR;
+                break;
+            case EncodedOperations.SAR:
+                decodedRTypeOperation = EncodedOperations.SAR;
+                break;
             case EncodedOperations.MUL:
                 decodedRTypeOperation = EncodedOperations.MUL;
                 break;
@@ -235,6 +256,9 @@ export class InstructionDecoder {
                 break;
             case EncodedOperations.NOP:
                 decodedRTypeOperation = EncodedOperations.NOP;
+                break;
+            case EncodedOperations.INVTLB:
+                decodedRTypeOperation = EncodedOperations.INVTLB;
                 break;
             default:
                 throw Error("Unrecognized R-type instrcution.");

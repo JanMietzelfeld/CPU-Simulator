@@ -97,13 +97,14 @@ export class PassthroughFilesystem {
         return 0;
     }
 
-    public io_close(fd: number) {
+    public io_close(fd: number): number {
         // TODO maybe add return value indicating success/error if invalid fd is given
         if (!this.fd_map.has(fd)) {
             // invalid fd
-            return;
+            return -1;
         }
         this.fd_map.delete(fd);
+        return 0;
     }
 
     public io_read_buffer(fd: number, buffer: Uint8Array, size: number): number {
@@ -204,7 +205,7 @@ export class PassthroughFilesystem {
             return -1;
         }
         const stat = lstatSync(path)
-        if (!stat.isFile || stat.isDirectory()) {
+        if (!stat.isFile() || stat.isDirectory()) {
             // not a file
             return -2;
         }
