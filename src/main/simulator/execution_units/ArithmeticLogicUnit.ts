@@ -291,7 +291,7 @@ export class ArithmeticLogicUnit {
     }
 
     /**
-     * This method subtracts two given binary numbers with taking the carry into account.
+     * This method subtracts two given binary numbers while taking the borrow into account.
      * 
      * Affects the **sign**, **zero**, **carry**, **overflow** and **parity** bit according to the result.
      * @param minuend The binary value to subtract from.
@@ -369,11 +369,16 @@ export class ArithmeticLogicUnit {
      */
     public shl(value: DoubleWord, count: DoubleWord, ): DoubleWord {
 
-        const carry: Bit = value.getBit(count.value - 1);
+        const result: DoubleWord = new DoubleWord();
 
-        const result: DoubleWord = new DoubleWord(value.value << count.value);
+        this._eflags.clearCarry()
 
-        this.checkCarry(carry === 1);
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value && count.value > 0) {
+            result.value = value.value << count.value;
+            count.value === 1 && value.getMostSignificantBit() !== value.getBit(1) ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+            value.getBit(count.value - 1) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+        }
+
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -390,19 +395,16 @@ export class ArithmeticLogicUnit {
      */
     public shr(value: DoubleWord, count: DoubleWord): DoubleWord {
 
-        let result: DoubleWord = value;
+        const result: DoubleWord = new DoubleWord();
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value) {
-            
-            const carry: Bit = value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value);
-            count.value == 1 && value.getBit(0) == 1 ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        this._eflags.clearCarry()
 
-            result = new DoubleWord(value.value >>> count.value);
-            this.checkCarry(carry === 1);
 
-        } else {
-            this._eflags.clearCarry()
-            result = new DoubleWord();
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value && count.value > 0) {
+            result.value = value.value >>> count.value;
+
+            value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry();
+            count.value == 1 && value.getMostSignificantBit() == 1 ? this._eflags.setOverflow() : this._eflags.clearOverflow();
         }
 
         this.checkForZero(result);
@@ -423,15 +425,12 @@ export class ArithmeticLogicUnit {
 
         let result: DoubleWord = value;
 
+        this._eflags.clearCarry()
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value) {
+        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value && count.value > 0) {
+            result.value = value.value >> count.value;
 
-            result = new DoubleWord(value.value >> count.value);
             value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
-
-        } else {
-            result = new DoubleWord();
-            this._eflags.clearCarry()
         }
 
         this._eflags.clearOverflow();

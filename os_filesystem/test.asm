@@ -2,9 +2,19 @@
 NOP
 NOP
 NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
 MOV $CONST_SYSCALL_PROCESS_EXIT, %eax
 INT $0x80
 JMP _TEST_START
 
 
-include "os/include/syscalls"
+.INCLUDE "os/include/syscalls"

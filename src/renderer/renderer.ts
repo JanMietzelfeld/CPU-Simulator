@@ -1701,6 +1701,17 @@ export class Renderer {
         return;
     }
 
+
+
+    
+    public async clearLog(): Promise<void> {
+        const log: HTMLElement | null = document.getElementById("log");
+        if (log !== null) {
+            log.children.namedItem("log-content")!.textContent = "";
+        }
+        return;
+    }
+
     /**
      * This method updates the log-widget with a message.
      * @param message The message that gets appended to the log-widget. 

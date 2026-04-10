@@ -211,4 +211,27 @@ export class PassthroughFilesystem {
         }
         return stat.size;
     }
+
+    public console_print_number(num: number) {
+        console.log(num);
+    }
+
+    public console_read_number(): [number, number] {
+        if (this.stdin_buffer.length === 0) {
+            // error -1 -> no input ready
+            return [0, -1];
+        }
+        const line = this.stdin_buffer[0]
+        this.stdin_buffer.shift();
+        const num = parseInt(new TextDecoder('latin1').decode(line));
+        if (isNaN(num)) {
+            // error -2 -> could not parse number
+            return [0, -2];
+        }
+        if (num > DoubleWord.MAXIMUM_NUMBER_DEC || num < DoubleWord.MINIMUM_NUMBER_DEC) {
+            // error -2 -> number does not fit into signed 32 bit DoubleWord
+            return [0, -3]
+        }
+        return [num, 0];
+    }
 }

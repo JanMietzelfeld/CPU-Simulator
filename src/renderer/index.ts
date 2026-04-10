@@ -99,6 +99,11 @@ window.simulator.onEnableAutoScrollForPageTable(() => {
 	return;
 });
 
+window.windowUpdate.onClearLog(() => {
+	renderer.clearLog();
+});
+
+
 window.windowUpdate.onUpdateLog((value: string) => {
 	renderer.updateLog(value);
 });

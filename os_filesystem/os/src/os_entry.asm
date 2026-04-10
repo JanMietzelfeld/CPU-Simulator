@@ -1,9 +1,9 @@
 JMP _OS_ENTRY ; start of the os
 
 ; include dependencies
-include "os/src/constants"
-include "os/src/interupts"
-include "os/src/util"
+.INCLUDE "os/src/constants"
+.INCLUDE "os/src/include_interrupts"
+.INCLUDE "os/src/include_util"
 
 ._OS_ENTRY:
     ; This is the entry point of the OS
@@ -96,7 +96,7 @@ include "os/src/util"
     ; the code for init Program should be located in the file os/user/init (as bynary file)
 
 
-    const _OS_ENTRY_CONST_INIT_FILE_PATH = "os/user/init.bin"
+    .CONST _OS_ENTRY_CONST_INIT_FILE_PATH "os/user/init.bin"
 
 
     MOV $_OS_ENTRY_CONST_INIT_FILE_PATH, %ebx
@@ -122,7 +122,7 @@ include "os/src/util"
 
     ; the code for idle Program should be located in the file os/user/idle (as bynary file)
 
-    const _OS_ENTRY_CONST_IDLE_FILE_PATH = "os/user/idle.bin"
+    .CONST _OS_ENTRY_CONST_IDLE_FILE_PATH "os/user/idle.bin"
 
     MOV $_OS_ENTRY_CONST_IDLE_FILE_PATH, %ebx
 

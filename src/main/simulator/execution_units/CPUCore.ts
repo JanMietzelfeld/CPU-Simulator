@@ -28,9 +28,9 @@ import { BadOperandError } from "../../../types/errors/BadOperandError";
 import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
 import { BrowserWindow } from "electron";
 import { getMainWindow } from "../../index"
-import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
 import { PageFaultError } from "../../../types/errors/PageFaultError";
+import { interruptNameByValue, InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { Timer } from "./Timer";
 
 
@@ -260,8 +260,7 @@ export class CPUCore {
 
             } catch(error) {
                 if (error instanceof PageFaultError) {
-                    console.log("Page Fault")
-                    this.triggertException(InterruptNumbers.PAGE_FAULT);
+                    this.triggertInterrupt(InterruptNumbers.PAGE_FAULT);
 
                     // Write the "bad" address onto the interrupt STACK.
                     this.esp.content = new DoubleWord(this.esp.content.value - 4);
@@ -282,8 +281,7 @@ export class CPUCore {
 
             } catch(error) {
                 if (error instanceof PageFaultError) {
-                    console.log("Page Fault")
-                    this.triggertException(InterruptNumbers.PAGE_FAULT);
+                    this.triggertInterrupt(InterruptNumbers.PAGE_FAULT);
 
                     // Write the "bad" address onto the interrupt STACK.
                     this.esp.content =  new DoubleWord(this.esp.content.value - 4);
@@ -295,13 +293,34 @@ export class CPUCore {
                 }
             }
         }
-        
+
         //Now handle all pending interrupts
-        if (this.eflags.interrupt && this.interruptQueue.length !== 0) {
-            console.log("Interrupted");
-            this.triggertException(this.interruptQueue.shift() as InterruptNumbers)
-            return;
+        while (this.eflags.interrupt && this.interruptQueue.length !== 0) {
+            let interruptNumber = this.interruptQueue.shift() as InterruptNumbers;
+            this.triggertInterrupt(interruptNumber);
+
+            while (this.eflags.isInKernelMode())
+            {
+                try {
+
+                    this.internalCycle();
+
+                } catch(error) {
+                    if (error instanceof PageFaultError) {
+                        this.triggertInterrupt(InterruptNumbers.PAGE_FAULT);
+
+                        // Write the "bad" address onto the interrupt STACK.
+                        this.esp.content = new DoubleWord(parseInt(this.esp.content.toString(), 2) - 4);
+                        this.mmu.writeDoublewordTo(this.esp.content, error.addressOfPageFault, false);
+                    }
+                    else
+                    {
+                        console.log(error)
+                    }
+                }
+            }
         }
+
     }
 
     /**
@@ -315,8 +334,7 @@ export class CPUCore {
         }
         catch(e)
         {
-            console.log("Invalid Opcode");
-            this.triggertException(InterruptNumbers.INVALID_OPCODE);
+            this.triggertInterrupt(InterruptNumbers.INVALID_OPCODE);
             return;
         }
         this.execute();
@@ -443,21 +461,26 @@ export class CPUCore {
         }
         const operation: EncodedOperations = this._decodedInstruction.operation;
 
-        const currentOperation:string = encodedOperationNameByValue(operation.toString());
-        this.log("Executing next instruction");
-        this.log("Instruction address: " + "0x" + this.eip.content.value.toString(16));
-        this.log("Instruction name: " + currentOperation);
-        if (this._decodedInstruction !== undefined) {
-            if (0 in this._decodedInstruction.operands!) {
-                const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
-                const hexOperand = parseInt(stringOperand, 2).toString(16);
-                this.log("First operand: " + "0x" + hexOperand);
+        if (this.eflags.isInUserMode()) {
+            const currentOperation:string = encodedOperationNameByValue(operation.toString());
+            this.log(" ");
+            let log = "Executing:    ";
+            log += currentOperation;
+
+            if (this._decodedInstruction.operands !== undefined) {
+                if (0 in this._decodedInstruction.operands! && this._decodedInstruction.operands[0] !== undefined) {
+                    const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
+                    const hexOperand = parseInt(stringOperand, 2).toString(16);
+                    log += " 0x" + hexOperand;
+                }
+                if (1 in this._decodedInstruction.operands! && this._decodedInstruction.operands[1] !== undefined) {
+                    const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
+                    const hexOperand = parseInt(stringOperand, 2).toString(16);
+                    log += ", 0x" + hexOperand;
+                }
             }
-            if (1 in this._decodedInstruction.operands!) {
-                const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
-                const hexOperand = parseInt(stringOperand, 2).toString(16);
-                this.log("Second operand: " + "0x" + hexOperand);
-            }
+
+            this.log(log);
         }
 
         let jumpPerformed = false;
@@ -665,7 +688,7 @@ export class CPUCore {
                 break;
             default:
                 // Call interrupt handler for Invalid Opcode.
-                this.triggertException(InterruptNumbers.INVALID_OPCODE);
+                this.triggertInterrupt(InterruptNumbers.INVALID_OPCODE);
                 break;
         }
         if (!jumpPerformed) {
@@ -677,8 +700,7 @@ export class CPUCore {
             this.eip.content = new DoubleWord(this.eip.content.value + 12);
             this.eflags.content = flags;
         }
-        this.log("Execution finished");
-        this.log("");
+
         return;
     }
 
@@ -728,7 +750,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
 
@@ -840,6 +862,14 @@ export class CPUCore {
             case DevCommands.FILE_STAT: // 00000111 - file_stat (filename_ptr=op2) -> file_length=eax
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(new DoubleWord(op2));
                 this.eax.content = new DoubleWord(this.fs.file_stat(filename));
+                break;
+            case DevCommands.CONSOLE_PRINT_NUMBER: // 00001000 - console_print_number(number=op2)
+                this.fs.console_print_number(op2);
+                break;
+            case DevCommands.CONSOLE_READ_NUMBER: //  00001001 - console_read_number() -> number=eax, error=ebx
+                const [num, err] = this.fs.console_read_number();
+                this.eax.content = new DoubleWord(num);
+                this.ebx.content = new DoubleWord(err);
                 break;
             case DevCommands.CPU_IS_MEMORY_VIRTUALIZATION_ENABLED: //  00001010 isMemoryVirtualizationEnabled()
                 this.eax.content = new DoubleWord(this.mmu.isMemoryVirtualizationEnabled());
@@ -1396,7 +1426,7 @@ export class CPUCore {
             result = this.alu.idiv(secondOperandsValue, firstOperandsValue);
         } catch (error) {
             if (error instanceof DivisionByZeroError) {
-                this.triggertException(InterruptNumbers.DIVIDE_ERROR);
+                this.triggertInterrupt(InterruptNumbers.DIVIDE_ERROR);
                 return;
             }
         }
@@ -2467,7 +2497,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         this.eflags.clearInterrupt();
@@ -2482,7 +2512,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         this.eflags.setInterrupt();
@@ -2501,7 +2531,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         // Check whether ESP reached lowest address (top) of STACK segment.
@@ -2526,7 +2556,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
         // Check whether ESP reached highest address (bottom) of STACK segment.
@@ -2764,6 +2794,12 @@ export class CPUCore {
             throw new BadOperandError("Interrupt operand must be between 0 and 255.")
         }
 
+        if (this.eflags.isInUserMode())
+        {
+            this.log("");
+            this.log("Interrupted: " + interruptNameByValue(target.value.value as InterruptNumbers));
+        }
+
         let eflagsValue = new DoubleWord(this.eflags.content.value);
         // Switch to kernel mode.
         this.eflags.enterKernelMode();
@@ -2816,7 +2852,7 @@ export class CPUCore {
         // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return false;
         }
         // Return from the interrupt handler by calling the RET operation.
@@ -2830,6 +2866,12 @@ export class CPUCore {
         this.esp.content = this.mmu.readDoublewordFrom(this.esp.content, false);
 
         this.eflags.content = new Byte(eflagsValue.getLeastSignificantBits(8));
+
+        if (this.eflags.isInUserMode())
+        {
+            this.log("Interrupt Handler Finished");
+        }
+
         return true;
     }
 
@@ -2934,7 +2976,7 @@ export class CPUCore {
                // Check whether CPU is in kernel mode.
         if (!this.eflags.isInKernelMode()) {
             // CPU is not in kernel mode.
-            this.triggertException(InterruptNumbers.GENERAL_PROTECTION_FAULT);
+            this.triggertInterrupt(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             return;
         }
 
@@ -3209,7 +3251,7 @@ export class CPUCore {
     /**
      * Trigger an Exeption
      */
-    public triggertException(number: InterruptNumbers)
+    public triggertInterrupt(number: InterruptNumbers)
     {
         if (this.eflags.interrupt == 0) {
             this.reset(); //A CPU exception while interrupt are disabled -> panic, reset system
@@ -3236,10 +3278,11 @@ export class CPUCore {
     {
         //Add interrupt to list to be executed after current instruction finishes
         this.interruptQueue.push(number);
-        
     }
 
     public reset() {
         // TODO implement
+        this.log("");
+        this.log("KERNEL PANIC! RESETING SIMULATOR");
     }
 }

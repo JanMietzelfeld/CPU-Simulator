@@ -16,6 +16,7 @@ import { disassemble } from "./Disassembler";
 import { exit } from "process";
 import { PassthroughFilesystem } from "./os/PassthroughFilesystem";
 import { Byte } from "../../types/binary/Byte";
+import { getMainWindow } from "..";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -149,7 +150,11 @@ export class SimulationController {
         
         this.createUtilityFiles();
 
-        this.core.cycle();        
+        this.core.cycle();       
+        
+        getMainWindow().webContents.send('clear_log');
+
+        getMainWindow().webContents.send('update_log', "OS Initialized");
 
         return;
     }

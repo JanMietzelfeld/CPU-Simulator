@@ -315,10 +315,10 @@ describe("Test ALU", () => {
             .toEqual("11111111111111111111111111111110");
     });
 
-    test("Perform DIV on binary representation of decimal -256 and binary representation of decimal 128", () => {
-        const testDoubleword1: DoubleWord = new DoubleWord(-2001);
+    test("Perform DIV on binary representation of decimal -2001 and binary representation of decimal 128", () => {
+        const testDoubleword1: DoubleWord = new  DoubleWord(-2001);
         const testDoubleword2: DoubleWord = new DoubleWord(128);
-        expect(alu.idiv(testDoubleword1, testDoubleword2).toString())
+        expect(alu.div(testDoubleword1, testDoubleword2).toString())
             .toEqual("11111111111111111111111111110001");
     });
 });
