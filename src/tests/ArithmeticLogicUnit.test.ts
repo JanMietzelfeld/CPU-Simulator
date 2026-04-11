@@ -1,4 +1,4 @@
-import { Bit } from "../types/binary/Bit";
+ import { Bit } from "../types/binary/Bit";
 import { Byte } from "../types/binary/Byte";
 import { DoubleWord } from "../types/binary/DoubleWord";
 import { ArithmeticLogicUnit } from "../main/simulator/execution_units/ArithmeticLogicUnit";
@@ -318,7 +318,7 @@ describe("Test ALU", () => {
     test("Perform DIV on binary representation of decimal -2001 and binary representation of decimal 128", () => {
         const testDoubleword1: DoubleWord = new  DoubleWord(-2001);
         const testDoubleword2: DoubleWord = new DoubleWord(128);
-        expect(alu.div(testDoubleword1, testDoubleword2).toString())
+        expect(alu.idiv(testDoubleword1, testDoubleword2).toString())
             .toEqual("11111111111111111111111111110001");
     });
 });

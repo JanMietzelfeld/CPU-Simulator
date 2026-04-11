@@ -33,7 +33,7 @@ describe("Test TLB", () => {
     test("Get entry", () => {
         translationLookasideBuffer.get(new DoubleWord(0x00001000));
         expect(translationLookasideBuffer.data).toEqual([
-            [2, [virtualAddress1, pageTableEntry1]]
+            [2, [virtualAddress1.getMostSignificantBits(20), pageTableEntry1]]
         ]);
     });
 
