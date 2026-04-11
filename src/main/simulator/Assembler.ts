@@ -652,9 +652,9 @@ export class Assembler {
 		} else if (jumpLabels.has(operand)) {
 			// Operand is jump label.
 			operand32BitEncoded = new DoubleWord(parseInt(jumpLabels.get(operand)!, 2));
-		} else if (operand.startsWith("$0b")) {
+		} else if (operand.startsWith("$0b") || operand.startsWith("$-0b")) {
 			// Binary immediate found.
-			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$0b", ""), line);
+			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$", ""), line);
 		} else if (operand.startsWith("$-0x") || operand.startsWith("$0x")) {
 			// Hexadecimal immediate found.
 			operand32BitEncoded = this.encodeHexadecimalValue(operand.replace("$", ""), line);
@@ -689,16 +689,17 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given immediate operand.
 	 */
 	private encodeBinaryValue(operand: string, line: number): DoubleWord {
-		if (operand.length > DataSizes.DOUBLEWORD) {
-			throw Error(`In line ${line + 1}: Binary immediate consists of more than ${DataSizes.DOUBLEWORD} bits.`);
+
+		let operandDec = 0;
+		operand = operand.replace("0b", "");
+		if (operand.startsWith("-")) {
+			// Negative binary value.
+			operandDec = parseInt(operand.replace("-", ""), 2) * -1;
+		} else {
+			// Positive binary value.
+			operandDec = parseInt(operand, 2);
 		}
-		// Sign extend binary value.
-		operand = operand.padStart(DataSizes.DOUBLEWORD, operand.charAt(0));
-		const binaryValue: DoubleWord = new DoubleWord();
-		operand.split("").map((bit, index) => {
-			binaryValue.setBit(index, (bit === "0") ? 0 : 1);
-		})
-		return binaryValue;
+		return new DoubleWord(operandDec);
 	}
 
 	/**
@@ -709,9 +710,10 @@ export class Assembler {
 	 */
 	private encodeHexadecimalValue(operand: string, line: number): DoubleWord {
 		let operandDec = 0;
+		operand = operand.replace("0x", "");
 		if (operand.startsWith("-")) {
 			// Negative hex value.
-			operandDec = (parseInt(operand.replace("-", ""), 16) * -1);
+			operandDec = parseInt(operand.replace("-", ""), 16) * -1;
 		} else {
 			// Positive hex value.
 			operandDec = parseInt(operand, 16);
@@ -729,7 +731,7 @@ export class Assembler {
 		let operandDec = 0;
 		if (operand.startsWith("-")) {
 			// Negative dec value.
-			operandDec = (parseInt(operand.replace("-", ""), 10) * -1);
+			operandDec = parseInt(operand.replace("-", ""), 10) * -1;
 		} else {
 			// Positive dec value.
 			operandDec = parseInt(operand, 10);

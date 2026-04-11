@@ -32,7 +32,7 @@ import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
 import { PageFaultError } from "../../../types/errors/PageFaultError";
 import { interruptNameByValue, InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { Timer } from "./Timer";
-
+import { DebugLogger } from "../Logger";
 
 /**
  * This class represents a CPU core which is capable of executing instructions.
@@ -183,6 +183,8 @@ export class CPUCore {
 
     public mainMemory: RAM;
 
+    private indention: string = "";
+
     /**
      * Constructs an instance of a CPU core.
      * @param mainMemory The main memory of the system.
@@ -268,7 +270,7 @@ export class CPUCore {
                 }
                 else
                 {
-                    console.log(error)
+                    DebugLogger.log(error);
                 }
             }
         }
@@ -289,7 +291,7 @@ export class CPUCore {
                 }
                 else
                 {
-                    console.log(error)
+                    DebugLogger.log(error);
                 }
             }
         }
@@ -315,7 +317,7 @@ export class CPUCore {
                     }
                     else
                     {
-                        console.log(error)
+                        DebugLogger.log(error);
                     }
                 }
             }
@@ -461,22 +463,90 @@ export class CPUCore {
         }
         const operation: EncodedOperations = this._decodedInstruction.operation;
 
-        if (this.eflags.isInUserMode()) {
+        if (DebugLogger.isLoggingEnabled()) {
+
+            if (EncodedOperations.CALL === operation || EncodedOperations.INT === operation)
+            {
+                DebugLogger.log("");
+            }
+
+            if (EncodedOperations.RET === operation || EncodedOperations.IRET === operation)
+            {
+                this.indention = this.indention.substring(0, this.indention.length - 2);
+            }
+
             const currentOperation:string = encodedOperationNameByValue(operation.toString());
+
+            let text = currentOperation;
+
+            if (this._decodedInstruction.operands !== undefined) {
+                if (0 in this._decodedInstruction.operands! && this._decodedInstruction.operands[0] !== undefined) {
+                    let operand:DoubleWord;
+
+                    if (this._decodedInstruction.operands[0]!.type === EncodedOperandTypes.IMMEDIATE) {
+                        operand = this._decodedInstruction.operands[0]!.value;
+                    } else if (this._decodedInstruction.operands[0]!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+                        operand = this.mmu.readDoublewordFrom(this._decodedInstruction.operands[0]!.value, true);
+                    } else {
+                        operand = this.readRegister(this._decodedInstruction.operands[0]!);
+                    }
+                    const hexOperand = operand.value.toString(16);
+                    text += " 0x" + hexOperand;
+                }
+                if (1 in this._decodedInstruction.operands! && this._decodedInstruction.operands[1] !== undefined) {
+                    if (this._decodedInstruction.operands[1]!.type === EncodedOperandTypes.IMMEDIATE) {
+                        text +=  ", 0x" + this._decodedInstruction.operands[1]!.value.value.toString(16);
+                    } else if (this._decodedInstruction.operands[1]!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+                        text +=  ", 0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operands[1]!.value, true).value.toString(16);
+                    } else {
+                        let register = this.decodeReadableRegister(this._decodedInstruction.operands[1]!);
+
+                        if (this._decodedInstruction.operands[1]!.addressingMode === EncodedAddressingModes.INDIRECT) {
+                            text +=  ", *%" + register.name + " (*0x" + register.content.value.toString(16) + ")" + " (0x" + this.mmu.readDoublewordFrom(register.content, false).value.toString(16) + ")";
+                        } else {
+                            text +=  ", %" + register.name + " (0x" + register.content.value.toString(16) + ")";
+                        }
+                    }
+                }
+            }
+
+            DebugLogger.log(this.indention  + text);
+        }
+
+        if (this.eflags.isInUserMode()) {
             this.log(" ");
             let log = "Executing:    ";
+            const currentOperation:string = encodedOperationNameByValue(operation.toString());
             log += currentOperation;
 
             if (this._decodedInstruction.operands !== undefined) {
                 if (0 in this._decodedInstruction.operands! && this._decodedInstruction.operands[0] !== undefined) {
-                    const stringOperand:string = this._decodedInstruction.operands[0].value.toString();
-                    const hexOperand = parseInt(stringOperand, 2).toString(16);
+                    let operand:DoubleWord;
+
+                    if (this._decodedInstruction.operands[0]!.type === EncodedOperandTypes.IMMEDIATE) {
+                        operand = this._decodedInstruction.operands[0]!.value;
+                    } else if (this._decodedInstruction.operands[0]!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+                        operand = this.mmu.readDoublewordFrom(this._decodedInstruction.operands[0]!.value, true);
+                    } else {
+                        operand = this.readRegister(this._decodedInstruction.operands[0]!);
+                    }
+                    const hexOperand = operand.value.toString(16);
                     log += " 0x" + hexOperand;
                 }
                 if (1 in this._decodedInstruction.operands! && this._decodedInstruction.operands[1] !== undefined) {
-                    const stringOperand:string = this._decodedInstruction.operands[1]!.value.toString();
-                    const hexOperand = parseInt(stringOperand, 2).toString(16);
-                    log += ", 0x" + hexOperand;
+                    if (this._decodedInstruction.operands[1]!.type === EncodedOperandTypes.IMMEDIATE) {
+                        log +=  ", 0x" + this._decodedInstruction.operands[1]!.value.value.toString(16);
+                    } else if (this._decodedInstruction.operands[1]!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+                        log +=  ", 0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operands[1]!.value, true).value.toString(16);
+                    } else {
+                        let register = this.decodeReadableRegister(this._decodedInstruction.operands[1]!);
+
+                        if (this._decodedInstruction.operands[1]!.addressingMode === EncodedAddressingModes.INDIRECT) {
+                            log +=  ", *%" + register.name + " (*0x" + register.content.value.toString(16) + ")" + " (0x" + this.mmu.readDoublewordFrom(register.content, false).value.toString(16) + ")";
+                        } else {
+                            log +=  ", %" + register.name + " (0x" + register.content.value.toString(16) + ")";
+                        }
+                    }
                 }
             }
 
@@ -699,6 +769,34 @@ export class CPUCore {
             const flags: Byte = this.eflags.content;
             this.eip.content = new DoubleWord(this.eip.content.value + 12);
             this.eflags.content = flags;
+        }
+
+        if (DebugLogger.isLoggingEnabled()) {
+
+            if (EncodedOperations.CALL === operation || EncodedOperations.INT === operation)
+            {
+                this.indention += "  ";
+            }
+
+            try {
+                if (this.esp.content.value <= 0xFFFFFFFC) {
+                    const physicalAddress: DoubleWord = this.mmu.translate(this.esp.content, false, false, true);
+                    let value = this.mainMemory.readDoublewordFrom(physicalAddress);
+                    DebugLogger.log(this.indention + "Stack value: " + value);
+                }
+                else {
+                    DebugLogger.log(this.indention + "Stack empty");
+                }
+            }
+            catch(e) {
+                DebugLogger.log(this.indention + "Stack value: Not Mapped");
+            }
+            
+            if (EncodedOperations.RET === operation || EncodedOperations.IRET === operation)
+            {
+                DebugLogger.log("");
+                this.indention.substring(0, this.indention.length - 2);
+            }
         }
 
         return;
@@ -3238,6 +3336,8 @@ export class CPUCore {
      */
     private log(message: string): void {
         this._mainWindow.webContents.send('update_log', message);
+        DebugLogger.log(this.indention + "    " + message);
+
     }
 
     /**

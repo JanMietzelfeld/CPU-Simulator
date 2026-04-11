@@ -17,6 +17,7 @@ import { exit } from "process";
 import { PassthroughFilesystem } from "./os/PassthroughFilesystem";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "..";
+import { DebugLogger } from "./Logger";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -149,6 +150,10 @@ export class SimulationController {
         this.assembleProgram(process.cwd() + "/os_filesystem/os/user/idle.asm");
         
         this.createUtilityFiles();
+
+        DebugLogger.log("");
+        DebugLogger.log("Starting Execution");
+        DebugLogger.log("");
 
         this.core.cycle();       
         

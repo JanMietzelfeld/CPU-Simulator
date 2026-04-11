@@ -345,7 +345,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		if (basis === NumberSystems.HEX) {
 			result = `0x${content.value.toString(16)}`;
 		} else if (basis === NumberSystems.DEC) {
-			result = `${content.toString()}`;
+			result = `${content.value}`;
 		} else {
 			result = content.toString().replace(/(.{4})/g, "$1 ").trim();
 		}
