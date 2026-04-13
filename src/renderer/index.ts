@@ -32,7 +32,8 @@ window.onload = async (event) => {
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);
 	await renderer.readECX(renderer.dataRepresentationECX);
-	await renderer.readEFLAGS();
+	await renderer.readEDX(renderer.dataRepresentationEDX);
+	await renderer.readFLAGS();
 	await renderer.readEIP(renderer.dataRepresentationEIP);
 	await renderer.readESP(renderer.dataRepresentationESP);
 	await renderer.readPTP(renderer.dataRepresentationPTP);
@@ -51,7 +52,8 @@ window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);
 	await renderer.readECX(renderer.dataRepresentationECX);
-	await renderer.readEFLAGS();
+	await renderer.readEDX(renderer.dataRepresentationEDX);
+	await renderer.readFLAGS();
 	await renderer.readEIP(renderer.dataRepresentationEIP);
 	// TODO: Hide until a new place for the GUI element, representing the EIR register, is found.
 	// await renderer.readEIR();

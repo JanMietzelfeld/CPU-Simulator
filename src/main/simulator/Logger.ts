@@ -1,16 +1,26 @@
 export class DebugLogger {
 
-    private static readonly logging: boolean = false;
+    private static readonly logging: boolean = true;
+
+    private static indention: string = "";
 
     public static isLoggingEnabled(): boolean {
 
-        return this.logging;
+        return DebugLogger.logging;
     }
 
-    public static log(message?: any, ...optionalParams: any[]): void {
+    public static log(message?: any): void {
 
         if (this.logging) {
-            console.log(message, optionalParams);
+            console.log(DebugLogger.indention + message);
         }
+    }
+
+    public static addIndentation() {
+        DebugLogger.indention += "  ";
+    }
+
+    public static removeIndentation() {
+        DebugLogger.indention = DebugLogger.indention.length === 0 ? "" : DebugLogger.indention.substring(0, DebugLogger.indention.length - 2);
     }
 }

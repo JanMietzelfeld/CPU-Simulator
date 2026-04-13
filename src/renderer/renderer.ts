@@ -78,6 +78,17 @@ export class Renderer {
     public dataRepresentationECX: NumberSystem;
 
     /**
+     * This field stores a reference to the HTMLElement representing the EDX register.
+     * @readonly
+     */
+    private readonly _edx: HTMLElement | null;
+
+    /**
+     * This field stores the currently selected representation of the data for the EDX register.
+     */
+    public dataRepresentationEDX: NumberSystem;
+
+    /**
      * This field stores a reference to the HTMLElement representing the EIP register.
      * @readonly
      */
@@ -89,10 +100,10 @@ export class Renderer {
     public dataRepresentationEIP: NumberSystem;
 
     /**
-     * This field stores a reference to the HTMLElement representing the EFLAGS register.
+     * This field stores a reference to the HTMLElement representing the FLAGS register.
      * @readonly
      */
-    private readonly _eflags: HTMLElement | null;
+    private readonly _flags: HTMLElement | null;
 
     /**
      * This field stores a reference to the HTMLElement representing the EIR register.
@@ -244,9 +255,8 @@ export class Renderer {
                     if (nextHigherPhysicalAddressDec >= Math.pow(2, 32)) {
                         return;
                     }
-                    const nextHigherPhysicalAddressHexString: string = nextHigherPhysicalAddressDec.toString(16);
-                    const binaryStringContent: string = await this._window.mainMemory.readFromPhysicalMemory(`0x${nextHigherPhysicalAddressHexString}`);
-                    const element: Element = this.createPhysicalRAMGuiElement(`0x${nextHigherPhysicalAddressHexString}`, binaryStringContent);
+                    const binaryContent: number = await this._window.mainMemory.readFromPhysicalMemory(nextHigherPhysicalAddressDec);
+                    const element: Element = this.createPhysicalRAMGuiElement("0x" + nextHigherPhysicalAddressDec.toString(16), binaryContent.toString(2).padStart(8, "0"));
                     this._physicalRAMObserver.observe(element);
                     ramCellsHTMLElement.insertBefore(element, ramCellsHTMLElement.firstElementChild);
                     this._listOfVisiblePhysicalRAMGuiElements.unshift(element);
@@ -263,9 +273,8 @@ export class Renderer {
                     if (nextLowerPhysicalAddressDec < 0) {
                         return;
                     }
-                    const nextLowerPhysicalAddressHexString: string = nextLowerPhysicalAddressDec.toString(16);
-                    const binaryStringContent: string = await this._window.mainMemory.readFromPhysicalMemory(`0x${nextLowerPhysicalAddressHexString}`);
-                    const element: Element = this.createPhysicalRAMGuiElement(`0x${nextLowerPhysicalAddressHexString}`, binaryStringContent);
+                    const binaryContent: number = await this._window.mainMemory.readFromPhysicalMemory(nextLowerPhysicalAddressDec);
+                    const element: Element = this.createPhysicalRAMGuiElement("0x" + nextLowerPhysicalAddressDec.toString(16), binaryContent.toString(2).padStart(8, "0"));
                     this._physicalRAMObserver.observe(element);
                     ramCellsHTMLElement.appendChild(element);
                     this._listOfVisiblePhysicalRAMGuiElements.push(element);
@@ -306,9 +315,8 @@ export class Renderer {
                     if (nextHigherVirtualAddressDec >= Math.pow(2, 32)) {
                         return;
                     }
-                    const nextHigherVirtualAddressHexString: string = nextHigherVirtualAddressDec.toString(16);
-                    const binaryStringContent: string = await this._window.mainMemory.readFromVirtualMemory(`0x${nextHigherVirtualAddressHexString}`);
-                    const element: Element = this.createVirtualRAMGuiElement(`0x${nextHigherVirtualAddressHexString}`, binaryStringContent);
+                    const binaryContent: number | undefined = await this._window.mainMemory.readFromVirtualMemory(nextHigherVirtualAddressDec);
+                    const element: Element = this.createVirtualRAMGuiElement("0x" + nextHigherVirtualAddressDec.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
                     this._virtualRAMObserver.observe(element);
                     ramCellsHTMLElement.insertBefore(element, ramCellsHTMLElement.firstElementChild);
                     this._listOfVisibleVirtualRAMGuiElements.unshift(element);
@@ -325,9 +333,8 @@ export class Renderer {
                     if (nextLowerVirtualAddressDec < 0) {
                         return;
                     }
-                    const nextLowerVirtualAddressHexString: string = nextLowerVirtualAddressDec.toString(16);
-                    const binaryStringContent: string = await this._window.mainMemory.readFromVirtualMemory(`0x${nextLowerVirtualAddressHexString}`);
-                    const element: Element = this.createVirtualRAMGuiElement(`0x${nextLowerVirtualAddressHexString}`, binaryStringContent);
+                    const binaryContent: number | undefined = await this._window.mainMemory.readFromVirtualMemory(nextLowerVirtualAddressDec);
+                    const element: Element = this.createVirtualRAMGuiElement("0x" + nextLowerVirtualAddressDec.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
                     this._virtualRAMObserver.observe(element);
                     ramCellsHTMLElement.appendChild(element);
                     this._listOfVisibleVirtualRAMGuiElements.push(element);
@@ -372,17 +379,17 @@ export class Renderer {
                     if (nextHigherPageNumberDec >= (Math.pow(2, 32) / numberAddressesPerPageDec) - 1) {
                         return;
                     }
-                    const pageTableEntries: Map<string, string> = await this._window.mainMemory.readPageTableEntries(nextHigherPageNumberDec, nextHigherPageNumberDec);
-                    for (const [pageNumberHexString, pageTableEntry] of Array.from(pageTableEntries).reverse()) {
-                        const presentFlag: boolean = (pageTableEntry[0].slice(0, 1) === "1") ? true : false;
-                        const writableFlag: boolean = (pageTableEntry[0].slice(1, 2) === "1") ? true : false;
-                        const executableFlag: boolean = (pageTableEntry[0].slice(2, 3) === "1") ? true : false;
-                        const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry[0].slice(3, 4) === "1") ? true : false;
-                        const pinnedFlag: boolean = (pageTableEntry[0].slice(4, 5) === "1") ? true : false;
-                        const changedFlag: boolean = (pageTableEntry[0].slice(5, 6) === "1") ? true : false;
-                        const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
+                    const pageTableEntries: Map<number, number> = await this._window.mainMemory.readPageTableEntries(nextHigherPageNumberDec, nextHigherPageNumberDec);
+                    for (const [pageNumber, pageTableEntry] of Array.from(pageTableEntries).reverse()) {
+                        const presentFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(0, 1) === "1") ? true : false;
+                        const writableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(1, 2) === "1") ? true : false;
+                        const executableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(2, 3) === "1") ? true : false;
+                        const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(3, 4) === "1") ? true : false;
+                        const pinnedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(4, 5) === "1") ? true : false;
+                        const changedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(5, 6) === "1") ? true : false;
+                        const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.toString(2).padStart(32, "0").slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
                         const element: HTMLElement = this.createPageTableEntryElement(
-                            pageNumberHexString,
+                            "0x" + pageNumber.toString(16),
                             presentFlag,
                             writableFlag,
                             executableFlag,
@@ -408,17 +415,17 @@ export class Renderer {
                     if (nextLowerPageNumberDec < 0) {
                         return;
                     }
-                    const pageTableEntries: Map<string, string> = await this._window.mainMemory.readPageTableEntries(nextLowerPageNumberDec, nextLowerPageNumberDec);
-                    for (const [pageNumberHexString, pageTableEntry] of Array.from(pageTableEntries).reverse()) {
-                        const presentFlag: boolean = (pageTableEntry[0].slice(0, 1) === "1") ? true : false;
-                        const writableFlag: boolean = (pageTableEntry[0].slice(1, 2) === "1") ? true : false;
-                        const executableFlag: boolean = (pageTableEntry[0].slice(2, 3) === "1") ? true : false;
-                        const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry[0].slice(3, 4) === "1") ? true : false;
-                        const pinnedFlag: boolean = (pageTableEntry[0].slice(4, 5) === "1") ? true : false;
-                        const changedFlag: boolean = (pageTableEntry[0].slice(5, 6) === "1") ? true : false;
-                        const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
+                    const pageTableEntries: Map<number, number> = await this._window.mainMemory.readPageTableEntries(nextLowerPageNumberDec, nextLowerPageNumberDec);
+                    for (const [pageNumber, pageTableEntry] of Array.from(pageTableEntries).reverse()) {
+                        const presentFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(0, 1) === "1") ? true : false;
+                        const writableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(1, 2) === "1") ? true : false;
+                        const executableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(2, 3) === "1") ? true : false;
+                        const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(3, 4) === "1") ? true : false;
+                        const pinnedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(4, 5) === "1") ? true : false;
+                        const changedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(5, 6) === "1") ? true : false;
+                        const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.toString(2).padStart(32, "0").slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
                         const element: HTMLElement = this.createPageTableEntryElement(
-                            pageNumberHexString,
+                            "0x" + pageNumber.toString(16),
                             presentFlag,
                             writableFlag,
                             executableFlag,
@@ -522,6 +529,34 @@ export class Renderer {
         }
         return;
     }
+
+    /**
+     * This callback is used as the change listeners logic for the GUI element, which visualizes the ECX register.
+     * @param event An object, which represents the event fired, whenever a change occurs on the <select> element contained in the GUI element.
+     */
+    private readonly onChangeListenerEDX: EventListenerOrEventListenerObject = (event: Event): void => {
+        const target: HTMLSelectElement = event.target as HTMLSelectElement;
+        const parent: HTMLElement | null = target.parentElement;
+        if (parent !== null) {
+            const currentRepresentation: string = parent.getAttribute("data-representation")!;
+            const demandedRepresentation: string = target.value;
+            parent.setAttribute("data-representation", demandedRepresentation);
+            if (currentRepresentation === demandedRepresentation) {
+                return;
+            } else if (demandedRepresentation === "DECIMAL") {
+                this.dataRepresentationECX = NumberSystem.DEC;
+                this.readEDX(10);
+            } else if (demandedRepresentation === "HEXADECIMAL") {
+                this.dataRepresentationECX = NumberSystem.HEX;
+                this.readEDX(16);
+            } else {
+                this.dataRepresentationECX = NumberSystem.BIN;
+                this.readEDX(2);
+            }
+        }
+        return;
+    }
+
 
     /**
      * This callback is used as the change listeners logic for the GUI element, which visualizes the EIP register.
@@ -842,6 +877,23 @@ export class Renderer {
     }
 
     /**
+     * This callback is used as the click listener logic for the GUI element, which visualizes the ECX register.
+     * @param event An object, which represents the event fired, whenever a click on the GUI element occurs.
+     */
+    private readonly onClickListenerEDX: EventListenerOrEventListenerObject = async (event: Event): Promise<void> => {
+        const target: HTMLElement = event.target as HTMLElement;
+        const parent: HTMLElement | null = target.parentElement;
+        if (parent !== null) {
+            if (target.getAttribute("name") === "register-select-representation") return;
+            let content: string = await this._window.simulator.readEDX(this.dataRepresentationEDX);
+            if (this._edx !== null) {
+                this.jumpToVirtualRamElement(content, this.dataRepresentationEDX);
+            }
+        } 
+        return;
+    }
+
+    /**
      * This callback is used as the click listener logic for the GUI element, which visualizes the ESP register.
      * @param event An object, which represents the event fired, whenever a click on the GUI element occurs.
      */
@@ -937,7 +989,9 @@ export class Renderer {
         this.dataRepresentationEBX = NumberSystem.BIN;
         this._ecx = document.getElementById("ecx");
         this.dataRepresentationECX = NumberSystem.BIN;
-        this._eflags = document.getElementById("eflags");
+        this._edx = document.getElementById("edx");
+        this.dataRepresentationEDX = NumberSystem.BIN;
+        this._flags = document.getElementById("flags");
         this._eip = document.getElementById("eip");
         this.dataRepresentationEIP = NumberSystem.BIN;
         this._eir = document.getElementById("eir");
@@ -1014,6 +1068,9 @@ export class Renderer {
                 case "ecx":
                     eventListener = this.onChangeListenerECX;
                     break;
+                case "edx":
+                    eventListener = this.onChangeListenerEDX;
+                    break;
                 case "vmptr":
                     eventListener = this.onChangeListenerVMPTR;
                     break;
@@ -1071,6 +1128,9 @@ export class Renderer {
                 case "ecx":
                     eventListener = this.onClickListenerECX;
                     break;
+                case "edx":
+                    eventListener = this.onClickListenerEDX;
+                    break;
                 case "esp":
                     eventListener = this.onClickListenerESP;
                     break;
@@ -1108,20 +1168,20 @@ export class Renderer {
             this._physicalRAMObserver.disconnect();
         }
         // Read physical memory address from the last element, which should have the lowest visible memory address.
-        const firstPhysicalAddressToReadHex: string =
-            this._listOfVisiblePhysicalRAMGuiElements.at(this._listOfVisiblePhysicalRAMGuiElements.length - 1)!.getAttribute("data-physical-address")!;
+        const firstPhysicalAddressToRead: number =
+            parseInt(this._listOfVisiblePhysicalRAMGuiElements.at(this._listOfVisiblePhysicalRAMGuiElements.length - 1)!.getAttribute("data-physical-address")!, 16);
         // Read physical memory address from the first element, which should have the highest visible memory adress.
-        const lastPhysicalAddressToReadHex: string = this._listOfVisiblePhysicalRAMGuiElements.at(0)!.getAttribute("data-physical-address")!;
-        const ramCells: Map<string, string> =
-            await this._window.mainMemory.readRangeFromPhysicalMemory(firstPhysicalAddressToReadHex, lastPhysicalAddressToReadHex);
-        for (const [physicalAddressHexString, binaryStringContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createPhysicalRAMGuiElement(physicalAddressHexString, binaryStringContent);
+        const lastPhysicalAddressToRead: number = parseInt(this._listOfVisiblePhysicalRAMGuiElements.at(0)!.getAttribute("data-physical-address")!, 16);
+        const ramCells: Map<number, number> =
+            await this._window.mainMemory.readRangeFromPhysicalMemory(firstPhysicalAddressToRead, lastPhysicalAddressToRead);
+        for (const [physicalAddress, binaryContent] of Array.from(ramCells).reverse()) {
+            const element: HTMLElement = this.createPhysicalRAMGuiElement("0x" + physicalAddress.toString(16), binaryContent.toString(2).padStart(8, "0"));
             ramCellsHTMLElement.appendChild(element);
             this._listOfVisiblePhysicalRAMGuiElements.push(element);
             this._physicalRAMObserver.observe(element);
         }
         // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-physical-address="${firstPhysicalAddressToReadHex}"]`)!.scrollIntoView();
+        this._document.querySelector(`[data-physical-address="${"0x" + firstPhysicalAddressToRead.toString(16)}"]`)!.scrollIntoView();
         return;
     }
 
@@ -1140,20 +1200,20 @@ export class Renderer {
             this._virtualRAMObserver.disconnect();
         }
         // Read physical memory address from the last element, which should have the lowest visible memory address.
-        const firstVirtualAddressToReadHex: string =
-            this._listOfVisibleVirtualRAMGuiElements.at(this._listOfVisibleVirtualRAMGuiElements.length - 1)!.getAttribute("data-virtual-address")!;
+        const firstVirtualAddressToRead: number =
+            parseInt(this._listOfVisibleVirtualRAMGuiElements.at(this._listOfVisibleVirtualRAMGuiElements.length - 1)!.getAttribute("data-virtual-address")!, 16);
         // Read physical memory address from the first element, which should have the highest visible memory adress.
-        const lastVirtualAddressToReadHex: string = this._listOfVisibleVirtualRAMGuiElements.at(0)!.getAttribute("data-virtual-address")!;
-        const ramCells: Map<string, string> =
-            await this._window.mainMemory.readRangeFromVirtualMemory(firstVirtualAddressToReadHex, lastVirtualAddressToReadHex);
-        for (const [virtualAddressHexString, binaryStringContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createVirtualRAMGuiElement(virtualAddressHexString, binaryStringContent);
+        const lastVirtualAddressToRead: number = parseInt(this._listOfVisibleVirtualRAMGuiElements.at(0)!.getAttribute("data-virtual-address")!, 16);
+        const ramCells: Map<number, number | undefined> =
+            await this._window.mainMemory.readRangeFromVirtualMemory(firstVirtualAddressToRead, lastVirtualAddressToRead);
+        for (const [virtualAddress, binaryContent] of Array.from(ramCells).reverse()) {
+            const element: HTMLElement = this.createVirtualRAMGuiElement("0x" + virtualAddress.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
             ramCellsHTMLElement.appendChild(element);
             this._listOfVisibleVirtualRAMGuiElements.push(element);
             this._virtualRAMObserver.observe(element);
         }
         // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-virtual-address="${firstVirtualAddressToReadHex}"]`)!.scrollIntoView();
+        this._document.querySelector(`[data-virtual-address="${"0x" + firstVirtualAddressToRead.toString(16)}"]`)!.scrollIntoView();
         return;
     }
 
@@ -1164,7 +1224,7 @@ export class Renderer {
      * @param [firstPhysicalAddressToReadHex="0x0"] The first physical memory address to read from main memory in hexadecimal representation.
      * @param [lastPhysicalAddressToReadHex="0x1e"] The last physical memory address to read from main memory in hexadecimal representation.
      */
-    public async createPhysicalRAMView(firstPhysicalAddressToReadHex = "0x0", lastPhysicalAddressToReadHex = "0x1e"): Promise<void> {
+    public async createPhysicalRAMView(firstPhysicalAddressToReadHex = 0x0, lastPhysicalAddressToReadHex = 0x1e): Promise<void> {
         const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("physical-ram-cells");
         if (!ramCellsHTMLElement) {
             return;
@@ -1175,15 +1235,15 @@ export class Renderer {
             this._physicalRAMObserver.disconnect();
             this._listOfVisiblePhysicalRAMGuiElements = new Array<Element>();
         }
-        const ramCells: Map<string, string> = await this._window.mainMemory.readRangeFromPhysicalMemory(firstPhysicalAddressToReadHex, lastPhysicalAddressToReadHex);
-        for (const [physicalAddressHexString, binaryStringContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createPhysicalRAMGuiElement(physicalAddressHexString, binaryStringContent);
+        const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(firstPhysicalAddressToReadHex, lastPhysicalAddressToReadHex);
+        for (const [physicalAddress, binaryContent] of Array.from(ramCells).reverse()) {
+            const element: HTMLElement = this.createPhysicalRAMGuiElement("0x" + physicalAddress.toString(16), binaryContent.toString(2).padStart(8, "0"));
             ramCellsHTMLElement.appendChild(element);
             this._listOfVisiblePhysicalRAMGuiElements.push(element);
             this._physicalRAMObserver.observe(element);
         }
         // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-physical-address="${firstPhysicalAddressToReadHex}"]`)!.scrollIntoView();
+        this._document.querySelector(`[data-physical-address="${"0x" + firstPhysicalAddressToReadHex.toString(16)}"]`)!.scrollIntoView();
         return;
     }
 
@@ -1193,7 +1253,7 @@ export class Renderer {
      * @param [firstVirtualAddressToReadHex="0x0"] The first virtual memory address to read from main memory in hexadecimal representation.
      * @param [lastVirtualAddressToReadHex="0x1e"] The last virtual memory address to read from main memory in hexadecimal representation.
      */
-    public async createVirtualRAMView(firstVirtualAddressToReadHex = "0x0", lastVirtualAddressToReadHex = "0x1e"): Promise<void> {
+    public async createVirtualRAMView(firstVirtualAddressToReadHex = 0x0, lastVirtualAddressToReadHex = 0x1e): Promise<void> {
         const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("virtual-ram-cells");
         if (!ramCellsHTMLElement) {
             return;
@@ -1204,15 +1264,15 @@ export class Renderer {
             this._virtualRAMObserver.disconnect();
             this._listOfVisibleVirtualRAMGuiElements = new Array<Element>();
         }
-        const ramCells: Map<string, string> = await this._window.mainMemory.readRangeFromVirtualMemory(firstVirtualAddressToReadHex, lastVirtualAddressToReadHex);
-        for (const [virtualAddressHexString, binaryStringContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createVirtualRAMGuiElement(virtualAddressHexString, binaryStringContent);
+        const ramCells: Map<number, number | undefined> = await this._window.mainMemory.readRangeFromVirtualMemory(firstVirtualAddressToReadHex, lastVirtualAddressToReadHex);
+        for (const [virtualAddress, binaryContent] of Array.from(ramCells).reverse()) {
+            const element: HTMLElement = this.createVirtualRAMGuiElement("0x" +  virtualAddress.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
             ramCellsHTMLElement.appendChild(element);
             this._listOfVisibleVirtualRAMGuiElements.push(element);
             this._virtualRAMObserver.observe(element);
         }
         // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-virtual-address="${firstVirtualAddressToReadHex}"]`)!.scrollIntoView();
+        this._document.querySelector(`[data-virtual-address="${"0x" + firstVirtualAddressToReadHex.toString(16)}"]`)!.scrollIntoView();
         return;
     }
 
@@ -1322,7 +1382,7 @@ export class Renderer {
      * @param [firstPageNumberToReadDec="0"] The first page number to read from Page Table.
      * @param [lastPageNumberToReadDec="30"] The last page number to read from Page Table.
      */
-    public async createPageTableView(firstPageNumberToReadDec = 0, lastPageNumberToReadDec = 30): Promise<void> {
+    public async createPageTableView(firstPageNumberToRead = 0, lastPageNumberToRead = 30): Promise<void> {
         const pageTableEntiresElement: HTMLElement | null = this._document.getElementById("page-table-entries");
         if (pageTableEntiresElement === null) {
             return;
@@ -1333,18 +1393,18 @@ export class Renderer {
             this._pageTableObserver.disconnect();
             this._listOfVisiblePageTableEntries = new Array<Element>();
         }
-        const pageTableEntries: Map<string, string> =
-            await this._window.mainMemory.readPageTableEntries(firstPageNumberToReadDec, lastPageNumberToReadDec);
-        for (const [pageNumberHexString, pageTableEntry] of Array.from(pageTableEntries).reverse()) {
-            const presentFlag: boolean = (pageTableEntry.slice(0, 1) === "1") ? true : false;
-            const writableFlag: boolean = (pageTableEntry.slice(1, 2) === "1") ? true : false;
-            const executableFlag: boolean = (pageTableEntry.slice(2, 3) === "1") ? true : false;
-            const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry.slice(3, 4) === "1") ? true : false;
-            const pinnedFlag: boolean = (pageTableEntry.slice(4, 5) === "1") ? true : false;
-            const changedFlag: boolean = (pageTableEntry.slice(5, 6) === "1") ? true : false;
-            const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
+        const pageTableEntries: Map<number, number> =
+            await this._window.mainMemory.readPageTableEntries(firstPageNumberToRead, lastPageNumberToRead);
+        for (const [pageNumber, pageTableEntry] of Array.from(pageTableEntries).reverse()) {
+            const presentFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(0, 1) === "1") ? true : false;
+            const writableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(1, 2) === "1") ? true : false;
+            const executableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(2, 3) === "1") ? true : false;
+            const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(3, 4) === "1") ? true : false;
+            const pinnedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(4, 5) === "1") ? true : false;
+            const changedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(5, 6) === "1") ? true : false;
+            const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.toString(2).padStart(32, "0").slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
             const element: HTMLElement = this.createPageTableEntryElement(
-                pageNumberHexString,
+                "0x" + pageNumber.toString(16),
                 presentFlag,
                 writableFlag,
                 executableFlag,
@@ -1358,7 +1418,7 @@ export class Renderer {
             this._pageTableObserver.observe(element);
         }
         // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-page-number="${firstPageNumberToReadDec}"]`)!.scrollIntoView();
+        this._document.querySelector(`[data-page-number="${"0x" + firstPageNumberToRead.toString(16)}"]`)!.scrollIntoView();
         return;
     }
 
@@ -1376,22 +1436,22 @@ export class Renderer {
             this._pageTableObserver.disconnect();
         }
         // Read physical memory address from the last element, which should have the lowest visible memory address.
-        const firstPageNumberToReadDec: string =
-            this._listOfVisiblePageTableEntries.at(this._listOfVisiblePageTableEntries.length - 1)!.getAttribute("data-page-number")!;
+        const firstPageNumberToRead: number =
+            parseInt(this._listOfVisiblePageTableEntries.at(this._listOfVisiblePageTableEntries.length - 1)!.getAttribute("data-page-number")!);
         // Read physical memory address from the first element, which should have the highest visible memory adress.
-        const lastPageNumberToReadDec: string = this._listOfVisiblePageTableEntries.at(0)!.getAttribute("data-page-number")!;
-        const ramCells: Map<string, string> =
-            await this._window.mainMemory.readPageTableEntries(firstPageNumberToReadDec, lastPageNumberToReadDec);
-        for (const [pageNumberHexString, pageTableEntry] of Array.from(ramCells).reverse()) {
-            const presentFlag: boolean = (pageTableEntry.slice(0, 1) === "1") ? true : false;
-            const writableFlag: boolean = (pageTableEntry.slice(1, 2) === "1") ? true : false;
-            const executableFlag: boolean = (pageTableEntry.slice(2, 3) === "1") ? true : false;
-            const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry.slice(3, 4) === "1") ? true : false;
-            const pinnedFlag: boolean = (pageTableEntry.slice(4, 5) === "1") ? true : false;
-            const changedFlag: boolean = (pageTableEntry.slice(5, 6) === "1") ? true : false;
-            const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
+        const lastPageNumberToRead: number = parseInt(this._listOfVisiblePageTableEntries.at(0)!.getAttribute("data-page-number")!);
+        const ramCells: Map<number, number> =
+            await this._window.mainMemory.readPageTableEntries(firstPageNumberToRead, lastPageNumberToRead);
+        for (const [pageNumber, pageTableEntry] of Array.from(ramCells).reverse()) {
+            const presentFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(0, 1) === "1") ? true : false;
+            const writableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(1, 2) === "1") ? true : false;
+            const executableFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(2, 3) === "1") ? true : false;
+            const accessableOnlyInKernelModeFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(3, 4) === "1") ? true : false;
+            const pinnedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(4, 5) === "1") ? true : false;
+            const changedFlag: boolean = (pageTableEntry.toString(2).padStart(32, "0").slice(5, 6) === "1") ? true : false;
+            const pageFrameNumberHexString = `0x${parseInt(pageTableEntry.toString(2).padStart(32, "0").slice(-Renderer.NUMBER_BITS_PAGE_FRAME_ADDRESS), 2)}`;
             const element: HTMLElement = this.createPageTableEntryElement(
-                pageNumberHexString,
+                "0x" + pageNumber.toString(16),
                 presentFlag,
                 writableFlag,
                 executableFlag,
@@ -1405,7 +1465,7 @@ export class Renderer {
             this._pageTableObserver.observe(element);
         }
         // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-page-number="${firstPageNumberToReadDec}"]`)!.scrollIntoView();
+        this._document.querySelector(`[data-page-number="${"0x" + firstPageNumberToRead.toString(16)}"]`)!.scrollIntoView();
         return;
     }
 
@@ -1443,12 +1503,23 @@ export class Renderer {
     }
 
     /**
-     * This method reads the content of the EFLAGS register.
+     * This method reads the content of the ECX register.
      */
-    public async readEFLAGS(): Promise<void> {
-        const content: string = await this._window.simulator.readEFLAGS();
-        if (this._eflags !== null) {
-            this._eflags.children.namedItem("register-content")!.textContent = content;
+    public async readEDX(radix: NumberSystem): Promise<void> {
+        const content: string = await this._window.simulator.readEDX(radix);
+        if (this._edx !== null) {
+            this._edx.children.namedItem("register-content")!.textContent = content;
+        }
+        return;
+    }
+
+    /**
+     * This method reads the content of the FLAGS register.
+     */
+    public async readFLAGS(): Promise<void> {
+        const content: string = await this._window.simulator.readFLAGS();
+        if (this._flags !== null) {
+            this._flags.children.namedItem("register-content")!.textContent = content;
         }
         const bodyElement: HTMLElement = this._document.getElementsByTagName("body")[0];
         // Check if kernel mode is enabled.
@@ -1583,9 +1654,7 @@ export class Renderer {
                 if (lastVirtualAddressToReadDec >= Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC) {
                     lastVirtualAddressToReadDec = Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC;
                 }
-                const firstVirtualAddressToReadHex = `0x${(firstVirtualAddressToReadDec).toString(16)}`;
-                const lastVirtualAddressToReadHex = `0x${(lastVirtualAddressToReadDec).toString(16)}`;
-                await this.createVirtualRAMView(firstVirtualAddressToReadHex, lastVirtualAddressToReadHex);
+                await this.createVirtualRAMView(firstVirtualAddressToReadDec, lastVirtualAddressToReadDec);
                 element = this._document.querySelector<Element>(`[data-virtual-address="${virtualAddressHexString}"]`);
             }
             if (element !== null) {
@@ -1642,9 +1711,8 @@ export class Renderer {
                 if (lastPhysicalAddressToReadDec >= Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC) {
                     lastPhysicalAddressToReadDec = Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC;
                 }
-                const firstPhysicalAddressToReadHex = `0x${(firstPhysicalAddressToReadDec).toString(16)}`;
-                const lastPhysicalAddressToReadHex = `0x${(lastPhysicalAddressToReadDec).toString(16)}`;
-                await this.createPhysicalRAMView(firstPhysicalAddressToReadHex, lastPhysicalAddressToReadHex);
+
+                await this.createPhysicalRAMView(firstPhysicalAddressToReadDec, lastPhysicalAddressToReadDec);
                 element = this._document.querySelector<Element>(`[data-physical-address="${physicalAddressHexString}"]`);
             }
             if (element !== null) {
@@ -1688,7 +1756,8 @@ export class Renderer {
         await this.readEAX(this.dataRepresentationEAX);
         await this.readEBX(this.dataRepresentationEBX);
         await this.readECX(this.dataRepresentationECX);
-        await this.readEFLAGS();
+        await this.readEDX(this.dataRepresentationEDX);
+        await this.readFLAGS();
         await this.readEIP(this.dataRepresentationEIP);
         // TODO: Hide until a new place for the GUI element, representing the EIR register, is found.
         // await renderer.readEIR();

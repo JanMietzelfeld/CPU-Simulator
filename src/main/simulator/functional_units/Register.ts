@@ -1,8 +1,9 @@
+
 /**
  * This class represents a generic register.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
-export abstract class Register<T> {
+export abstract class Register<T extends number> {
     /**
      * The registers content.
      */
@@ -29,10 +30,14 @@ export abstract class Register<T> {
      * Accessor for retrieving a copy of the current registers content.
      * @returns A copy of the current registers content.
      */
-    public abstract get content(): T;
+    public get content(): T {
+        return this._content;
+    }    
 
     /**
      * Accessor for setting a new value as registers content.
      */
-    public abstract set content(newValue: T);
+    public set content(newValue: T) {
+        this._content = newValue;
+    }
 }

@@ -3,6 +3,10 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { NumberSystems } from './types/enumerations/NumberSystems';
+import { DoubleWord } from './types/binary/DoubleWord';
+import { Byte } from './types/binary/Byte';
+import { PageNumber } from './types/binary/PageNumber';
+import { PageTableEntry } from './types/binary/PageTableEntry';
 
 declare global {
 	interface Window {
@@ -18,16 +22,16 @@ contextBridge.exposeInMainWorld('electron', {
 });
 
 contextBridge.exposeInMainWorld("mainMemory", {
-	readRangeFromPhysicalMemory: (fromPhysicalAddressHexString: string, toPhysicalAddressHexString: string): Promise<Map<string, string>> => 
-		ipcRenderer.invoke("readRangeFromPhysicalMemory", fromPhysicalAddressHexString, toPhysicalAddressHexString),
-	readFromPhysicalMemory: (physicalAddressHexString: string): Promise<Map<string, string>> => 
-		ipcRenderer.invoke("readFromPhysicalMemory", physicalAddressHexString),
-	readRangeFromVirtualMemory: (fromVirtualAddressHexString: string, toVirtualAddressHexString: string): Promise<Map<string, string>> => 
-		ipcRenderer.invoke("readRangeFromVirtualMemory", fromVirtualAddressHexString, toVirtualAddressHexString),
-	readFromVirtualMemory: (virtualAddressHexString: string): Promise<Map<string, string>> => 
-		ipcRenderer.invoke("readFromVirtualMemory", virtualAddressHexString),
-	readPageTableEntries: (firstPageNumberToReadDec: number, lastPageNumberToReadDec: number): Promise<Map<string, string>> =>
-		ipcRenderer.invoke("readPageTableEntries", firstPageNumberToReadDec, lastPageNumberToReadDec),
+	readRangeFromPhysicalMemory: (fromPhysicalAddress: DoubleWord, toPhysicalAddress: DoubleWord): Promise<Map<DoubleWord, Byte>> => 
+		ipcRenderer.invoke("readRangeFromPhysicalMemory", fromPhysicalAddress, toPhysicalAddress),
+	readFromPhysicalMemory: (physicalAddress: DoubleWord): Promise<Byte> => 
+		ipcRenderer.invoke("readFromPhysicalMemory", physicalAddress),
+	readRangeFromVirtualMemory: (fromVirtualAddress: DoubleWord, toVirtualAddress: DoubleWord): Promise<Map<DoubleWord, Byte | undefined>> => 
+		ipcRenderer.invoke("readRangeFromVirtualMemory", fromVirtualAddress, toVirtualAddress),
+	readFromVirtualMemory: (virtualAddress: DoubleWord): Promise<Byte | undefined> => 
+		ipcRenderer.invoke("readFromVirtualMemory", virtualAddress),
+	readPageTableEntries: (firstPageNumberToRead: PageNumber, lastPageNumberToRead: PageNumber): Promise<Map<PageNumber, PageTableEntry>> =>
+		ipcRenderer.invoke("readPageTableEntries", firstPageNumberToRead, lastPageNumberToRead),
 });
 
 contextBridge.exposeInMainWorld("simulator", {
@@ -35,8 +39,9 @@ contextBridge.exposeInMainWorld("simulator", {
 	readEAX: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readEAX", radix),
 	readEBX: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readEBX", radix),
 	readECX: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readECX", radix),
+	readEDX: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readEDX", radix),
 	readEIP: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readEIP", radix),
-	readEFLAGS: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readEFLAGS", radix),
+	readFLAGS: (radix: NumberSystems = 2): Promise<string> => ipcRenderer.invoke("readFLAGS", radix),
 	readEIR: (asInstruction: boolean): Promise<string> => ipcRenderer.invoke("readEIR", asInstruction),
 	readNPTP: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readNPTP", radix),
 	readVMPTR: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readVMPTR", radix),

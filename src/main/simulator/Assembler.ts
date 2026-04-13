@@ -4,6 +4,7 @@ import { Bit } from "../../types/binary/Bit";
 import { AssemblyLanguageDefinition } from "./compiler/AssemblyLanguageDefinition";
 import { DataSizes } from "../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../types/binary/DoubleWord";
+import { Byte } from "../../types/binary/Byte";
 
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
@@ -369,7 +370,7 @@ export class Assembler {
 					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
 					constants.set(
 						constantName, 
-						"0b" + (programLocationCounter+12).toString(2)
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
@@ -385,7 +386,7 @@ export class Assembler {
 					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2)
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
 					programLocationCounter += 16;
@@ -399,7 +400,7 @@ export class Assembler {
 					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2)
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
 					programLocationCounter += 16;
@@ -413,7 +414,7 @@ export class Assembler {
 					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2)
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
 					programLocationCounter += 16;
@@ -428,7 +429,7 @@ export class Assembler {
 					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2)
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
@@ -516,20 +517,22 @@ export class Assembler {
 		//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
 		//and encode each segment into binary values.
 		if (continuousBufferSegmentSize > 0) {
-			for (let i = 0; i <= stringByteLength - 4; i += 4) {
-				const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
-				const encodedStringPart = new DoubleWord(parseInt(bufferSegment, 16));
+			for (let i = 0; i < continuousBufferSegmentSize; i += 4) {
+				const byte1 = Byte.fromNumber(stringBuffer[i]);
+				const byte2 = Byte.fromNumber(stringBuffer[i+1]);
+				const byte3 = Byte.fromNumber(stringBuffer[i+2]);
+				const byte4 = Byte.fromNumber(stringBuffer[i+3]);
+				const encodedStringPart = DoubleWord.fromBytes(byte1, byte2, byte3, byte4);
 				encodedInstructions.push(encodedStringPart);
 			}
 		}
 		//Get the last bytes from the buffer
 		if (restOfBufferSize > 0) {
-			let bufferSegment = stringBuffer.toString("hex", continuousBufferSegmentSize, stringByteLength);
-			for (let i = 0; i < 4 - restOfBufferSize; i++) 
-			{
-				bufferSegment += "00";
-			}
-			const encodedStringPart = new DoubleWord(parseInt(bufferSegment, 16));
+			const byte1 = Byte.fromNumber(stringBuffer[continuousBufferSegmentSize]);
+			const byte2 = Byte.fromNumber(restOfBufferSize > 1 ? stringBuffer[continuousBufferSegmentSize+1] : 0);
+			const byte3 = Byte.fromNumber(restOfBufferSize > 2 ? stringBuffer[continuousBufferSegmentSize+2] : 0);
+			const byte4 = Byte.ZERO;
+			const encodedStringPart = DoubleWord.fromBytes(byte1, byte2, byte3, byte4);
 			encodedInstructions.push(encodedStringPart);
 		}
 		stringEncoded = true;
@@ -549,13 +552,13 @@ export class Assembler {
 	 * @returns An array containing the binary equivalent of the given instruction and its operand values.
 	 */
 	private encodeInstruction(regexMatchArrayInstruction: RegExpMatchArray, line: number, jumpLabels: Map<string, string>): DoubleWord[] {
-		const encodedInstruction: DoubleWord = new DoubleWord();
+		let encodedInstruction: DoubleWord;
 		let addressingModeOperand1: Array<Bit> = new Array<Bit>(2);
 		let typeOperand1: Array<Bit> = new Array<Bit>(7);
 		let addressingModeOperand2: Array<Bit> = new Array<Bit>(2);
 		let typeOperand2: Array<Bit> = new Array<Bit>(7);
-		let encodedOperandValue1: DoubleWord = new DoubleWord();
-		let encodedOperandValue2: DoubleWord = new DoubleWord();
+		let encodedOperandValue1: DoubleWord;
+		let encodedOperandValue2: DoubleWord;
 		let instructionType: Array<Bit> = new Array<Bit>(3);
 		const opcode: Array<Bit> = new Array<Bit>(7);
 		const instructionMnemonic: string = regexMatchArrayInstruction[1];
@@ -610,7 +613,7 @@ export class Assembler {
 		];
 
 
-		encodedInstruction.value = parseInt(finalInstruction.join(""), 2);
+		encodedInstruction = DoubleWord.fromNumber(parseInt(finalInstruction.join(""), 2));
 		
 		return [encodedInstruction, encodedOperandValue1, encodedOperandValue2];
 	}
@@ -648,10 +651,10 @@ export class Assembler {
 	private encodeOperandValue(operand: string, line: number, jumpLabels: Map<string, string>): DoubleWord {
 		let operand32BitEncoded: DoubleWord;
 		if (operand.length === 0) {
-			operand32BitEncoded = new DoubleWord();
+			operand32BitEncoded = DoubleWord.ZERO;
 		} else if (jumpLabels.has(operand)) {
 			// Operand is jump label.
-			operand32BitEncoded = new DoubleWord(parseInt(jumpLabels.get(operand)!, 2));
+			operand32BitEncoded = DoubleWord.fromNumber(parseInt(jumpLabels.get(operand)!, 2));
 		} else if (operand.startsWith("$0b") || operand.startsWith("$-0b")) {
 			// Binary immediate found.
 			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$", ""), line);
@@ -692,14 +695,21 @@ export class Assembler {
 
 		let operandDec = 0;
 		operand = operand.replace("0b", "");
-		if (operand.startsWith("-")) {
+
+		let negative = operand.startsWith("-");
+		operand = negative ? operand.replace("-", "") : operand;
+
+		// Sign extend binary value.
+		operand = operand.padStart(DataSizes.DOUBLEWORD, operand.charAt(0));
+		
+		if (negative) {
 			// Negative binary value.
-			operandDec = parseInt(operand.replace("-", ""), 2) * -1;
+			operandDec = parseInt(operand, 2) * -1;
 		} else {
 			// Positive binary value.
 			operandDec = parseInt(operand, 2);
 		}
-		return new DoubleWord(operandDec);
+		return DoubleWord.fromNumber(operandDec);
 	}
 
 	/**
@@ -718,7 +728,7 @@ export class Assembler {
 			// Positive hex value.
 			operandDec = parseInt(operand, 16);
 		}
-		return new DoubleWord(operandDec);
+		return DoubleWord.fromNumber(operandDec);
 	}
 
 	/**
@@ -736,7 +746,7 @@ export class Assembler {
 			// Positive dec value.
 			operandDec = parseInt(operand, 10);
 		}
-		return new DoubleWord(operandDec);
+		return DoubleWord.fromNumber(operandDec);
 	}
 
 	/**
@@ -752,7 +762,7 @@ export class Assembler {
 		}
 		// Extend binary address with zeros if necessary.
 		operand = operand.padStart(DataSizes.DOUBLEWORD, "0");
-		return new DoubleWord(parseInt(operand, 2));
+		return DoubleWord.fromNumber(parseInt(operand, 2));
 	}
 
 	/**
@@ -765,7 +775,7 @@ export class Assembler {
 	private encodeHexadecimalAddress(operand: string, line: number): DoubleWord {
 		let virtualAddress: DoubleWord;
 		try {
-			virtualAddress = new DoubleWord(parseInt(operand, 16));
+			virtualAddress = DoubleWord.fromNumber(parseInt(operand, 16));
 		} catch (error) {
 			throw Error(`In line ${line + 1}: Invalid hexadecimal memory address.`);
 		}
@@ -782,7 +792,7 @@ export class Assembler {
 	private encodeDecimalAddress(operand: string, line: number): DoubleWord {
 		let virtualAddress: DoubleWord;
 		try {
-			virtualAddress = new DoubleWord(parseInt(operand, 10));
+			virtualAddress = DoubleWord.fromNumber(parseInt(operand, 10));
 		} catch (error) {
 			throw Error(`In line ${line + 1}: Invalid hexadecimal memory address.`);
 		}
@@ -825,9 +835,9 @@ export class Assembler {
 		for (const reg of this.languageDefinition.addressable_registers) {
 			if (register === reg.name.toLowerCase()) {
 				const tmp: string = reg.code.padStart(DataSizes.DOUBLEWORD, "0");
-				const encodedRegister: DoubleWord = new DoubleWord();
+				let encodedRegister: DoubleWord = DoubleWord.ZERO;
 				tmp.split("").forEach((bit, index) => {
-					encodedRegister.setBit(index, (bit === "0") ? 0 : 1);
+					encodedRegister = DoubleWord.setBit(encodedRegister, index as DoubleWord.BitIndex, (bit === "0") ? 0 : 1);
 				});
 				return encodedRegister;
 			}

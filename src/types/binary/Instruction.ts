@@ -1,0 +1,47 @@
+import { InstructionTypes } from "../enumerations/InstructionTypes";
+import { Instructions } from "../enumerations/IntructionSet";
+import { InstructionOperand } from "./InstructionOperand";
+
+/**
+ * This class represents a decoded (non-binary) instruction, ready for execution.
+ * @author Erik Burmester <erik.burmester@nextbeam.net>
+ */
+export class Instruction {
+	/**
+	 * The instructions type.
+	 */
+	private readonly _type: InstructionTypes;
+	
+	/**
+	 * The instructions operation.
+	 */
+	private readonly _instruction: Instructions;
+
+	/**
+	 * A list of the operations operands or undefined, if no operand is present.
+	 */
+	private readonly _operands: [InstructionOperand | undefined, InstructionOperand | undefined];
+
+	/**
+	 * Constructs a new instance from the given arguments.
+	 * @param type The instructions type.
+	 * @param operation The instructions operation.
+	 */
+    public constructor(type: InstructionTypes, instruction: Instructions, operands: [InstructionOperand | undefined, InstructionOperand | undefined] = [undefined, undefined]) {
+        this._type = type;
+        this._instruction = instruction;
+        this._operands = operands;
+    }
+
+	public get type(): InstructionTypes {
+		return this._type;
+	}
+
+	public get instruction(): Instructions {
+		return this._instruction;
+	}
+
+	public get operands(): [InstructionOperand | undefined, InstructionOperand | undefined] {
+		return this._operands;
+	}
+}

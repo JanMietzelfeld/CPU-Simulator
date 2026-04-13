@@ -1,10 +1,7 @@
-import { BinaryValue } from "../../../types/binary/BinaryValue";
-import { Bit } from "../../../types/binary/Bit";
-import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
-import { DivisionByZeroError } from "../../../types/errors/DivisionByZeroError";
-import { EFLAGS } from "../functional_units/EFLAGS";
-import { Byte } from "../../../types/binary/Byte";
+import { CPUCore } from "./CPUCore";
+import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
+import { ExceptionError } from "../../../types/errors/ExceptionError";
 
 /**
  * @author Erik Burmester <erik.burmester@nextbeam.net>
@@ -14,15 +11,15 @@ export class ArithmeticLogicUnit {
      * A refference to the CPU cores EFLAGS register, this ALU is associated with.
      * @readonly
      */
-    private readonly _eflags: EFLAGS;
+    private readonly _cpu: CPUCore;
 
     /**
      * Constructs a new instance from the given arguments.
      * @param eflags The EFLAGS register of the CPU core this ALU is associated with.
      * @constructor
      */
-    public constructor(eflags: EFLAGS) {
-        this._eflags = eflags;
+    public constructor(cpu: CPUCore) {
+        this._cpu = cpu;
     }
 
     /**
@@ -32,10 +29,10 @@ export class ArithmeticLogicUnit {
      * @returns
      */
     private checkForZero(operand: DoubleWord) {
-        if (operand.value === 0) {
-            this._eflags.setZero();
+        if (operand === 0) {
+            this._cpu.flags.setZero();
         } else {
-            this._eflags.clearZero();
+            this._cpu.flags.clearZero();
         }
         return;
     }
@@ -48,15 +45,15 @@ export class ArithmeticLogicUnit {
      */
     private checkForParity(operand: DoubleWord) {
         let noSetBits = 0;
-        operand.getLeastSignificantBits(Byte.NUMBER_OF_BITS_DEC).toString().split("").forEach(bit => {
+        DoubleWord.getFourthByte(operand).toString(2).split("").forEach(bit => {
             if (bit === "1") {
                 ++noSetBits
             }
         });
         if (noSetBits % 2 === 0) {
-            this._eflags.setParity();
+            this._cpu.flags.setParity();
         } else {
-            this._eflags.clearParity();
+            this._cpu.flags.clearParity();
         }
         return;
     }
@@ -69,10 +66,10 @@ export class ArithmeticLogicUnit {
      * @returns
      */
     private checkForSigned(operand: DoubleWord) {
-        if (operand.getMostSignificantBit() === 1) {
-            this._eflags.setSigned();
+        if (DoubleWord.getMostSignificantBit(operand) === 1) {
+            this._cpu.flags.setSigned();
         } else {
-            this._eflags.clearSigned();
+            this._cpu.flags.clearSigned();
         }
         return;
     }
@@ -84,9 +81,9 @@ export class ArithmeticLogicUnit {
      */
     private checkForOverflow(carry: boolean, sign: boolean) {
         if (carry !== sign) {
-            this._eflags.setOverflow();
+            this._cpu.flags.setOverflow();
         } else {
-            this._eflags.clearOverflow();
+            this._cpu.flags.clearOverflow();
         }
         return;
     }
@@ -97,9 +94,9 @@ export class ArithmeticLogicUnit {
      */
     private checkCarry(carry: boolean) {
         if (carry === true) {
-            this._eflags.setCarry();
+            this._cpu.flags.setCarry();
         } else {
-            this._eflags.clearCarry();
+            this._cpu.flags.clearCarry();
         }
     }
 
@@ -113,7 +110,7 @@ export class ArithmeticLogicUnit {
      * @returns The inverted binary value.
      */
     public not(operand: DoubleWord): DoubleWord {        
-        return new DoubleWord(~operand.value);
+        return DoubleWord.fromNumber(~operand);
     }
 
     /**
@@ -134,9 +131,9 @@ export class ArithmeticLogicUnit {
      * @returns The resulting binary value.
      */
     public and(firstOperand: DoubleWord, secondOperand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord(firstOperand.value & secondOperand.value);
-        this._eflags.clearCarry();
-        this._eflags.clearOverflow();
+        const result: DoubleWord = DoubleWord.fromNumber(firstOperand & secondOperand);
+        this._cpu.flags.clearCarry();
+        this._cpu.flags.clearOverflow();
     
         this.checkForZero(result);
         this.checkForParity(result);
@@ -162,9 +159,9 @@ export class ArithmeticLogicUnit {
      * @returns The resulting binary value.
      */
     public or(firstOperand: DoubleWord, secondOperand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord(firstOperand.value | secondOperand.value);
-        this._eflags.clearCarry();
-        this._eflags.clearOverflow();
+        const result: DoubleWord = DoubleWord.fromNumber(firstOperand | secondOperand);
+        this._cpu.flags.clearCarry();
+        this._cpu.flags.clearOverflow();
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -189,9 +186,9 @@ export class ArithmeticLogicUnit {
      * @returns The resulting binary value.
      */
     public xor(firstOperand: DoubleWord, secondOperand: DoubleWord) {
-        const result: DoubleWord = new DoubleWord(firstOperand.value ^ secondOperand.value);
-        this._eflags.clearCarry();
-        this._eflags.clearOverflow();
+        const result: DoubleWord = DoubleWord.fromNumber(firstOperand ^ secondOperand);
+        this._cpu.flags.clearCarry();
+        this._cpu.flags.clearOverflow();
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -207,9 +204,9 @@ export class ArithmeticLogicUnit {
      * @returns The two's complement.
      */
     public neg(operand: DoubleWord): DoubleWord {
-        const result: DoubleWord = new DoubleWord(~operand.value + 1);
-        this._eflags.clearCarry();
-        this._eflags.clearOverflow();
+        const result: DoubleWord = DoubleWord.fromNumber((~operand) + 1);
+        this._cpu.flags.clearCarry();
+        this._cpu.flags.clearOverflow();
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -226,17 +223,17 @@ export class ArithmeticLogicUnit {
      */
     public add(firstSummand: DoubleWord, secondSummand: DoubleWord): DoubleWord {
 
-        let numericResult = firstSummand.value + secondSummand.value;
+        let numericResult = firstSummand + secondSummand;
 
-        const carry: boolean = numericResult > DoubleWord.MAXIMUM_NUMBER_DEC;
-        const result: DoubleWord = new DoubleWord(numericResult);
+        const carry: boolean = numericResult > DoubleWord.MAX_POSITIVE_NUMBER;
+        const result: DoubleWord = DoubleWord.fromNumber(numericResult);
 
 
         this.checkForParity(result);
         this.checkForSigned(result);
         this.checkForZero(result);
 
-        this.checkForOverflow(carry, this._eflags.sign === 1);
+        this.checkForOverflow(carry, this._cpu.flags.sign === 1);
         this.checkCarry(carry);
         return result;
     }
@@ -251,16 +248,16 @@ export class ArithmeticLogicUnit {
      */
     public adc(firstSummand: DoubleWord, secondSummand: DoubleWord): DoubleWord {
         
-        let numericResult = firstSummand.value + secondSummand.value + this._eflags.carry;
+        let numericResult = firstSummand + secondSummand + this._cpu.flags.carry;
 
-        const carry: boolean = numericResult > DoubleWord.MAXIMUM_NUMBER_DEC;
-        const result: DoubleWord = new DoubleWord(numericResult);
+        const carry: boolean = numericResult > DoubleWord.MAX_POSITIVE_NUMBER;
+        const result: DoubleWord = DoubleWord.fromNumber(numericResult);
 
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
 
-        this.checkForOverflow(carry, this._eflags.sign === 1);
+        this.checkForOverflow(carry, this._cpu.flags.sign === 1);
         this.checkCarry(carry);
         return result;
     }
@@ -275,16 +272,16 @@ export class ArithmeticLogicUnit {
      */
     public sub(minuend: DoubleWord, subtrahend: DoubleWord): DoubleWord {
         
-        let numericResult = minuend.value - subtrahend.value;
+        let numericResult = minuend - subtrahend;
 
         const barrow: boolean = numericResult < 0;
-        const result: DoubleWord = new DoubleWord(numericResult);
+        const result: DoubleWord = DoubleWord.fromNumber(numericResult);
 
         this.checkForParity(result);
         this.checkForSigned(result);
         this.checkForZero(result);
 
-        minuend.getMostSignificantBit() !== subtrahend.getMostSignificantBit() && minuend.getMostSignificantBit() !== result.getMostSignificantBit() ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        DoubleWord.getMostSignificantBit(minuend) !== DoubleWord.getMostSignificantBit(subtrahend) && DoubleWord.getMostSignificantBit(minuend) !== DoubleWord.getMostSignificantBit(result) ? this._cpu.flags.setOverflow() : this._cpu.flags.clearOverflow();
         this.checkCarry(barrow);
 
         return result;
@@ -300,64 +297,18 @@ export class ArithmeticLogicUnit {
      */
     public sbb(minuend: DoubleWord, subtrahend: DoubleWord): DoubleWord {
 
-        let numericResult = minuend.value - subtrahend.value - this._eflags.carry;
+        let numericResult = minuend - subtrahend - this._cpu.flags.carry;
 
         const barrow: boolean = numericResult < 0;
-        const result: DoubleWord = new DoubleWord(numericResult);
+        const result: DoubleWord = DoubleWord.fromNumber(numericResult);
 
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
-
-        minuend.getMostSignificantBit() !== subtrahend.getMostSignificantBit() && minuend.getMostSignificantBit() !== result.getMostSignificantBit() ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        DoubleWord.getMostSignificantBit(minuend) !== DoubleWord.getMostSignificantBit(subtrahend) && DoubleWord.getMostSignificantBit(minuend) !== DoubleWord.getMostSignificantBit(result) ? this._cpu.flags.setOverflow() : this._cpu.flags.clearOverflow();
         this.checkCarry(barrow);
 
         return result;
-    }
-
-
-    /**
-     * This method performs a logical shift on the given binary value one bit to the right.
-     * @param operand The operand to perform a right shift on.
-     * @returns The bit right shifted.
-     */
-    public logicalRightShift<T extends BinaryValue>(operand: T): Bit {
-        
-        const removedBit: Bit = operand.getLeastSignificantBit();
-
-        operand.value = operand.value >>> 1;
-
-        return removedBit;
-    }
-
-    /**
-     * This method performs an arithmetic shift on the given binary value one bit to the right.
-     * @param operand The operand to perform a right shift on.
-     * @returns The bit right shifted.
-     */
-    public arithmeticRightShift<T extends BinaryValue>(operand: T): Bit {
-        const removedBit: Bit = operand.getLeastSignificantBit();
-
-        const msb = operand.getMostSignificantBit();
-
-        // Arithmetic right shift by 1
-        operand.value = operand.value >>> 1
-        operand.setBit(0 , msb);
-
-        return removedBit;
-    }
-
-    /**
-     * This method performs an logical shift on the given binary value one bit to the left.
-     * @param operand The operand to perform a right shift on.
-     * @returns The bit left shifted.
-     */
-    public logicalLeftShift<T extends BinaryValue>(operand: T): Bit {
-        const removedBit: Bit = operand.getMostSignificantBit();
-
-        operand.value = operand.value << 1;
-
-        return removedBit;
     }
 
      /**
@@ -367,16 +318,16 @@ export class ArithmeticLogicUnit {
      * @param count The first operand, number of left shifts.
      * @returns The resulting binary value.
      */
-    public shl(value: DoubleWord, count: DoubleWord, ): DoubleWord {
+    public shl(value: DoubleWord, count: DoubleWord.BitCount): DoubleWord {
 
-        const result: DoubleWord = new DoubleWord();
+        let result: DoubleWord = DoubleWord.ZERO;
 
-        this._eflags.clearCarry()
+        this._cpu.flags.clearCarry()
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value && count.value > 0) {
-            result.value = value.value << count.value;
-            count.value === 1 && value.getMostSignificantBit() !== value.getBit(1) ? this._eflags.setOverflow() : this._eflags.clearOverflow();
-            value.getBit(count.value - 1) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+        if (DoubleWord.NUMBER_OF_BITS >= count && count > 0) {
+            result = DoubleWord.fromNumber(value << count);
+            count === 1 && DoubleWord.getMostSignificantBit(value) !== DoubleWord.getBit(value, 1) ? this._cpu.flags.setOverflow() : this._cpu.flags.clearOverflow();
+            DoubleWord.getBit(value, count - 1 as DoubleWord.BitIndex) == 1 ? this._cpu.flags.setCarry() : this._cpu.flags.clearCarry();
         }
 
         this.checkForZero(result);
@@ -393,18 +344,17 @@ export class ArithmeticLogicUnit {
      * @param count The first operand, number of right shifts.
      * @returns The resulting binary value.
      */
-    public shr(value: DoubleWord, count: DoubleWord): DoubleWord {
+    public shr(value: DoubleWord, count: DoubleWord.BitCount): DoubleWord {
 
-        const result: DoubleWord = new DoubleWord();
+        let result: DoubleWord = DoubleWord.ZERO;
 
-        this._eflags.clearCarry()
+        this._cpu.flags.clearCarry()
 
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value && count.value > 0) {
-            result.value = value.value >>> count.value;
-
-            value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry();
-            count.value == 1 && value.getMostSignificantBit() == 1 ? this._eflags.setOverflow() : this._eflags.clearOverflow();
+        if (DoubleWord.NUMBER_OF_BITS >= count && count > 0) {
+            result = DoubleWord.fromNumber(value >>> count);
+            count === 1 && DoubleWord.getMostSignificantBit(value) === 1 ? this._cpu.flags.setOverflow() : this._cpu.flags.clearOverflow();
+            DoubleWord.getBit(value, DoubleWord.NUMBER_OF_BITS - count as DoubleWord.BitIndex) == 1 ? this._cpu.flags.setCarry() : this._cpu.flags.clearCarry();
         }
 
         this.checkForZero(result);
@@ -421,19 +371,18 @@ export class ArithmeticLogicUnit {
      * @param count The first operand, number of right shifts.
      * @returns The resulting binary value.
      */
-    public sar(value: DoubleWord, count: DoubleWord): DoubleWord {
+    public sar(value: DoubleWord, count: DoubleWord.BitCount): DoubleWord {
 
         let result: DoubleWord = value;
 
-        this._eflags.clearCarry()
+        this._cpu.flags.clearCarry()
 
-        if (DoubleWord.NUMBER_OF_BITS_DEC >= count.value && count.value > 0) {
-            result.value = value.value >> count.value;
-
-            value.getBit(DoubleWord.NUMBER_OF_BITS_DEC - count.value) == 1 ? this._eflags.setCarry() : this._eflags.clearCarry()
+        if (DoubleWord.NUMBER_OF_BITS >= count && count > 0) {
+            result = DoubleWord.fromNumber(value >> count);
+            DoubleWord.getBit(value, DoubleWord.NUMBER_OF_BITS - count as DoubleWord.BitIndex) == 1 ? this._cpu.flags.setCarry() : this._cpu.flags.clearCarry();
         }
 
-        this._eflags.clearOverflow();
+        this._cpu.flags.clearOverflow();
         this.checkForZero(result);
         this.checkForParity(result);
         this.checkForSigned(result);
@@ -453,12 +402,12 @@ export class ArithmeticLogicUnit {
      */
     public imul(multiplier: DoubleWord, multiplicand: DoubleWord): DoubleWord {
         
-        const result64 = BigInt(multiplier.value) * BigInt(multiplicand.value);
+        const result64 = BigInt(multiplier) * BigInt(multiplicand);
 
         const low32 = Number(result64 & 0xFFFFFFFFn) >>> 0; 
         const high32 = Number((result64 >> 32n) & 0xFFFFFFFFn);
 
-        const result = new DoubleWord(low32);
+        const result = DoubleWord.fromNumber(low32);
 
         // Determine if high32 is proper sign extension of low32
         const low32Signed = low32 | 0; // convert to signed
@@ -468,8 +417,8 @@ export class ArithmeticLogicUnit {
 
         const overflow = !properSignExtension;
 
-        overflow ? this._eflags.setOverflow() : this._eflags.clearOverflow();
-        overflow ? this._eflags.setCarry() : this._eflags.clearCarry();
+        overflow ? this._cpu.flags.setOverflow() : this._cpu.flags.clearOverflow();
+        overflow ? this._cpu.flags.setCarry() : this._cpu.flags.clearCarry();
 
         return result;
     }
@@ -483,12 +432,13 @@ export class ArithmeticLogicUnit {
      * @returns The resulting quotient.
      */
     public idiv(dividend: DoubleWord, divisor: DoubleWord): DoubleWord {
-        if (divisor.value === 0) {
-            throw new DivisionByZeroError("Dividing by zero is not permittet.");
+        if (divisor === 0) {
+            throw new ExceptionError(InterruptNumbers.DIVIDE_ERROR);
         }
-        let result = (dividend.value | 0) / (divisor.value | 0);
+        
+        let result = (dividend | 0) / (divisor | 0);
 
-        return new DoubleWord(result);
+        return DoubleWord.fromNumber(result);
     }
 
     /**

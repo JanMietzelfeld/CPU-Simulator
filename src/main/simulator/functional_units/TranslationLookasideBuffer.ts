@@ -1,82 +1,106 @@
 import { PageTableEntry } from "../../../types/binary/PageTableEntry";
-import { Bit } from "../../../types/binary/Bit";
-import { DoubleWord } from "../../../types/binary/DoubleWord";
-
+import { PageNumber } from "../../../types/binary/PageNumber";
 
 export class TranslationLookasideBuffer {
-    private _data: [number, [number, PageTableEntry]][];
+    private _data: Map<PageNumber, [PageTableEntry, number]>;
+    private _oldest: [PageNumber, number] | undefined;
     private _capacity: number;
 
     public constructor(capacity: number) {
-        this._data = [];
+        this._data = new Map();
+        this._oldest = undefined;
         this._capacity = capacity;
     }
 
-    public insert(item: [DoubleWord, PageTableEntry]): void {
+    public insert(item: [PageNumber, PageTableEntry]): void {
+
         if (this.has(item[0])) {
             return;
         }
-        if (this._data.length === this._capacity) {
-            this._data.pop();
+        if (this._data.size === this._capacity) {
+            this.deleteOldest();
         }
-        this._data.push([1, [item[0].getMostSignificantBits(20), item[1]]]);
-        this.sort();
+        this._data.set(item[0], [item[1], 1]);
+        this.updateOldest([item[0], 1]);
         return;
     }
 
-    public get data(): [number, [number, PageTableEntry]][] {
-        return this._data;
+
+    private deleteOldest(): boolean {
+
+        if (this._oldest === undefined)
+        {
+            return false;
+        }
+
+        this._data.delete(this._oldest[0]);
+        this.updateOldest(this._oldest);
+
+        return true;
     }
 
-    private sort() {
-        this._data.sort((current, successor) => (current[0] < successor[0]) ? current[0] : successor[0]);
-    }
+    private updateOldest(updatedElement: [PageNumber, number]): void {
+       
+        if (this._oldest !== undefined && this._oldest[0] === updatedElement[0])
+        {
+            if (this._data.size === 0)
+            {
+                this._oldest = undefined;
+                return;
+            }
 
-    public peek(): [number, [number, PageTableEntry]] | undefined {
-        return (this._data.length === 0) 
-            ? undefined
-            : this._data[0];
-    }
+            this._oldest = updatedElement;
 
-    public pop(): [number, [number, PageTableEntry]] | undefined {
-        return (this._data.length === 0) ? undefined : this._data.pop();
+            for (const [key, [, count]] of this._data.entries()) {
+                if (count < this._oldest[1]) {
+                    this._oldest = [key, count];
+
+                    if (this._oldest[1] === 1) { //Minimum count is 1
+                        break;
+                    }
+                }
+          }
+
+            return;
+        }
+
+        this._oldest = this._oldest === undefined ? updatedElement : this._oldest[1] > updatedElement[1] ? updatedElement : this._oldest;
     }
     
     public size(): number {
-        return this._data.length;
+        return this._data.size;
     }
     
     public isEmpty(): boolean {
-        return this._data.length === 0;
+        return this._data.size === 0;
     }
 
-    public has(virtualAddress: DoubleWord): boolean {
-        let includes = false;
-        for (let i = 0; i < this._data.length; ++i) {
-            if (this._data[i][1][0] === virtualAddress.getMostSignificantBits(20)) {
-                includes = true;
-            }
-        }
-        return includes;
+    public has(pageNumber: PageNumber): boolean {
+        return this._data.has(pageNumber);
     }
 
-    public get(virtualAddress: DoubleWord): PageTableEntry | undefined {
-        let pageTableEntry: PageTableEntry | undefined = undefined;
-        for (let i = 0; i < this._data.length; ++i) {
-            if (this._data[i][1][0] === virtualAddress.getMostSignificantBits(20)) {
-                pageTableEntry = this._data[i][1][1];
-                this._data[i][0]++;
-            }
+    public get(pageNumber: PageNumber): PageTableEntry | undefined {
+        const entry = this._data.get(pageNumber);
+
+        if (entry === undefined)
+        {
+            return undefined;
         }
-        this.sort();
-        return pageTableEntry;
+
+        entry[1]++;
+        this.updateOldest([pageNumber, entry[1]]);
+
+        return entry[0] as PageTableEntry;
     }
 
     public clear(): void {
-        this._data = [];
+        this._data.clear();
+        this._oldest = undefined;
     }
 
     public toString(): string {
-        return this._data.toString();
+        return [...this._data.entries()]
+            .map(([key, [a, b]]) => `${key},${a},${b}`)
+            .join(",");
     }
 }
