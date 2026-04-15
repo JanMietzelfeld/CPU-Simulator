@@ -4,6 +4,7 @@ export type Byte = number & { __brand: "Byte" };
 
 export namespace Byte {
 
+    export const SIZE: number = 2**8;
     export const MAX_POSITIVE_NUMBER: number = 2**8 - 1;
 	export const MAX_NEGATIVE_NUMBER: number = -(2**7);
 	export const NUMBER_OF_BITS: number = 8;
@@ -15,14 +16,16 @@ export namespace Byte {
 
     /**
      * This method creates a Byte from a number.
+     * @param number 
      * @returns
      */
     export function fromNumber(number: number): Byte {
-        return (number & 0xff) as Byte;
+        return (number & MAX_POSITIVE_NUMBER) as Byte;
     }
 
     /**
      * This method returns the least significant bit of this value.
+     * @param byte 
      * @returns The least significant bit.
      */
     export function getLeastSignificantBit(byte: Byte): Bit {
@@ -31,6 +34,7 @@ export namespace Byte {
 
     /**
      * This method returns the most significant bit of this value.
+     * @param byte 
      * @returns The most significant bit.
      */
     export function getMostSignificantBit(byte: Byte): Bit {
@@ -105,7 +109,7 @@ export namespace Byte {
     /**
      * This method performs a logical shift on the given Byte one bit to the right.
      * @param operand The operand to perform a right shift on.
-     * @returns The bit right shifted.
+     * @returns [result, shifted out bit]
      */
 	export function logicalRightShift(operand: Byte): [Byte, Bit] {
 		const removedBit: Bit = Byte.getLeastSignificantBit(operand);
@@ -116,7 +120,7 @@ export namespace Byte {
 	/**
 	 * This method performs an arithmetic shift on the given Byte one bit to the right.
 	 * @param operand The operand to perform a right shift on.
-	 * @returns The bit right shifted.
+	 * @returns [result, shifted out bit]
 	 */
 	export function arithmeticRightShift(operand: Byte): [Byte, Bit] {
 		const removedBit: Bit = Byte.getLeastSignificantBit(operand);
@@ -130,7 +134,7 @@ export namespace Byte {
     /**
      * This method performs an logical shift on the given Byte one bit to the left.
      * @param operand The operand to perform a left shift on.
-     * @returns The bit left shifted.
+     * @returns [result, shifted out bit]
      */
     export function leftShift(operand: Byte): [Byte, Bit] {
 		const removedBit: Bit = Byte.getMostSignificantBit(operand);

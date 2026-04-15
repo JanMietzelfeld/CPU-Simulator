@@ -7,8 +7,8 @@ import { CPUCore } from "../main/simulator/execution_units/CPUCore";
 import { DataSizes } from "../types/enumerations/DataSizes";
 
 describe("Test ALU", () => {
-    const mainMemory = new RAM(Math.pow(2, 32));
-    const cpu = new CPUCore(mainMemory, DataSizes.DOUBLEWORD);
+    const mainMemory = new RAM(DoubleWord.SIZE);
+    const cpu = new CPUCore(mainMemory, DataSizes.DOUBLEWORD, "./os_filesystem");
     const alu: ArithmeticLogicUnit = new ArithmeticLogicUnit(cpu);
 
     test("Perform logical NOT on binary representation of decimal 255", () => {

@@ -19,7 +19,6 @@ export abstract class Register<T extends number> {
      * This method constructs an instance of the Register class.
      * @param name The name of the register.
      * @param content The initial content of the register.
-     * @constructor
      */
     public constructor(name: string, content: T) {
         this.name = name.toUpperCase();

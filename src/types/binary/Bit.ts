@@ -2,8 +2,11 @@ export type Bit = 0 | 1;
 
 export namespace Bit {
 
+    export const SIZE: number = 2;
+
     /**
      * This method creates a Bit from a number.
+     * @param number
      * @returns
      */
     export function fromNumber(number: number): Bit {

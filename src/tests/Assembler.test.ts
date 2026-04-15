@@ -3,7 +3,7 @@ import { Assembler } from '../main/simulator/Assembler';
 import { DoubleWord } from '../types/binary/DoubleWord';
 
 describe('Encode instructions', () => {
-    const assembler = new Assembler("./settings/language_definition.json");
+    const assembler = new Assembler("./settings/language_definition.json", "./os_filesystem");
     
     test('Encode instruction "ADD $1, %eax"', () => {
         const result: DoubleWord[] = assembler.assemble("ADD $1, %eax");

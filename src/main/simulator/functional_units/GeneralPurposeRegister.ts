@@ -10,7 +10,6 @@ export class GeneralPurposeRegister extends Register<DoubleWord> {
     /**
      * This method constructs an instance.
      * @param name The name of the register.
-     * @constructor
      */
     public constructor(name: string) {
         super(name.toUpperCase(), DoubleWord.ZERO);

@@ -8,7 +8,7 @@ export class ExceptionError extends Error {
 	private readonly _interruptNumber: InterruptNumbers;
 	/**
 	 * Constructs a new instance with the given message.
-	 * @param description A short text describing the error and its cause.
+	 * @param interruptNumber
 	 */
     constructor(interruptNumber: InterruptNumbers) {
 		super();

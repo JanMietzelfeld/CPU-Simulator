@@ -39,12 +39,11 @@ describe("Create doubleword from decimal integer values", () => {
     });
 
     test("Measure toNumber() performance", () => {
-        const mainMemory = new RAM(Math.pow(2, 32));
-        const cpu = new CPUCore(mainMemory, DataSizes.DOUBLEWORD);
+        const mainMemory = new RAM(DoubleWord.SIZE);
+        const cpu = new CPUCore(mainMemory, DataSizes.DOUBLEWORD, "./os_filesystem");
         const alu: ArithmeticLogicUnit = new ArithmeticLogicUnit(cpu);
-        const repetitions = 100000;
-        //const one = DoubleWord.fromInteger(1)
-        let dword = DoubleWord.fromNumber(0)
+        const repetitions = 100_000;
+        let dword = DoubleWord.ZERO
         for (let i = 0; i < repetitions; i++) {
             expect(dword).toBe(i)
             dword = alu.add(dword, DoubleWord.fromNumber(1))

@@ -15,8 +15,7 @@ export class ArithmeticLogicUnit {
 
     /**
      * Constructs a new instance from the given arguments.
-     * @param eflags The EFLAGS register of the CPU core this ALU is associated with.
-     * @constructor
+     * @param cpu The cpu.
      */
     public constructor(cpu: CPUCore) {
         this._cpu = cpu;
@@ -26,24 +25,21 @@ export class ArithmeticLogicUnit {
      * This method checks whether the given binary value is a binary zero
      * and sets or clears the **zero** flag accordingly.
      * @param operand A binary value.
-     * @returns
      */
-    private checkForZero(operand: DoubleWord) {
+    private checkForZero(operand: DoubleWord): void {
         if (operand === 0) {
             this._cpu.flags.setZero();
         } else {
             this._cpu.flags.clearZero();
         }
-        return;
     }
 
     /**
      * This method checks whether the given binary value has an even number of set bits
      * in the least significant byte and sets or clears the **parity** flag accordingly.
      * @param operand A binary value.
-     * @returns
      */
-    private checkForParity(operand: DoubleWord) {
+    private checkForParity(operand: DoubleWord): void {
         let noSetBits = 0;
         DoubleWord.getFourthByte(operand).toString(2).split("").forEach(bit => {
             if (bit === "1") {
@@ -55,7 +51,6 @@ export class ArithmeticLogicUnit {
         } else {
             this._cpu.flags.clearParity();
         }
-        return;
     }
 
     /**
@@ -63,7 +58,6 @@ export class ArithmeticLogicUnit {
      * sets or clears the **sign** flag accordingly. The given value is 
      * treated as a negative value if the MSB is set to 1.
      * @param operand A binary value. 
-     * @returns
      */
     private checkForSigned(operand: DoubleWord) {
         if (DoubleWord.getMostSignificantBit(operand) === 1) {
@@ -71,13 +65,13 @@ export class ArithmeticLogicUnit {
         } else {
             this._cpu.flags.clearSigned();
         }
-        return;
     }
 
     /**
      * This method checks whether the last operation resulted in an overflow.
      * An overflow occurs, if the two highest bits of the carry are unequal.
      * @param carry The carry bits to check.
+     * @param sign The sign of the result
      */
     private checkForOverflow(carry: boolean, sign: boolean) {
         if (carry !== sign) {
@@ -185,7 +179,7 @@ export class ArithmeticLogicUnit {
      * @param secondOperand The second doubleword.
      * @returns The resulting binary value.
      */
-    public xor(firstOperand: DoubleWord, secondOperand: DoubleWord) {
+    public xor(firstOperand: DoubleWord, secondOperand: DoubleWord): DoubleWord {
         const result: DoubleWord = DoubleWord.fromNumber(firstOperand ^ secondOperand);
         this._cpu.flags.clearCarry();
         this._cpu.flags.clearOverflow();
@@ -450,9 +444,8 @@ export class ArithmeticLogicUnit {
      * @param firstOperand 
      * @param secondOperand 
      */
-    public cmp(firstOperand: DoubleWord, secondOperand: DoubleWord) {
+    public cmp(firstOperand: DoubleWord, secondOperand: DoubleWord): void {
         this.sub(secondOperand, firstOperand);
-        return;
     }
 
     /**
@@ -464,7 +457,7 @@ export class ArithmeticLogicUnit {
      * @param firstOperand 
      * @param secondOperand 
      */
-    public test(firstOperand: DoubleWord, secondOperand: DoubleWord) {
+    public test(firstOperand: DoubleWord, secondOperand: DoubleWord): void {
         this.and(firstOperand, secondOperand);
     }
 }

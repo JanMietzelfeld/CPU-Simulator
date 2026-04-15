@@ -4,7 +4,9 @@ import { Byte } from "./Byte";
 export type Word = number & { __brand: "Word" };
 
 export namespace Word {
-	export const MAX_POSITIVE_NUMBER: number = 2**16 - 1;
+
+	export const SIZE: number = 2**16;
+	export const MAX_POSITIVE_NUMBER: number = 16 - 1;
 	export const MAX_NEGATIVE_NUMBER: number = -(2**15);
 	export const NUMBER_OF_BITS: number = 16;
 	export const NUMBER_OF_BYTES: number = 2;
@@ -20,14 +22,17 @@ export namespace Word {
 
 	/**
 	 * This method creates a Word from a number.
+	 * @param number 
 	 * @returns
 	 */
 	export function fromNumber(number: number): Word {
-		return (number & 0xffff) as Word;
+		return (number & MAX_POSITIVE_NUMBER) as Word;
 	}
 
 	/**
 	 * This method creates a Word from bytes.
+	 * @param high 
+	 * @param low 
 	 * @returns
 	 */
 	export function fromBytes(high: Byte, low: Byte): Word {
@@ -36,6 +41,7 @@ export namespace Word {
 
 	/**
 	 * This method returns the least significant bit of this value.
+	 * @param word 
 	 * @returns The least significant bit.
 	 */
 	export function getLeastSignificantBit(word: Word): Bit {
@@ -44,6 +50,7 @@ export namespace Word {
 
 	/**
 	 * This method returns the most significant bit of this value.
+	 * @param word 
 	 * @returns The most significant bit.
 	 */
 	export function getMostSignificantBit(word: Word): Bit {
@@ -72,7 +79,7 @@ export namespace Word {
 
 	/**
 	 * This method gets a bit at a specified index, were index 0 is MSB and Index size - 1 is LSB.
-	 * @param byte
+	 * @param word
 	 * @param index The position of the bit to get.
 	 * @returns 
 	 */
@@ -105,7 +112,7 @@ export namespace Word {
 
 	/**
 	 * This method sets the bit at a specified index to the passed bit value, were index 0 is MSB and Index size - 1 is LSB.
-	 * @param byte
+	 * @param word
 	 * @param index The position of the bit to set.
 	 * @param bit The binary value to set the bit to.
 	 * @returns 
@@ -117,7 +124,7 @@ export namespace Word {
 
 	/**
 	 * This method gets the upper Byte
-	 * @param byte
+	 * @param word
 	 * @returns 
 	 */
 	export function getUpperByte(word: Word): Byte {
@@ -126,7 +133,7 @@ export namespace Word {
 
 	/**
 	 * This method gets the lower Byte
-	 * @param byte
+	 * @param word
 	 * @returns 
 	 */
 	export function getLowerByte(word: Word): Byte {
@@ -136,7 +143,7 @@ export namespace Word {
 	/**
      * This method performs a logical shift on the given Word one bit to the right.
      * @param operand The operand to perform a right shift on.
-     * @returns The bit right shifted.
+     * @returns [result, shifted out bit]
      */
 	export function logicalRightShift(operand: Word): [Word, Bit] {
 		const removedBit: Bit = Word.getLeastSignificantBit(operand);
@@ -147,7 +154,7 @@ export namespace Word {
 	/**
 	 * This method performs an arithmetic shift on the given Word one bit to the right.
 	 * @param operand The operand to perform a right shift on.
-	 * @returns The bit right shifted.
+	 * @returns [result, shifted out bit]
 	 */
 	export function arithmeticRightShift(operand: Word): [Word, Bit] {
 		const removedBit: Bit = Word.getLeastSignificantBit(operand);
@@ -161,7 +168,7 @@ export namespace Word {
     /**
      * This method performs an logical shift on the given Word one bit to the left.
      * @param operand The operand to perform a left shift on.
-     * @returns The bit left shifted.
+     * @returns [result, shifted out bit]
      */
     export function leftShift(operand: Word): [Word, Bit] {
 		const removedBit: Bit = Word.getMostSignificantBit(operand);

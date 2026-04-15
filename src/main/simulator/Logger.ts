@@ -1,6 +1,6 @@
 export class DebugLogger {
 
-    private static readonly logging: boolean = true;
+    private static readonly logging: boolean = false;
 
     private static indention: string = "";
 

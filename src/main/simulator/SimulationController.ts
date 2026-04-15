@@ -53,17 +53,21 @@ export class SimulationController {
 
     private webContents: WebContents;
 
+    public readonly pathToOSFilesystem: string;
+
     /**
      * Creates a new instance.
      * @param capacityOfMainMemory The initial capacity of the main memory. This value can not be modified after the simulator started.
      * @param pathToLanguageDefinition The path to the language definition file.
-     * @param pathToAssemblyFiles The path to the assembly files.
+     * @param pathToOSFilesystem The path to the language definition file.
+     * @param webContents
      * @param [processingWidth=DataSizes.DOUBLEWORD] The processing width of the simulated CPU.
      */
-    private constructor(capacityOfMainMemory: number, pathToLanguageDefinition: string, webContents: WebContents, processingWidth: DataSizes = DataSizes.DOUBLEWORD) {
+    private constructor(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, webContents: WebContents, processingWidth: DataSizes = DataSizes.DOUBLEWORD) {
         this.mainMemory = new RAM(capacityOfMainMemory);
-        this.core = new CPUCore(this.mainMemory, processingWidth);
-        this._assembler = new Assembler(pathToLanguageDefinition);
+        this.pathToOSFilesystem = pathToOSFilesystem;
+        this.core = new CPUCore(this.mainMemory, processingWidth, pathToOSFilesystem);
+        this._assembler = new Assembler(pathToLanguageDefinition, pathToOSFilesystem);
         this._programmLoaded = true;
         this.autoScrollForPageTableEnabled = true;
         this.autoScrollForPhysicalRAMEnabled = true;
@@ -80,20 +84,25 @@ export class SimulationController {
     }
 
     /**
-     * This method can be used to retrieve an initialized instance of the simulator.
+     * This method returns the SimulatorController instance or creates one if not present
      * @param capacityOfMainMemory
      * @param pathToLanguageDefinition
-     * @param pathToAssemblyFiles
+     * @param pathToOSFilesystem
+     * @param webContents
      * @returns 
      */
-    public static getInstanceOrCreate(capacityOfMainMemory: number, pathToLanguageDefinition: string, webContents: WebContents): SimulationController {
+    public static getInstanceOrCreate(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, webContents: WebContents): SimulationController {
         if (SimulationController._instance === null) {
-            SimulationController._instance = new SimulationController(capacityOfMainMemory, pathToLanguageDefinition, webContents);
+            SimulationController._instance = new SimulationController(capacityOfMainMemory, pathToLanguageDefinition, pathToOSFilesystem, webContents);
             SimulationController._instance.bootKernel();
         }
         return SimulationController._instance;
     }
 
+    /**
+     * This method returns the SimulatorController instance
+     * @returns 
+     */
     public static getInstance(): SimulationController | undefined  {
         if (SimulationController._instance === null) {
             return undefined;
@@ -118,7 +127,7 @@ export class SimulationController {
             throw new EvalError("Unexpected begin of OS memory");
         }
 
-        const compiledOS: DoubleWord[] = this._assembler.assemble(readFileSync(`${process.cwd()}/os_filesystem/os/src/os_entry.asm`, "utf-8"), startOfKernelSpace)
+        const compiledOS: DoubleWord[] = this._assembler.assemble(readFileSync(this.pathToOSFilesystem + "/os/src/os_entry.asm", "utf-8"), startOfKernelSpace)
 
         //disassemble(compiledOS, kernelCodeStartAddress) //For debugging
 
@@ -129,10 +138,10 @@ export class SimulationController {
         this.core.eip.content = startOfKernelSpace;
 
         //Assemble the init program (needed by the os)
-        this.assembleProgram(process.cwd() + "/os_filesystem/os/user/init.asm");
+        this.assembleProgram(this.pathToOSFilesystem + "/os/user/init.asm");
 
         //Assemble the idle program (needed by the os)
-        this.assembleProgram(process.cwd() + "/os_filesystem/os/user/idle.asm");
+        this.assembleProgram(this.pathToOSFilesystem + "/os/user/idle.asm");
         
         this.createUtilityFiles();
 
@@ -154,7 +163,6 @@ export class SimulationController {
     /**
      * This method is used to initialize a process and prepare its execution.
      * @param pathToProgramCode 
-     * @returns 
      */
     public createProcess(pathToProgramCode: string): void {
 
@@ -187,7 +195,7 @@ export class SimulationController {
         }
 
 
-        writeFileSync(process.cwd() + "/os_filesystem/os/util/new_process_name.bin", Buffer.from(buffer));
+        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from(buffer));
         
         return;
     }
@@ -195,7 +203,6 @@ export class SimulationController {
     /**
      * This method is used to assemble a program
      * @param pathToProgramCode 
-     * @returns 
      */
     public assembleProgram(pathToProgramCode: string): void {
         
@@ -216,22 +223,18 @@ export class SimulationController {
         });
 
         writeFileSync(pathToProgramCode.replace(".asm", ".bin"), buffer);
-
-        return;
     }
 
-        /**
+    /**
      * This method is used to assemble a program
-     * @param pathToProgramCode 
-     * @returns 
      */
     public createUtilityFiles(): void {
         
-        writeFileSync(process.cwd() + "/os_filesystem/os/util/new_process_name.bin", Buffer.from([0]));
+        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from([0]));
 
-        let zeroFramePath = process.cwd() + "/os_filesystem/os/util/zero_frame.bin"
+        let zeroFramePath = this.pathToOSFilesystem + "/os/util/zero_frame.bin"
 
-        let pageTablePath = process.cwd() + "/os_filesystem/os/util/page_table.bin"
+        let pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
 
         let buffer = Buffer.alloc(4096 * 4);
 
@@ -264,8 +267,6 @@ export class SimulationController {
         }
 
         writeFileSync(pageTablePath, buffer);
-
-        return;
     }
 
 

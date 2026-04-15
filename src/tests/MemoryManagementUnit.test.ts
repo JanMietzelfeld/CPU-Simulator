@@ -6,8 +6,8 @@ import { DoubleWord } from "../types/binary/DoubleWord";
 import { DataSizes } from "../types/enumerations/DataSizes";
 
 describe("Read from and write to main memory using MMU as proxy", () => {
-    const mainMemory = new RAM(Math.pow(2, 32));
-    const cpu = new CPUCore(mainMemory, DataSizes.DOUBLEWORD);
+    const mainMemory = new RAM(DoubleWord.SIZE);
+    const cpu = new CPUCore(mainMemory, DataSizes.DOUBLEWORD, "./os_filesystem");
     const mmu = new MemoryManagementUnit(cpu);
 
     test("Write byte to main memory", () => {

@@ -5,6 +5,8 @@ import { Word } from "./Word";
 export type DoubleWord = number & { __brand: "DoubleWord" };
 
 export namespace DoubleWord {
+
+	export const SIZE: number = 2**32;
 	export const MAX_POSITIVE_NUMBER: number = 2**32 - 1;
 	export const MAX_NEGATIVE_NUMBER: number = -(2**31);
 	export const NUMBER_OF_BITS: number = 32;
@@ -26,15 +28,18 @@ export namespace DoubleWord {
 		| 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32;
 
 	/**
-	 * This method creates a Word from a number.
+	 * This method creates a DoubleWord from a number.
+	 * @param number
 	 * @returns
 	 */
 	export function fromNumber(number: number): DoubleWord {
-		return (number & 0xffffffff) >>> 0 as DoubleWord;
+		return (number & MAX_POSITIVE_NUMBER) >>> 0 as DoubleWord;
 	}
 
 	/**
-	 * This method creates a Word from bytes.
+	 * This method creates a DoubleWord from bytes.
+	 * @param high the high word
+	 * @param low the low word
 	 * @returns
 	 */
 	export function fromWords(high: Word, low: Word): DoubleWord {
@@ -42,18 +47,23 @@ export namespace DoubleWord {
 	}
 
 	/**
-	 * This method creates a Word from bytes.
+	 * This method creates a DoubleWord from bytes.
+	 * @param firstByte Most Significant Byte
+	 * @param secondByte 
+	 * @param thirdByte 
+	 * @param fourthByte Least Significant Byte
 	 * @returns
 	 */
-	export function fromBytes(b0: Byte, b1 : Byte, b2 : Byte, b3 : Byte): DoubleWord {
-		return ((b0 << (NUMBER_OF_BITS - Byte.NUMBER_OF_BITS)) | 
-				(b1 << Word.NUMBER_OF_BITS) |
-				(b2 << Byte.NUMBER_OF_BITS) |
-				b3) >>> 0 as DoubleWord;   
+	export function fromBytes(firstByte: Byte, secondByte : Byte, thirdByte : Byte, fourthByte : Byte): DoubleWord {
+		return ((firstByte << (NUMBER_OF_BITS - Byte.NUMBER_OF_BITS)) | 
+				(secondByte << Word.NUMBER_OF_BITS) |
+				(thirdByte << Byte.NUMBER_OF_BITS) |
+				fourthByte) >>> 0 as DoubleWord;   
 	}
 
 	/**
 	 * This method returns the least significant bit of this value.
+	 * @param doubleWord 
 	 * @returns The least significant bit.
 	 */
 	export function getLeastSignificantBit(doubleWord: DoubleWord): Bit {
@@ -62,6 +72,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method returns the most significant bit of this value.
+	 * @param doubleWord 
 	 * @returns The most significant bit.
 	 */
 	export function getMostSignificantBit(doubleWord: DoubleWord): Bit {
@@ -75,22 +86,22 @@ export namespace DoubleWord {
 	 * @returns 
 	 */
 	export function getLeastSignificantBits(doubleWord: DoubleWord, count: BitCount): DoubleWord {
-		return (doubleWord & (count === 32 ? 0xffffffff : (1 << count) - 1)) >>> 0 as DoubleWord;
+		return (doubleWord & (count === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << count) - 1)) >>> 0 as DoubleWord;
 	}
 
 	/**
 	 * This method returns the first bits of the binary value.
-	 * @param word 
+	 *  @param doubleWord 
 	 * @param count Amount of bits to include
 	 * @returns 
 	 */
 	export function getMostSignificantBits(doubleWord: DoubleWord, count: BitCount): DoubleWord {
-		return ((doubleWord >>> (NUMBER_OF_BITS - count)) & (count === 32 ? 0xffffffff : (1 << count) - 1)) >>> 0 as DoubleWord;
+		return ((doubleWord >>> (NUMBER_OF_BITS - count)) & (count === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << count) - 1)) >>> 0 as DoubleWord;
 	}    
 
 	/**
 	 * This method gets a bit at a specified index, were index 0 is MSB and Index size - 1 is LSB.
-	 * @param byte
+	 *  @param doubleWord 
 	 * @param index The position of the bit to get.
 	 * @returns 
 	 */
@@ -100,30 +111,30 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets a range of bits from a specified start index
-	 * @param word
+	 *  @param doubleWord 
 	 * @param start The zero-based index number indicating the beginning of the range.
 	 * @param end Zero-based index number indicating the end of the range. The range includes the bit up to, but not including, the bit indicated by end.
 	 * @returns 
 	 */
 	export function getBitRange(doubleWord: DoubleWord, start: BitIndex, end: BitIndex | 32 = NUMBER_OF_BITS as 32): DoubleWord {
-		return ((doubleWord >>> (NUMBER_OF_BITS - end)) & ((end - start) === 32 ? 0xffffffff : (1 << (end - start)) - 1)) >>> 0 as DoubleWord;
+		return ((doubleWord >>> (NUMBER_OF_BITS - end)) & ((end - start) === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << (end - start)) - 1)) >>> 0 as DoubleWord;
 	}
 
 	/**
 	 * This method gets a range of bits from a specified start index
-	 * @param word
+	 * @param doubleWord 
 	 * @param start The zero-based index number indicating the beginning of the range.
 	 * @param count Number of bits to include after start
 	 * @returns 
 	 */
 	export function getBitsStartingAt(doubleWord: DoubleWord, start: BitIndex, count: BitCount = 1): DoubleWord {
 		const end = start + count;
-		return ((doubleWord >>> (NUMBER_OF_BITS - end)) & ((end - start) === 32 ? 0xffffffff : (1 << (end - start)) - 1)) >>> 0 as DoubleWord;
+		return ((doubleWord >>> (NUMBER_OF_BITS - end)) & ((end - start) === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << (end - start)) - 1)) >>> 0 as DoubleWord;
 	}
 
 	/**
 	 * This method sets the bit at a specified index to the passed bit value, were index 0 is MSB and Index size - 1 is LSB.
-	 * @param byte
+	 * @param doubleWord 
 	 * @param index The position of the bit to set.
 	 * @param bit The binary value to set the bit to.
 	 * @returns 
@@ -135,7 +146,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets the upper Word
-	 * @param byte
+	 * @param doubleWord 
 	 * @returns 
 	 */
 	export function getUpperWord(doubleWord: DoubleWord): Word {
@@ -144,7 +155,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets the lower Word
-	 * @param byte
+	 * @param doubleWord 
 	 * @returns 
 	 */
 	export function getLowerWord(doubleWord: DoubleWord): Word {
@@ -155,7 +166,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets the first Byte (Most Significant Byte)
-	 * @param byte
+	 * @param doubleWord 
 	 * @returns 
 	 */
 	export function getFirstByte(doubleWord: DoubleWord): Byte {
@@ -164,7 +175,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets the second Byte
-	 * @param byte
+	 * @param doubleWord 
 	 * @returns 
 	 */
 	export function getSecondByte(doubleWord: DoubleWord): Byte {
@@ -173,7 +184,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets the third Byte
-	 * @param byte
+	 * @param doubleWord 
 	 * @returns 
 	 */
 	export function getThirdByte(doubleWord: DoubleWord): Byte {
@@ -182,7 +193,7 @@ export namespace DoubleWord {
 
 	/**
 	 * This method gets the fourth Byte (Least Significant Byte)
-	 * @param byte
+	 * @param doubleWord 
 	 * @returns 
 	 */
 	export function getFourthByte(doubleWord: DoubleWord): Byte {
@@ -192,7 +203,7 @@ export namespace DoubleWord {
 	/**
      * This method performs a logical shift on the given DoubleWord one bit to the right.
      * @param operand The operand to perform a right shift on.
-     * @returns
+     * @returns [result, shifted out bit]
      */
 	export function logicalRightShift(operand: DoubleWord): [DoubleWord, Bit] {
 		const removedBit: Bit = (operand & 1) as Bit;
@@ -202,7 +213,7 @@ export namespace DoubleWord {
 	/**
 	 * This method performs an arithmetic shift on the given DoubleWord one bit to the right.
 	 * @param operand The operand to perform a right shift on.
-	 * @returns The bit right shifted.
+	 * @returns [result, shifted out bit]
 	 */
 	export function arithmeticRightShift(operand: DoubleWord): [DoubleWord, Bit] {
 		const removedBit: Bit = (operand & 1) as Bit;
@@ -212,7 +223,7 @@ export namespace DoubleWord {
     /**
      * This method performs an logical shift on the given DoubleWord one bit to the left.
      * @param operand The operand to perform a right left on.
-     * @returns The bit left shifted.
+     * @returns [result, shifted out bit]
      */
     export function leftShift(operand: DoubleWord): [DoubleWord, Bit] {
 		const removedBit: Bit = DoubleWord.getMostSignificantBit(operand);

@@ -8,7 +8,6 @@ import { Register } from "./Register";
 export class InstructionRegister extends Register<DoubleWord> {
     /**
      * Constructs a new instance.
-     * @constructor
      */
     public constructor() {
         super("EIR", DoubleWord.ZERO);

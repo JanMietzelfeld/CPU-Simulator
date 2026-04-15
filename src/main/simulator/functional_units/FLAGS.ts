@@ -18,6 +18,9 @@ export class FLAGS extends Register<Byte> {
     private static POS_CARRY_BIT: Byte.BitIndex = 6;
     private static POS_PARITY_BIT: Byte.BitIndex = 7;
 
+    /**
+     * This method constructs an instance.
+     */
     public constructor() {
         super("FLAGS", Byte.fromNumber(0b11000000));
     }

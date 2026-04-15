@@ -21,8 +21,8 @@ export class RAM {
      * @throws AddressOutOfRangeError - If the physical memory address is out of range.
      * @param doubleword Doubleword-sized data to write.
      */
-    public writeDoubleWordTo(physicalAddress: DoubleWord, doubleword: DoubleWord) {
-        if (physicalAddress > this.capacity) {
+    public writeDoubleWordTo(physicalAddress: DoubleWord, doubleword: DoubleWord): void {
+        if (physicalAddress >= this.capacity) {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
         // Only write byte, if it is not a zero byte.
@@ -33,7 +33,6 @@ export class RAM {
         this.writeByteTo(DoubleWord.fromNumber(physicalAddress + 2), DoubleWord.getThirdByte(doubleword));
         // Only write byte, if it is not a zero byte.
         this.writeByteTo(DoubleWord.fromNumber(physicalAddress + 3), DoubleWord.getFourthByte(doubleword));
-        return;
     }
 
     /**
@@ -43,8 +42,8 @@ export class RAM {
      * @throws AddressOutOfRangeError - If the physical memory address is out of range.
      * @param data Byte-sized data to write to the specified pyhsical memory address.
      */
-    public writeByteTo(physicalAddress: DoubleWord, data: Byte) {
-        if (physicalAddress > this.capacity) {
+    public writeByteTo(physicalAddress: DoubleWord, data: Byte): void {
+        if (physicalAddress >= this.capacity) {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
 
@@ -54,7 +53,6 @@ export class RAM {
         }
         // Write byte to "memory".
         this._cells.set(physicalAddress, data);
-        return;
     }
 
     /**
@@ -64,7 +62,7 @@ export class RAM {
      * @returns Doubleword-sized binary data.
      */
     public readDoublewordFrom(physicalAddress: DoubleWord): DoubleWord {
-        if (physicalAddress > this.capacity) {
+        if (physicalAddress >= this.capacity) {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
 
@@ -89,7 +87,7 @@ export class RAM {
      * @returns The byte-sized data found at the specified address.
      */
     public readByteFrom(physicalAddress: DoubleWord): Byte {
-        if (physicalAddress > this.capacity) {
+        if (physicalAddress >= this.capacity) {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
         return this._cells.has(physicalAddress) ? this._cells.get(physicalAddress)! : Byte.ZERO;

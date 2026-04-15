@@ -177,11 +177,10 @@ export class CPUCore {
     /**
      * Constructs an instance of a CPU core.
      * @param mainMemory The main memory of the system.
-     * @param highestAddressOfStackDec The highest address (bottom) of the STACK segment in decimal format.
-     * @param lowestAddressOfStackDec The lowest address (top) of the STACK segment in decimal format.
      * @param processingWidth The maximum number of bits that can be processed in one cycle. Defaults to 32 bits (a doubleword).
+     * @param pathToOSFilesystem 
      */
-    public constructor(mainMemory: RAM, processingWidth: DataSizes) {
+    public constructor(mainMemory: RAM, processingWidth: DataSizes, pathToOSFilesystem: string) {
         this._virtualizationEnabled = false;
         this.eax = new GeneralPurposeRegister("EAX");
         this.ebx = new GeneralPurposeRegister("EBX");
@@ -201,7 +200,7 @@ export class CPUCore {
         // TODO: Adopt MMU to be able to use different processing widths.
         this.mainMemory = mainMemory;
         this.mmu = new MemoryManagementUnit(this);
-        this.fs = new PassthroughFilesystem(process.cwd() + "/os_filesystem");
+        this.fs = new PassthroughFilesystem(pathToOSFilesystem);
         this.timer = new Timer(this);
         this._decodedInstruction = null;
         this._processingWidth = processingWidth;
@@ -269,6 +268,7 @@ export class CPUCore {
 
     /**
      * Handle an Interrupt
+     * @param number Interrupt number to handle
      */
     public handleInterrupt(number: InterruptNumbers)
     {
@@ -817,9 +817,7 @@ export class CPUCore {
 
      * @param command 
      * @param data Command-dependend
-     * @throws {UnsupportedOperandTypeError}
-     * @throws {MissingOperandError} If one of the operands is missing.
-     * @throws {BadOperandError} If command or data could not be interpreted correctly.
+     * @throws {ExceptionError} If an exception was generated
      * @author Laurin Gehlenborg
      */
     private dev(command: InstructionOperand, data: InstructionOperand): void {
@@ -971,8 +969,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private add(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1017,8 +1014,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private adc(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1063,8 +1059,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private sub(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1110,8 +1105,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private sbb(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1156,8 +1150,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private shl(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1204,8 +1197,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private shr(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1252,8 +1244,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private sar(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1298,8 +1289,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private mul(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1344,8 +1334,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private div(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1397,8 +1386,7 @@ export class CPUCore {
      * It takes a binary value from the location defined by the given operand to perfom the computation on.
      * The result is written to the location defined by the operand.
      * @param target An operand used as an argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private neg(target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1435,8 +1423,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private and(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1481,8 +1468,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private or(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1527,8 +1513,7 @@ export class CPUCore {
      * The result is written to the location defined by the second operand.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private xor(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1572,8 +1557,7 @@ export class CPUCore {
      * It takes a binary value from the location defined by the given operand to perfom the computation on.
      * The result is written to the location defined by the operand.
      * @param target An operand used as an argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private not(target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1609,8 +1593,7 @@ export class CPUCore {
      * The operation leaves both operands intact.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private cmp(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1650,8 +1633,7 @@ export class CPUCore {
      * The operation leaves both operands intact.
      * @param source An operand used as the first argument for the operation.
      * @param target An operand used as the second argument for the operation and to write the result to.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private test(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1694,8 +1676,7 @@ export class CPUCore {
      * This method takes a binary value from the location defined by the specified operand. 
      * The binary value is interpreted as a virtual address. This operation is an alias for the JZ operation.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      */
     private jmp(target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
@@ -1720,8 +1701,7 @@ export class CPUCore {
      * This method takes a binary value from the location defined by the specified operand. 
      * The binary value is interpreted as a virtual address. This operation is an alias for the JE operation.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jz(target: InstructionOperand): boolean {
@@ -1751,8 +1731,7 @@ export class CPUCore {
      * This method takes a binary value from the location defined by the specified operand. 
      * The binary value is interpreted as a virtual address. This operation is an alias for the JZ operation.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private je(target: InstructionOperand): boolean {
@@ -1768,8 +1747,7 @@ export class CPUCore {
      * This method takes a binary value from the location defined by the specified operand. 
      * The binary value is interpreted as a virtual address. This operation is an alias for the JNE operation.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jnz(target: InstructionOperand): boolean {
@@ -1799,8 +1777,7 @@ export class CPUCore {
      * This method takes a binary value from the location defined by the specified operand. 
      * The binary value is interpreted as a virtual address. This operation is an alias for the JNZ operation.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jne(target: InstructionOperand): boolean {
@@ -1815,8 +1792,7 @@ export class CPUCore {
      * compared value was above the second. This method takes a binary value from the location defined 
      * by the specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private ja(target: InstructionOperand): boolean {
@@ -1849,8 +1825,7 @@ export class CPUCore {
      * compared value was above or equal to the second. This method takes a binary value from the location defined 
      * by the specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jae(target: InstructionOperand): boolean {
@@ -1882,8 +1857,7 @@ export class CPUCore {
      * compared value was below the second. This method takes a binary value from the location defined 
      * by the specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jb(target: InstructionOperand): boolean {
@@ -1915,8 +1889,7 @@ export class CPUCore {
      * compared value was below or equal to the second. This method takes a binary value from the location defined 
      * by the specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jbe(target: InstructionOperand): boolean {
@@ -1950,8 +1923,7 @@ export class CPUCore {
      * compared value was greater than the second. This method takes a binary value from the location defined 
      * by the specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jg(target: InstructionOperand): boolean {
@@ -1985,8 +1957,7 @@ export class CPUCore {
      * equal to or greater than the second. This method takes a binary value from the location defined by the 
      * specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jge(target: InstructionOperand): boolean {
@@ -2016,8 +1987,7 @@ export class CPUCore {
      * second. This method takes a binary value from the location defined by the specified operand. 
      * The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jl(target: InstructionOperand): boolean {
@@ -2047,8 +2017,7 @@ export class CPUCore {
      * that the first compared value was equal to or smaller than the second. This method takes a binary value 
      * from the location defined by the specified operand. The binary value is interpreted as a virtual address.
      * @param target An operand used as an argument for the operation.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
+     * @throws {ExceptionError} If an exception was generated
      * @returns True, if a jump was performed, false otherwise.
      */
     private jle(target: InstructionOperand): boolean {
@@ -2083,12 +2052,7 @@ export class CPUCore {
      * The source operand can be of type IMMEDIATE, MEMORY_ADDRESS or REGISTER. The target operand can be of type MEMORY_ADDRESS or REGISTER.
      * @param source The first operand which defines the value to copy and the location to copy this value from.
      * @param target The second operand which defines the value to copy and the location to copy this value from.
-     * @throws {UnsupportedOperandTypeError} If the source and target operands are both of type memory address.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If one of the operands is missing.
-     * @throws {UnknownRegisterError} If the source or target operand is of type REGISTER and the register could not be decoded.
-     * @throws {RegisterNotWritableInUserModeError} If the target operand is of type REGISTER and the register is read-only in user mode.
-     * @throws {RegisterNotAvailableError} If source or target operand is of type REGISTER and the register is currently not available.
+     * @throws {ExceptionError} If an exception was generated
      */
     private mov(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the source and target operands are both of type memory address.
@@ -2127,13 +2091,7 @@ export class CPUCore {
      * The source operand can be of type MEMORY_ADDRESS or REGISTER. The target operand can be of type MEMORY_ADDRESS or REGISTER.
      * @param source The first operand which defines the (virtual) memory address to copy.
      * @param target The second operand which defines the value to copy and the location to copy this value from.
-     * @throws {UnsupportedOperandTypeError} If the source and target operands are both of type memory address.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {UnsupportedOperandTypeError} If the source operand is of type REGISTER and uses DIRECT addressing mode.
-     * @throws {MissingOperandError} If one of the operands is missing.
-     * @throws {UnknownRegisterError} If the source or target operand is of type REGISTER and the register could not be decoded.
-     * @throws {RegisterNotWritableInUserModeError} If the target operand is of type REGISTER and the register is read-only in user mode.
-     * @throws {RegisterNotAvailableError} If source or target operand is of type REGISTER and the register is currently not available.
+     * @throws {ExceptionError} If an exception was generated
      */
     private lea(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the source and target operands are both of type memory address.
@@ -2205,6 +2163,7 @@ export class CPUCore {
     /**
      * This method clears the interrupt flag.
      * The CPU will ignore all software interrupts to occur.
+     * @throws {ExceptionError} If an exception was generated
      */
     private cli(): void {
         // Check whether CPU is in kernel mode.
@@ -2238,7 +2197,7 @@ export class CPUCore {
 
     /**
      * This method pushes the contents of the EFLAGS register onto the STACK.
-     * @throws {StackOverflowError} If the ESP reached the lowest possible address (top) of the STACK segment.
+     * @throws {ExceptionError} If an exception was generated
      */
     private pushf(): void {
         // Check whether CPU is in kernel mode.
@@ -2263,7 +2222,7 @@ export class CPUCore {
     /**
      * This method reads the contents of the EFLAGS register from the STACK into the EFLAGS register.
      * The STACK pointer is incremented by 1 (byte/address) after the operation and the used memory gets deallocated.
-     * @throws {StackUnderflowError} If the ESP reached the highest possible address (bottom) of the STACK segment.
+     * @throws {ExceptionError} If an exception was generated
      */
     private popf(): void {
         // Check whether CPU is in kernel mode.
@@ -2293,10 +2252,7 @@ export class CPUCore {
      * This method copies a doubleword sized binary value from the STACK to the target defined by the given operand.
      * The STACK pointer is incremented by four (bytes/addresses), which deallocates memory for a doubleword.
      * @param target This operand defines where to put the red binary value from the STACK to.
-     * @throws {StackUnderflowError} If the ESP reached the highest possible address (bottom) of the STACK segment.
-     * @throws {RegisterNotWritableInUserModeError} If the targeted register is not writable in user mode.
-     * @throws {UnknownRegisterError} If the targeted register is unknown.
-     * @throws {MissingOperandError} If the operand given is of type NO.
+     * @throws {ExceptionError} If an exception was generated
      */
     public pop(target: InstructionOperand) {
         // Check whether ESP reached highest address (bottom) of STACK segment.
@@ -2331,13 +2287,10 @@ export class CPUCore {
     /**
      * This method copies a doubleword sized binary value defined by the given operand onto the STACK.
      * Therefore the stack pointer is decremented by 4 (bytes/addresses), which allocates memory for a doubleword on the STACK.
-     * @param target This operand defines from where to copy the binary value.
-     * @throws {StackOverflowError} If the ESP reached the lowest possible address (top) of the STACK segment.
-     * @throws {RegisterNotWritableInUserModeError} If the targeted register is not writable in user mode.
-     * @throws {UnknownRegisterError} If the targeted register is unknown.
-     * @throws {MissingOperandError} If the operand given is of type NO.
+     * @param source This operand defines from where to copy the binary value.
+     * @throws {ExceptionError} If an exception was generated
      */
-    public push(source: InstructionOperand) {
+    public push(source: InstructionOperand): void {
         // Check whether ESP reached lowest address (top) of STACK segment.
         // if (this.esp.content.equal(Doubleword.fromInteger(this._lowestAddressOfStackDec))) {
         //     // ESP reached lowest address (top) of STACK segment.
@@ -2378,10 +2331,7 @@ export class CPUCore {
      * (EIP) register and control is transfered to the callee (targeted subroutine).
      * @param target This operand defines the (virtual) base address of the subroutine to call.
      * @returns True if jump was performed, which is always the case.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If the operand given is of type NO.
-     * @throws {RegisterNotAvailableError} If the register to read from, is not available.
-     * @throws {UnknownRegisterError} If the register to read from, is unknown.
+     * @throws {ExceptionError} If an exception was generated
      */
     private call(target: InstructionOperand): boolean {
         // Check if the source operand is of type IMMEDIATE.
@@ -2420,6 +2370,7 @@ export class CPUCore {
     /**
      * This method returns from a subroutine. It reads the return address from the STACK and transfers
      * control to the caller, by loading the return address into the instruction pointer (EIP) register.
+     * @throws {ExceptionError} If an exception was generated
      * @returns Always returns true to indicate a jump was performed.
      */
     private ret(): boolean {
@@ -2447,7 +2398,7 @@ export class CPUCore {
      * The call follows the same rules as a normal function call.
      * @param target The interrupt handlers number.
      * @returns Always returns true to indicate a jump was performed.
-     * @throws {StackOverflowError} If the ESP reached the lowest possible address (top) of the STACK segment.
+     * @throws {ExceptionError} If an exception was generated
      */
     public int(target: InstructionOperand): boolean {
         // Check if exactly one operand is present.
@@ -2519,7 +2470,6 @@ export class CPUCore {
      * This method returns from an interrupt handler triggered by a software interrupt. It reads the return address from the STACK
      * and transfers control back to the interrupted process. Additionally, the EFLAGS gets restored from the STACK, the interrupt flag
      * is cleared and the CPU switches back to user mode.
-     * @returns returns true to indicate a jump was performed.
      * @throws {ExceptionError} If the CPU is not in kernel mode when this mehtod is called.
      */
     public iret(): void {
@@ -2558,11 +2508,7 @@ export class CPUCore {
      * erea of the main memory, this method needs to enter the kernel mode. In order to ensure, this subroutine can not be interrupted,
      * the interrupt flag is cleared. The current content of the EFLAGS register is written onto the STACK.
      * @param target This operand defines the physical base address of the systems subroutine to call.
-     * @throws {StackOverflowError} If the ESP reached the lowest possible address (top) of the STACK segment.
-     * @throws {UnsupportedOperandTypeError} If the target operand is of type IMMEDIATE.
-     * @throws {MissingOperandError} If the operand given is of type NO. 
-     * @throws {RegisterNotAvailableError} If the register to read from, is not available.
-     * @throws {UnknownRegisterError} If the register to read from, is unknown.
+     * @throws {ExceptionError} If an exception was generated
      */
     private sysenter(target: InstructionOperand): void {
         // Check if exactly one operand is present.
@@ -2601,7 +2547,7 @@ export class CPUCore {
      * This method returns from a systems subroutine. It reads the return address from the STACK
      * and transfers control back to the caller. Additionally, the EFLAGS gets restored from the STACK, the interrupt flag
      * is cleared and the CPU switches back to user mode.
-     * @throws {StackUnderflowError} If the ESP reached the highest possible address (bottom) of the STACK segment.
+     * @throws {ExceptionError} If an exception was generated
      */
     private sysexit(): void {
         if (!this.flags.isInKernelMode()) {
@@ -2631,7 +2577,7 @@ export class CPUCore {
 
     /**
      * This method invalidates the TLB
-     * @throws {PrivilegeViolationError} If the CPU is not in kernel mode when this mehtod is called.
+     * @throws {ExceptionError} If an exception was generated
      */
     private invtlb(): void {
                // Check whether CPU is in kernel mode.
@@ -2650,8 +2596,7 @@ export class CPUCore {
      * Depending on the access type, the value is written directly to the register or to an referenced 
      * (virtual) memory address.
      * @param operand The register operand to read a binary value from.
-     * @throws {RegisterNotWritableInUserModeError} If the targeted register is not writable in user mode.
-     * @throws {UnknownRegisterError} If the targeted is unknown.
+     * @throws {ExceptionError} If an exception was generated
      * @returns The red binary value.
      */
     private writeRegister(value: DoubleWord, operand: InstructionOperand): void {
@@ -2668,7 +2613,7 @@ export class CPUCore {
      * This method writes a given doubleword sized binary value to the register defined by the given operand.
      * @param value The binary value to write to the given register.
      * @param operand The register to write the value to.
-     * @throws {ExceptionError}
+     * @throws {ExceptionError} If an exception was generated
      */
     private writeRegisterDirect(value: DoubleWord, operand: InstructionOperand): void {
         // Decode the register defined by the operand.
@@ -2697,7 +2642,7 @@ export class CPUCore {
      * The (virtual memory address) is referenced by the register defined by the given operand.
      * @param value The binary value to write to the memory address referenced by the given register.
      * @param operand The register which references a memory address to write to.
-     * @throws {ExceptionError}
+     * @throws {ExceptionError} If an exception was generated
      */
     private writeRegisterIndirect(value: DoubleWord, operand: InstructionOperand): void {
         // Decode the register defined by the operand.
@@ -2711,7 +2656,7 @@ export class CPUCore {
      * Depending on the addressing mode, the value is read directly from the register or from the main memory. 
      * In the latter case, the value contained in the register is interpreted as the memory address.
      * @param operand The register operand to read a binary value from.
-     * @throws {ExceptionError}
+     * @throws {ExceptionError} If an exception was generated
      * @returns The binary value red from the register or the referenced (virtual) memory address.
      */
     private readRegister(operand: InstructionOperand): DoubleWord {
@@ -2729,7 +2674,7 @@ export class CPUCore {
      * This method reads a given doubleword sized binary value from a (virtual) memory address.
      * The (virtual) memory address is referenced by the register defined in the given operand.
      * @param operand The operand to extract the register from.
-     * @throws {ExceptionError}
+     * @throws {ExceptionError} If an exception was generated
      * @returns The binary value red from the referenced (virtual) memory address.
      */
     private readRegisterIndirect(operand: InstructionOperand): DoubleWord {
@@ -2742,8 +2687,7 @@ export class CPUCore {
     /**
      * This method reads a given doubleword sized binary value from the register defined by the given operand.
      * @param operand The operand to extract the register from.
-     * @throws {RegisterNotAvailableError} If the register to read from is not available.
-     * @throws {UnknownRegisterError} If the register to read from is unknown.
+     * @throws {ExceptionError} If an exception was generated
      * @returns The binary value red from the register.
      */
     private readRegisterDirect(operand: InstructionOperand): DoubleWord {
@@ -2755,7 +2699,7 @@ export class CPUCore {
      * This method decodes a given operands value and returns the encoded register.
      * Only readable registers can be decoded.
      * @param operand The operand to extract the register from.
-     * @throws {ExceptionError}
+     * @throws {ExceptionError} If an exception was generated
      * @returns The decoded register.
      */
     private decodeReadableRegister(operand: InstructionOperand): Register<DoubleWord> {
@@ -2805,7 +2749,7 @@ export class CPUCore {
      * This method decodes a given operands value and returns the encoded register. 
      * Both read- and writable registers can be decoded.
      * @param operand The operand to extract the register from.
-     * @throws {ExceptionError}
+     * @throws {ExceptionError} If an exception was generated
      * @returns The decoded register.
      */
     private decodeWritableRegister(operand: InstructionOperand): Register<DoubleWord> {
@@ -2851,6 +2795,7 @@ export class CPUCore {
     /**
      * Read a buffer bytewise from memory until the first zero byte and return it as ASCII string
      * @param address The start of the buffer.
+     * @throws {ExceptionError} If an exception was generated
      * @returns ASCII string of the content
      * @author Laurin Gehlenborg
      */
@@ -2875,6 +2820,7 @@ export class CPUCore {
 
     /**
      * Pop a value from stack and return it for CPU-internal usage.
+     * @throws {ExceptionError} If an exception was generated
      * @returns 32 bit value from stack.
      * @author Laurin Gehlenborg
      */
@@ -2889,13 +2835,15 @@ export class CPUCore {
     /**
      * Trigger an External Interrupt
      */
-    public triggertExternalInterrupt(number: InterruptNumbers)
-    {
+    public triggertExternalInterrupt(number: InterruptNumbers): void {
         //Add interrupt to list to be executed after current instruction finishes
         this.interruptQueue.push(number);
     }
 
-    public reset() {
+    /**
+     * Reset the cpu
+     */
+    public reset(): void {
         // TODO implement
         SimulationController.getInstance()!.log("");
         SimulationController.getInstance()!.log("KERNEL PANIC! RESETING SIMULATOR");
@@ -2904,6 +2852,7 @@ export class CPUCore {
     /**
      * This method decodes the type of an instruction.
      * @param encodedOperandType 
+     * @throws {ExceptionError} If an exception was generated
      * @returns 
      */
     public decodeOperandType(encodedOperandType: number): OperandTypes {
@@ -2917,6 +2866,7 @@ export class CPUCore {
     /**
      * This method decodes the addressing mode of an instruction.
      * @param encodedAddressingMode 
+     * @throws {ExceptionError} If an exception was generated
      * @returns 
      */
     public decodeAddressingMode(encodedAddressingMode: number): AddressingModes {
@@ -2930,6 +2880,7 @@ export class CPUCore {
     /**
      * This methods decodes an instructions type.
      * @param encodedInstructionType The binary encoded instructions type.
+     * @throws {ExceptionError} If an exception was generated
      * @returns A decoded representation of the type.
      */
     public decodeInstructionType(encodedInstructionType: number): InstructionTypes {
@@ -2943,6 +2894,7 @@ export class CPUCore {
     /**
      * This methods decodes an I-type instruction.
      * @param encodedOperation The binary encoded I-type operation.
+     * @throws {ExceptionError} If an exception was generated
      * @returns A decoded representation of the operation.
      */
     public decodeIInstruction(encodedOperation: number): Instructions {
@@ -2956,6 +2908,7 @@ export class CPUCore {
     /**
      * This methods decodes a J-type instruction.
      * @param encodedOperation The binary encoded J-type instruction.
+     * @throws {ExceptionError} If an exception was generated
      * @returns A decoded representation of the operation.
      */
     public decodeJIntruction(encodedOperation: number): Instructions {
@@ -2969,6 +2922,7 @@ export class CPUCore {
     /**
      * This methods decodes a R-type instruction.
      * @param encodedOperation The binary encoded R-type instruction.
+     * @throws {ExceptionError} If an exception was generated
      * @returns A decoded representation of the operation.
      */
     public decodeRIntruction(encodedOperation: number): Instructions {

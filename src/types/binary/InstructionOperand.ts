@@ -33,7 +33,6 @@ export class InstructionOperand {
 	 * @param addressingMode The operands addressing mode.
 	 * @param type The operands type.
 	 * @param value The operands value in binary representation.
-	 * @constructor
 	 */
     public constructor(addressingMode: AddressingMode, type: OperandTypes, value: DoubleWord) {
         this.addressingMode = addressingMode;

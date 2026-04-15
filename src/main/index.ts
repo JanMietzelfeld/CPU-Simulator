@@ -224,6 +224,12 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 	return menu;
 };
 
+console.log(process.env.ELECTRON_OZONE_PLATFORM_HINT);
+app.commandLine.appendSwitch("ozone-platform", "x11");
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch("disable-gpu");
+app.commandLine.appendSwitch("disable-software-rasterizer");
+app.commandLine.appendSwitch("disable-vulkan");
 const createWindow = (): void => {
 	// Create the browser window.
 	mainWindow = new BrowserWindow({
@@ -239,18 +245,19 @@ const createWindow = (): void => {
 	// mainWindow.webContents.openDevTools();
 
 	let pathToLanguageDefinition: string;
-	let pathToAssembly: string;
+	let pathToOSFilesystem: string;
 	if (app.isPackaged) {
 		pathToLanguageDefinition = `${process.resourcesPath}/settings/language_definition.json`;
-		pathToAssembly = `${process.resourcesPath}/assembly/`;
+		pathToOSFilesystem = `${process.resourcesPath}/os_filesystem`;
 	} else {
 		pathToLanguageDefinition = "./settings/language_definition.json";
-		pathToAssembly = "./assembly/";
+		pathToOSFilesystem = "./os_filesystem";
 	}
 	
 	const simulator = SimulationController.getInstanceOrCreate(
-		Math.pow(2, 32),
+		DoubleWord.SIZE,
 		pathToLanguageDefinition,
+		pathToOSFilesystem,
 		getMainWindow().webContents
 	);
 	
@@ -532,7 +539,14 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on("ready", createWindow);
+app.whenReady().then(() => {
+	try {
+		createWindow();
+	}
+	catch (e) {
+		console.log(e);
+	}
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

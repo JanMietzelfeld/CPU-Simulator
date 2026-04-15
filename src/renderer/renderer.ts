@@ -4,7 +4,7 @@
  * are problematic to use in frontend. Maybe there is a solution.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
-enum NumberSystem {
+export enum NumberSystem {
     HEX = 16,
     DEC = 10,
     BIN = 2,
@@ -1221,8 +1221,8 @@ export class Renderer {
      * This method initializes the view of the physical RAM by reading the first twenty
      * entries of the main memory and creating HTMLElements, which represents the individual 
      * RAM cells.
-     * @param [firstPhysicalAddressToReadHex="0x0"] The first physical memory address to read from main memory in hexadecimal representation.
-     * @param [lastPhysicalAddressToReadHex="0x1e"] The last physical memory address to read from main memory in hexadecimal representation.
+     * @param [firstPhysicalAddressToReadHex=0x0] The first physical memory address to read from main memory in hexadecimal representation.
+     * @param [lastPhysicalAddressToReadHex=0x1e] The last physical memory address to read from main memory in hexadecimal representation.
      */
     public async createPhysicalRAMView(firstPhysicalAddressToReadHex = 0x0, lastPhysicalAddressToReadHex = 0x1e): Promise<void> {
         const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("physical-ram-cells");
@@ -1250,8 +1250,8 @@ export class Renderer {
     /**
      * This method initializes the view of the virtual RAM by reading the first twenty entries of the main memory 
      * and creating HTMLElements, which represents the individual RAM cells.
-     * @param [firstVirtualAddressToReadHex="0x0"] The first virtual memory address to read from main memory in hexadecimal representation.
-     * @param [lastVirtualAddressToReadHex="0x1e"] The last virtual memory address to read from main memory in hexadecimal representation.
+     * @param [firstVirtualAddressToReadHex=0x0] The first virtual memory address to read from main memory in hexadecimal representation.
+     * @param [lastVirtualAddressToReadHex=0x1e] The last virtual memory address to read from main memory in hexadecimal representation.
      */
     public async createVirtualRAMView(firstVirtualAddressToReadHex = 0x0, lastVirtualAddressToReadHex = 0x1e): Promise<void> {
         const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("virtual-ram-cells");
@@ -1379,8 +1379,8 @@ export class Renderer {
     /**
      * This method initializes the view of the Page Table reading the first thirty entries of the Page Table
      * and creats GUI elements, which represents the individual entries.
-     * @param [firstPageNumberToReadDec="0"] The first page number to read from Page Table.
-     * @param [lastPageNumberToReadDec="30"] The last page number to read from Page Table.
+     * @param [firstPageNumberToRead=0] The first page number to read from Page Table.
+     * @param [lastPageNumberToRead=30] The last page number to read from Page Table.
      */
     public async createPageTableView(firstPageNumberToRead = 0, lastPageNumberToRead = 30): Promise<void> {
         const pageTableEntiresElement: HTMLElement | null = this._document.getElementById("page-table-entries");

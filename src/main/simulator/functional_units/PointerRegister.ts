@@ -9,7 +9,6 @@ import { Register } from "./Register";
 export class PointerRegister extends Register<DoubleWord> {
     /**
      * Constructs a new instance.
-     * @constructor
      */
     public constructor(name: string) {
         super(name, DoubleWord.ZERO);

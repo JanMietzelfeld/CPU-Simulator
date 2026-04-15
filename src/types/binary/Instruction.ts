@@ -25,7 +25,8 @@ export class Instruction {
 	/**
 	 * Constructs a new instance from the given arguments.
 	 * @param type The instructions type.
-	 * @param operation The instructions operation.
+	 * @param instruction The instruction.
+	 * @param operands The instructions operands.
 	 */
     public constructor(type: InstructionTypes, instruction: Instructions, operands: [InstructionOperand | undefined, InstructionOperand | undefined] = [undefined, undefined]) {
         this._type = type;

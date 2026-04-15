@@ -83,10 +83,7 @@ export class MemoryManagementUnit {
 
     /**
      * Constructs a new instance from the given references of the RAM, Page Table Pointer (PTP) register, the ALU and the EFLAGS register.
-     * @param mainMemory A reference to the main memory of this computer system.
-     * @param ptp A reference to the Page Table Pointer of the CPU core, this MMU is associated with.
-     * @param eflags A reference to the EFLAGS register of the CPU core, this MMU is associated with.
-     * @constructor
+     * @param cpu A reference to the cpu.
      */
     public constructor(cpu: CPUCore) {
         this._cpu = cpu;
@@ -94,6 +91,7 @@ export class MemoryManagementUnit {
 
     /**
      * This method retruns if memory virtualization is enabled 1 = eabled | 0 = disabled.
+     * @returns
      */
     public isMemoryVirtualizationEnabled(): number {
         return this._memoryVirtualizationEnabled ? 1 : 0;
@@ -102,32 +100,30 @@ export class MemoryManagementUnit {
     /**
      * This method enables memory virtualization.
      */
-    public enableMemoryVirtualization() {
+    public enableMemoryVirtualization(): void {
         this._memoryVirtualizationEnabled = true;
     }
 
     /**
      * This method disables memory virtualization.
      */
-    public disableMemoryVirtualization() {
+    public disableMemoryVirtualization(): void {
         this._memoryVirtualizationEnabled = false;
     }
 
     /**
      * This method invalidates the TLB.
      */
-    public invalidateTLB() {
+    public invalidateTLB(): void {
         this._tlb.clear();
     }
 
     /**
      * This methods writes a doubleword (4-byte) value to memory to the specified memory address.
-     * @param physicalAddress A binary virtual memory address to write the doubleword-sized data to.
+     * @param virtualAddress A binary virtual memory address to write the doubleword-sized data to.
      * @param doubleword Doubleword-sized data to write.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @param attemptsToExecute 
+     * @throws {ExceptionError} If an exception was generated
      */
     public writeDoublewordTo(virtualAddress: DoubleWord, doubleword: DoubleWord, attemptsToExecute: boolean): void {
         const physicalAddress: DoubleWord = this.translate(virtualAddress, true, attemptsToExecute);
@@ -139,10 +135,7 @@ export class MemoryManagementUnit {
      * This method reads doubleword sized data from the main memory starting at the specified physical memory address.
      * @param virtualAddress A binary virtual memory address to read the doubleword-sized data from.
      * @param attemptsToExecute Whether the reading process attempts to execute the content to read.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      * @returns Doubleword-sized binary data.
      */
     public readDoublewordFrom(virtualAddress: DoubleWord, attemptsToExecute: boolean): DoubleWord {
@@ -155,10 +148,7 @@ export class MemoryManagementUnit {
      * in the main memory. Throws an error, if the data exeeds a byte.
      * @param virtualAddress A binary value representing a virtual memory address to write the data to.
      * @param data Byte-sized data to write to the specified pyhsical memory address.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      */
     public writeByteTo(virtualAddress: DoubleWord, data: Byte): void {
         const physicalAddress: DoubleWord = this.translate(virtualAddress, true, false);
@@ -171,10 +161,7 @@ export class MemoryManagementUnit {
      * Returns a binary zero for address not conatined in the
      * map in order to simulate a full size memory.
      * @param virtualAddress A binary value representing a virtual memory address to write the data to.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      * @returns The byte of data found at the specified address.
      */
     public readByteFrom(virtualAddress: DoubleWord): Byte {
@@ -186,10 +173,7 @@ export class MemoryManagementUnit {
      * This method clears all bits at the specified locations, depending on the given number of bytes.
      * @param virtualAddress The virtual address to clear all bits at.
      * @param length The number of bytes to clear, starting at the given physical address.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      */
     public clearMemory(virtualAddress: DoubleWord, length: DataSizes): void {
         // The first virtual memory address to translate and to clear all bits at.
@@ -291,7 +275,6 @@ export class MemoryManagementUnit {
      * to the page to which the given virtual memory address is assigned. The page table entry includes some status 
      * bits and possibly the physical base address of a page frame.
      * @param virtualAddress The virtual memory address to look up in the page table.
-     * @returns The page table entry.
      */
     private searchPageTable(virtualAddress: DoubleWord): PageTableEntry {
         const wasInKernelMode: boolean = this._cpu.flags.isInKernelMode();

@@ -9,14 +9,15 @@ import { Byte } from "../../types/binary/Byte";
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
 	public readonly languageDefinition: AssemblyLanguageDefinition;
-
+ 	public readonly pathToOSFilesystem: string
 	/**
 	 * Constructs a new assembler object with the given processing width.
-	 * @param processingWidth The processing width of the computer system the assembler is used for.
 	 * @param pathToLanguageDefinition The path to the language definition file of the assembly language used by this assembler.
+	 * @param pathToOSFilesystem 
 	 */
-	public constructor(pathToLanguageDefinition: string) {
+	public constructor(pathToLanguageDefinition: string, pathToOSFilesystem: string) {
 		this.languageDefinition = JSON.parse(readFileSync(pathToLanguageDefinition, "utf-8"));
+		this.pathToOSFilesystem = pathToOSFilesystem;
 	}
 
 	/**
@@ -66,7 +67,7 @@ export class Assembler {
 				let fileName: string = regexMatch[0].toString();
 				fileName = fileName.substring(fileName.indexOf("\"") + 1, fileName.lastIndexOf("\""));
 
-				let fileContents: string = readFileSync(process.cwd() + "/os_filesystem/" + fileName + ".asm", "utf-8");
+				let fileContents: string = readFileSync(this.pathToOSFilesystem + "/" + fileName + ".asm", "utf-8");
 				fileContents = this.replaceIncludeLabels(fileContents)
 
 				lineContent = line.replace(includeRegex, () => fileContents);
