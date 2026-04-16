@@ -96,7 +96,7 @@ JMP _OS_ENTRY ; start of the os
     ; the code for init Program should be located in the file os/user/init (as bynary file)
 
 
-    .CONST _OS_ENTRY_CONST_INIT_FILE_PATH "os/user/init.bin"
+    .CONST _OS_ENTRY_CONST_INIT_FILE_PATH "os/bin/init.bin"
 
 
     MOV $_OS_ENTRY_CONST_INIT_FILE_PATH, %ebx
@@ -122,7 +122,7 @@ JMP _OS_ENTRY ; start of the os
 
     ; the code for idle Program should be located in the file os/user/idle (as bynary file)
 
-    .CONST _OS_ENTRY_CONST_IDLE_FILE_PATH "os/user/idle.bin"
+    .CONST _OS_ENTRY_CONST_IDLE_FILE_PATH "os/bin/idle.bin"
 
     MOV $_OS_ENTRY_CONST_IDLE_FILE_PATH, %ebx
 

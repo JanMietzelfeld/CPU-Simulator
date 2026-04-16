@@ -107,7 +107,7 @@ export class SimulationController {
      */
     public assemblyKernel(): void {
 
-        this.assembleOSCode(this.pathToOSFilesystem + "/os/src/os_entry.asm", "ihmeOS");
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/src/os_entry.asm", "ihmeOS", SimulationController.KERNEL_SPACE_START);
 
         //Assemble the init program (needed by the os)
         this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
@@ -138,12 +138,12 @@ export class SimulationController {
 
         for (let i = 0; i < lenght; i+=4) {
             const value: DoubleWord = DoubleWord.fromBytes(
-                Byte.fromNumber(buffer[0]), 
-                Byte.fromNumber(buffer[1]), 
-                Byte.fromNumber(buffer[2]), 
-                Byte.fromNumber(buffer[3]));
+                Byte.fromNumber(buffer[i]), 
+                Byte.fromNumber(buffer[i+1]), 
+                Byte.fromNumber(buffer[i+2]), 
+                Byte.fromNumber(buffer[i+3]));
 
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + i*DoubleWord.NUMBER_OF_BYTES), value)
+            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
         }
 
         if (buffer.length % 4 !== 0)
@@ -154,7 +154,7 @@ export class SimulationController {
                 Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
                 Byte.ZERO);
 
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + lenght*DoubleWord.NUMBER_OF_BYTES), value)
+            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
         }
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
@@ -208,8 +208,8 @@ export class SimulationController {
             throw new EvalError("file must be in the os_filesystem")
         }
 
-        let relativePathToCode = pathToProgramCode.substring(pathToProgramCode.indexOf("/os_filesystem/") + "/os_filesystem/".length)
-        relativePathToCode = relativePathToCode.concat("\0");
+        let programName = pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
+        let relativePathToCode = "/bin" + programName + "\0";
 
         while (relativePathToCode.length % 4 != 0)
         {
@@ -251,9 +251,8 @@ export class SimulationController {
             buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
         });
 
-        pathToProgramCode.replace(".asm", "");
         pathToProgramCode = this.pathToOSFilesystem + "/bin" + pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
-        pathToProgramCode += ".bin";
+        pathToProgramCode = pathToProgramCode.replace(".asm", ".bin");;
 
         writeFileSync(pathToProgramCode, buffer);
     }
@@ -262,13 +261,14 @@ export class SimulationController {
      * This method is used to assemble os code
      * @param pathToProgramCode 
      * @param [name=null] 
+     * @param [baseOffeset=0] 
      */
-    public assembleOSCode(pathToProgramCode: string, name: string | null = null): void {
+    public assembleOSCode(pathToProgramCode: string, name: string | null = null, baseOffeset: number = 0): void {
         
         // Read the program code.
         const fileContents: string = readFileSync(pathToProgramCode, "utf-8");
         // Compile the program code.
-        const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents);
+        const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents, baseOffeset);
 
         const buffer = Buffer.alloc(compiledProgram.length * 4);
 

@@ -337,7 +337,6 @@ export class CPUCore {
         const instruction: DoubleWord = this.mmu.readDoublewordFrom(instructionAddress, true);
         // Load instruction into EIR register.
         this.eir.content = instruction;
-        return;
     }
 
     /**
@@ -433,7 +432,6 @@ export class CPUCore {
         } else {
             this._decodedInstruction = new Instruction(decodedInstructionType, decodedOperation);
         }
-        return;
     }
 
     /**
@@ -723,9 +721,6 @@ export class CPUCore {
                 DebugLogger.removeIndentation()
             }
         }
-
-        return;
-
     }
 
     private getLogText(currentOperation: string): string {

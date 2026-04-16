@@ -26,7 +26,7 @@ export class RAM {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
         // Only write byte, if it is not a zero byte.
-        this.writeByteTo(DoubleWord.fromNumber(physicalAddress), DoubleWord.getFirstByte(doubleword));
+        this.writeByteTo(physicalAddress, DoubleWord.getFirstByte(doubleword));
         // Only write byte, if it is not a zero byte.
         this.writeByteTo(DoubleWord.fromNumber(physicalAddress + 1), DoubleWord.getSecondByte(doubleword));
         // Only write byte, if it is not a zero byte.
