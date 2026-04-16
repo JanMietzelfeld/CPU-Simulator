@@ -18,7 +18,7 @@ import { Renderer } from './renderer';
 
 const renderer: Renderer = new Renderer(document, window);
 
-window.onload = async (event) => {
+window.onload = async () => {
 	document.getElementById("next_cycle")?.setAttribute("src", next_cycle);
 	document.getElementById("cycle-btn")?.addEventListener("click", async () => {
 		renderer.cycle();

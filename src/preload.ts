@@ -1,7 +1,7 @@
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
-import { contextBridge, ipcRenderer, BrowserWindow } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 import { NumberSystems } from './types/enumerations/NumberSystems';
 import { DoubleWord } from './types/binary/DoubleWord';
 import { Byte } from './types/binary/Byte';
@@ -10,9 +10,13 @@ import { PageTableEntry } from './types/binary/PageTableEntry';
 
 declare global {
 	interface Window {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		mainMemory: any,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		simulator: any,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		electron: any,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		windowUpdate: any
 	}
 }

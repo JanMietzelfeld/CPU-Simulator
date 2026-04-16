@@ -22,7 +22,7 @@ import { Timer } from "./Timer";
 import { DebugLogger } from "../Logger";
 import { ExceptionError } from "../../../types/errors/ExceptionError";
 import { RegisterNumbers } from "../../../types/enumerations/RegisterNumbers";
-import { SimulationController } from "../SimulationController";
+import { getMainWindow } from "../../index";
 
 /**
  * This class represents a CPU core which is capable of executing instructions.
@@ -277,7 +277,7 @@ export class CPUCore {
             throw new Error("Kernel Panic");
         }
 
-        let returnValue = this.eip.content;
+        const returnValue = this.eip.content;
 
         this.int(new InstructionOperand(
             AddressingModes.DIRECT,
@@ -473,8 +473,8 @@ export class CPUCore {
             let log = "Executing:    ";
             log += logText;
             
-            SimulationController.getInstance()!.log(" ");
-            SimulationController.getInstance()!.log(log);
+            this.logToLogger(" ");
+            this.logToLogger(log);
         }
 
         let jumpPerformed = false;
@@ -706,14 +706,14 @@ export class CPUCore {
             try {
                 if (this.esp.content <= 0xFFFFFFFC) {
                     const physicalAddress: DoubleWord = this.mmu.translate(this.esp.content, false, false, true);
-                    let value = this.mainMemory.readDoublewordFrom(physicalAddress);
+                    const value = this.mainMemory.readDoublewordFrom(physicalAddress);
                     DebugLogger.log("Stack value: 0x" + value.toString(16));
                 }
                 else {
                     DebugLogger.log("Stack empty");
                 }
             }
-            catch(e) {
+            catch {
                 DebugLogger.log("Stack value: Not Mapped");
             }
             
@@ -739,7 +739,7 @@ export class CPUCore {
                 } else if (this._decodedInstruction.operands[0]!.type === OperandTypes.MEMORY_ADDRESS) {
                     text += " 0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operands[0]!.value, true).toString(16);
                 } else {
-                    let register = this.decodeReadableRegister(this._decodedInstruction.operands[0]!);
+                    const register = this.decodeReadableRegister(this._decodedInstruction.operands[0]!);
 
                     if (this._decodedInstruction.operands[0]!.addressingMode === AddressingModes.INDIRECT) {
                         text += " *%" + register.name + " (*0x" + register.content.toString(16) + ")" + " (0x" + this.mmu.readDoublewordFrom(register.content, false).toString(16) + ")";
@@ -767,7 +767,7 @@ export class CPUCore {
                 } else if (this._decodedInstruction.operands[1]!.type === OperandTypes.MEMORY_ADDRESS) {
                     text += ", 0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operands[1]!.value, true).toString(16);
                 } else {
-                    let register = this.decodeReadableRegister(this._decodedInstruction.operands[1]!);
+                    const register = this.decodeReadableRegister(this._decodedInstruction.operands[1]!);
 
                     if (this._decodedInstruction.operands[1]!.addressingMode === AddressingModes.INDIRECT) {
                         text += ", *%" + register.name + " (*0x" + register.content.toString(16) + ")" + " (0x" + this.mmu.readDoublewordFrom(register.content, false).toString(16) + ")";
@@ -864,18 +864,18 @@ export class CPUCore {
 
         let filename: string;
         switch (op1) {
-            case DevOperations.IO_SEEK: // 00000000 - io_seek (fd=op2, offset=stack, mode=stack) -> success=eax
+            case DevOperations.IO_SEEK: { // 00000000 - io_seek (fd=op2, offset=stack, mode=stack) -> success=eax
                 const seekMode = this.internal_pop();
                 const seekOffset = this.internal_pop();
                 const seek_result = this.fs.io_seek(op2, seekOffset, seekMode);
                 this.eax.content = DoubleWord.fromNumber(seek_result);
                 break;
-                
-            case DevOperations.IO_CLOSE:
+            }
+            case DevOperations.IO_CLOSE: {
                 this.eax.content =  DoubleWord.fromNumber(this.fs.io_close(op2))
                 break;
-                
-            case DevOperations.IO_READ_BUFFER: // 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
+            }
+            case DevOperations.IO_READ_BUFFER: {// 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
                 const bufferAddress = this.internal_pop();
                 const bufferSize = this.internal_pop();
                 const buffer = new Uint8Array(bufferSize);
@@ -897,62 +897,76 @@ export class CPUCore {
                 }
                 
                 break;
-            case DevOperations.IO_WRITE_BUFFER: // 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
+            }
+            case DevOperations.IO_WRITE_BUFFER: {// 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
                 const writeBufferAddress = this.internal_pop();
                 const writeBufferSize = this.internal_pop();
                 const writeBuffer = new Uint8Array(writeBufferSize);
                 for (let index = 0; index < writeBufferSize; index++) {
-                    let byte = this.mmu.readByteFrom(DoubleWord.fromNumber(writeBufferAddress + index))
+                    const byte = this.mmu.readByteFrom(DoubleWord.fromNumber(writeBufferAddress + index))
                     writeBuffer[index] = byte;
                 }
                 const bytesWritten = this.fs.io_write_buffer(op2, writeBuffer, writeBufferSize);
                 this.eax.content = DoubleWord.fromNumber(bytesWritten);
                 break;
-            case DevOperations.FILE_CREATE: // 00000100 - file_create (filename_ptr=op2)
+            }
+            case DevOperations.FILE_CREATE: { // 00000100 - file_create (filename_ptr=op2)
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(DoubleWord.fromNumber(op2));
                 this.eax.content = DoubleWord.fromNumber(this.fs.file_create(filename));
                 break;
-            case DevOperations.FILE_DELETE: // 00000101 file_delete (filename_ptr=op2) -> success=eax
+            }
+            case DevOperations.FILE_DELETE: {// 00000101 file_delete (filename_ptr=op2) -> success=eax
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(DoubleWord.fromNumber(op2));
                 this.eax.content = DoubleWord.fromNumber(this.fs.file_delete(filename));
                 break;
-            case DevOperations.FILE_OPEN: // 00000110 - file_open (filename_ptr=op2) -> fd=eax
+            }
+            case DevOperations.FILE_OPEN:{ // 00000110 - file_open (filename_ptr=op2) -> fd=eax
                 // load the filename from the given address
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(DoubleWord.fromNumber(op2));
-                let fd: number = this.fs.file_open(filename);
+                const fd: number = this.fs.file_open(filename);
                 this.eax.content = DoubleWord.fromNumber(fd);
                 break;
-            case DevOperations.FILE_STAT: // 00000111 - file_stat (filename_ptr=op2) -> file_length=eax
+            }
+            case DevOperations.FILE_STAT: {// 00000111 - file_stat (filename_ptr=op2) -> file_length=eax
                 filename = this.loadZeroTerminatedASCIIStringFromMemory(DoubleWord.fromNumber(op2));
                 this.eax.content = DoubleWord.fromNumber(this.fs.file_stat(filename));
                 break;
-            case DevOperations.CONSOLE_PRINT_NUMBER: // 00001000 - console_print_number(number=op2)
+            }
+            case DevOperations.CONSOLE_PRINT_NUMBER:{ // 00001000 - console_print_number(number=op2)
                 this.fs.console_print_number(op2);
                 break;
-            case DevOperations.CONSOLE_READ_NUMBER: //  00001001 - console_read_number() -> number=eax, error=ebx
+            }
+            case DevOperations.CONSOLE_READ_NUMBER: {//  00001001 - console_read_number() -> number=eax, error=ebx
                 const [num, err] = this.fs.console_read_number();
                 this.eax.content = DoubleWord.fromNumber(num);
                 this.ebx.content = DoubleWord.fromNumber(err);
                 break;
-            case DevOperations.CPU_IS_MEMORY_VIRTUALIZATION_ENABLED: //  00001010 isMemoryVirtualizationEnabled()
+            }
+            case DevOperations.CPU_IS_MEMORY_VIRTUALIZATION_ENABLED: {//  00001010 isMemoryVirtualizationEnabled()
                 this.eax.content = DoubleWord.fromNumber(this.mmu.isMemoryVirtualizationEnabled());
                 break;
-            case DevOperations.CPU_ENABLE_MEMORY_VIRTUALIZATION: //  00001011 enableMemoryVirtualization()
+            }
+            case DevOperations.CPU_ENABLE_MEMORY_VIRTUALIZATION: {//  00001011 enableMemoryVirtualization()
                 this.mmu.enableMemoryVirtualization();
                 break;
-            case DevOperations.CPU_DISABLE_MEMORY_VIRTUALIZATION: //  00001100 disableMemoryVirtualization()
+            }
+            case DevOperations.CPU_DISABLE_MEMORY_VIRTUALIZATION:{ //  00001100 disableMemoryVirtualization()
                 this.mmu.disableMemoryVirtualization();
                 break;
-            case DevOperations.TIMER_GET_FINISHED: //  00001101 getReadyID() -> id=eax
+            }
+            case DevOperations.TIMER_GET_FINISHED:{ //  00001101 getReadyID() -> id=eax
                 this.eax.content = DoubleWord.fromNumber(this.timer.getReadyID());
                 break;
-            case DevOperations.TIMER_SET: //  00001110 addTimer()
+            }
+            case DevOperations.TIMER_SET:{ //  00001110 addTimer()
                 const timeValue = this.internal_pop();
 
                 this.timer.addTimer(op2, timeValue);
                 break;
-            default:
+            }
+            default:{
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
+            }
         }
 
         return;
@@ -2238,7 +2252,7 @@ export class CPUCore {
         // }
 
         // Read contents of flags register from STACK into flags register.
-        let content = this.mmu.readDoublewordFrom(this.esp.content, false);
+        const content = this.mmu.readDoublewordFrom(this.esp.content, false);
         // Deallocate four bytes from STACK by incrementing the value in ESP.
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
 
@@ -2421,17 +2435,17 @@ export class CPUCore {
 
         if (this.flags.isInUserMode())
         {
-            SimulationController.getInstance()!.log("");
-            SimulationController.getInstance()!.log("Interrupted: " + InterruptNumbers[target.value]);
+            this.logToLogger("");
+            this.logToLogger("Interrupted: " + InterruptNumbers[target.value]);
         }
 
-        let eflagsValue = DoubleWord.fromNumber(this.flags.content);
+        const eflagsValue = DoubleWord.fromNumber(this.flags.content);
         // Switch to kernel mode.
         this.flags.enterKernelMode();
         this.flags.clearInterrupt();
 
         // Switch to the interrupt stack
-        let stackPointer = DoubleWord.fromNumber(this.esp.content);
+        const stackPointer = DoubleWord.fromNumber(this.esp.content);
         this.esp.content = DoubleWord.ZERO;
         
         // Write the user stack address to the interrupt STACK.
@@ -2481,7 +2495,7 @@ export class CPUCore {
         // Return from the interrupt handler by calling the RET operation.
         this.ret();
         // Restore the old EFLAGS contents from the STACK.
-        let eflagsValue = this.mmu.readDoublewordFrom(this.esp.content, false);
+        const eflagsValue = this.mmu.readDoublewordFrom(this.esp.content, false);
         this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
         this.esp.content = DoubleWord.fromNumber(this.esp.content + 4);
 
@@ -2492,7 +2506,7 @@ export class CPUCore {
 
         if (this.flags.isInUserMode())
         {
-            SimulationController.getInstance()!.log("Interrupt Handler Finished");
+            this.logToLogger("Interrupt Handler Finished");
         }
     }
 
@@ -2808,7 +2822,7 @@ export class CPUCore {
             addressValue = DoubleWord.fromNumber(addressValue + 4);
 
             for (let index = 0; index < 4; index++) {
-                let byte = DoubleWord.getBitsStartingAt(currentDoubleWord, index * Byte.NUMBER_OF_BITS as DoubleWord.BitIndex, Byte.NUMBER_OF_BITS as DoubleWord.BitCount)
+                const byte = DoubleWord.getBitsStartingAt(currentDoubleWord, index * Byte.NUMBER_OF_BITS as DoubleWord.BitIndex, Byte.NUMBER_OF_BITS as DoubleWord.BitCount)
                 if (byte == 0)
                 {
                     return str
@@ -2845,8 +2859,8 @@ export class CPUCore {
      */
     public reset(): void {
         // TODO implement
-        SimulationController.getInstance()!.log("");
-        SimulationController.getInstance()!.log("KERNEL PANIC! RESETING SIMULATOR");
+        this.logToLogger("");
+        this.logToLogger("KERNEL PANIC! RESETING SIMULATOR");
     }
 
     /**
@@ -2931,5 +2945,14 @@ export class CPUCore {
         }
 
         return encodedOperation as Instructions;
+    }
+
+    /**
+     * Send a message to be appended to the log-widget in the main window.
+     * @param message The message that gets appended to the log-widget.
+     */
+    public logToLogger(message: string): void {
+        getMainWindow().webContents.send('update_log', message);
+        DebugLogger.log("  " + message);
     }
 }

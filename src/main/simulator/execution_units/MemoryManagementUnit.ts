@@ -8,8 +8,6 @@ import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
 import { ExceptionError } from "../../../types/errors/ExceptionError";
 import { PageNumber } from "../../../types/binary/PageNumber";
 import { PageTableEntryFlags } from "../../../types/binary/PageTableEntryFlags";
-import { DebugLogger } from "../Logger";
-import { FrameNumber } from "../../../types/binary/FrameNumber";
 
 /**
  * This class represents a Memory Management Unit (MMU). This specialized execution unit is responsible

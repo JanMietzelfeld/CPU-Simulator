@@ -66,7 +66,7 @@ describe('Encode instructions', () => {
     });
 
     test("Encode assembly programs", () => {        
-        const result: DoubleWord[] = assembler.assemble(readFileSync("./os_filesystem/user/examples/loop.asm", "utf8"));
+        const result: DoubleWord[] = assembler.assemble(readFileSync("./os_filesystem/home/examples/loop.asm", "utf8"));
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b11011001001011101010000101100000),
             DoubleWord.fromNumber(0b100),

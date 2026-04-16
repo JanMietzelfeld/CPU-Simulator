@@ -81,7 +81,6 @@ export class PassthroughFilesystem {
             default:
                 // unkown mode
                 return -4;
-                break;
         }
 
         if (this.file_stat(vfd.filename) < vfd.seek_position) {
@@ -93,7 +92,7 @@ export class PassthroughFilesystem {
             return -3;
         }
         // node:fs doesnt support seek() on file descriptors, but allows it on write commands. Seek is emulated on each write command.
-        vfd.seek_position += offset;
+        vfd.seek_position += new_seek_postion;
         return 0;
     }
 

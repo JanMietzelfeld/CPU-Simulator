@@ -1,4 +1,3 @@
-import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
 import { Register } from "./Register";
 

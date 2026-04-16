@@ -1,5 +1,4 @@
 import { GeneralPurposeRegister } from "../main/simulator/functional_units/GeneralPurposeRegister";
-import { Bit } from "../types/binary/Bit";
 import { DoubleWord } from "../types/binary/DoubleWord";
 
 describe("Read and write from or to main memory", () => {

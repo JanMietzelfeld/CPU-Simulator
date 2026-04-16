@@ -1,6 +1,5 @@
 import { Bit } from "../../../types/binary/Bit";
 import { Byte } from "../../../types/binary/Byte";
-import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { Register } from "./Register";
 
 /**

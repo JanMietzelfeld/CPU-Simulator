@@ -1,4 +1,3 @@
- import { FLAGS } from "../main/simulator/functional_units/FLAGS";
 import { ArithmeticLogicUnit } from "../main/simulator/execution_units/ArithmeticLogicUnit";
 import { DoubleWord } from "../types/binary/DoubleWord";
 import { CPUCore } from "../main/simulator/execution_units/CPUCore";

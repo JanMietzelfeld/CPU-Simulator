@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, IpcMainInvokeEvent, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, IpcMainInvokeEvent, Menu, shell } from 'electron';
 import * as path from 'path';
 import { NumberSystems } from '../types/enumerations/NumberSystems';
 import { Byte } from './../types/binary/Byte';
@@ -17,9 +17,12 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 let mainWindow: BrowserWindow;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 if (require('electron-squirrel-startup')) {
 	app.quit();
 }
+
+if (process.env.NODE_ENV !== "test") {
 
 app.setAppUserModelId("de.hs-hannover.IhmeCoreX1Simulator.IhmeCoreX1Simulator");
 
@@ -224,12 +227,6 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 	return menu;
 };
 
-console.log(process.env.ELECTRON_OZONE_PLATFORM_HINT);
-app.commandLine.appendSwitch("ozone-platform", "x11");
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch("disable-gpu");
-app.commandLine.appendSwitch("disable-software-rasterizer");
-app.commandLine.appendSwitch("disable-vulkan");
 const createWindow = (): void => {
 	// Create the browser window.
 	mainWindow = new BrowserWindow({
@@ -258,7 +255,7 @@ const createWindow = (): void => {
 		DoubleWord.SIZE,
 		pathToLanguageDefinition,
 		pathToOSFilesystem,
-		getMainWindow().webContents
+		!app.isPackaged
 	);
 	
 	registerHandlers(simulator, mainWindow);
@@ -298,7 +295,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 				const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
 				tmp.set(i, byte);
 			}
-			catch (e) {
+			catch {
 				tmp.set(i, undefined);
 			}
 		}
@@ -310,7 +307,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 			const physicalAddress:DoubleWord = simulator.core.mmu.translate(virtualAddress, false, false, true, true);
 			const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
 			return byte;
-		} catch (e) {
+		} catch {
 			return undefined;
 		}
 		
@@ -400,7 +397,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
-	ipcMain.handle("readFLAGS", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
+	ipcMain.handle("readFLAGS", async (): Promise<string> => {
 		const content = simulator.core.flags.content;
 		return content.toString(2).padStart(8, "0");
 	});
@@ -564,6 +561,8 @@ app.on('activate', () => {
 		createWindow();
 	}
 });
+
+}
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

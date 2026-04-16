@@ -1,4 +1,3 @@
-import { Bit } from "../types/binary/Bit";
 import { Byte } from "../types/binary/Byte";
 import { DoubleWord } from "../types/binary/DoubleWord";
 import { ArithmeticLogicUnit } from "../main/simulator/execution_units/ArithmeticLogicUnit";
@@ -221,14 +220,14 @@ describe("Test ALU", () => {
     });
 
     test("Perform arithmetic right shift on doubleword and check shifted bit", () => {
-        let testDoubleword1: DoubleWord = DoubleWord.fromNumber(-128);
-        let shiftedBit = DoubleWord.arithmeticRightShift(testDoubleword1)[1];
+        const testDoubleword1: DoubleWord = DoubleWord.fromNumber(-128);
+        const shiftedBit = DoubleWord.arithmeticRightShift(testDoubleword1)[1];
         expect(shiftedBit).toEqual(0b0);
     });
 
     test("Perform arithmetic right shift on byte and check shifted bit", () => {
         const testByte: Byte = Byte.fromNumber(0b10000011);
-        let shiftedBit = Byte.arithmeticRightShift(testByte)[1];
+        const shiftedBit = Byte.arithmeticRightShift(testByte)[1];
         expect(shiftedBit).toEqual(0b1);
     });
 

@@ -9,6 +9,7 @@ export class DebugLogger {
         return DebugLogger.logging;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public static log(message?: any): void {
 
         if (this.logging) {

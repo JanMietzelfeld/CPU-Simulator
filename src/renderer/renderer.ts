@@ -601,9 +601,9 @@ export class Renderer {
                 return;
             } else if (demandedRepresentation === "INSTRUCTION") {
                 // TODO: Implement mechanism for retrieving textual instruction from main process of the Simulator!
-                this.readEIR(true);
+                this.readEIR();
             } else {
-                this.readEIR(false);
+                this.readEIR();
             }
         }
         return;
@@ -834,7 +834,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readEAX(this.dataRepresentationEAX);
+            const content: string = await this._window.simulator.readEAX(this.dataRepresentationEAX);
             if (this._eax !== null) {
                 this.jumpToVirtualRamElement(content, this.dataRepresentationEAX);
             }
@@ -851,7 +851,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readEBX(this.dataRepresentationEBX);
+            const content: string = await this._window.simulator.readEBX(this.dataRepresentationEBX);
             if (this._ebx !== null) {
                 this.jumpToVirtualRamElement(content, this.dataRepresentationEBX);
             }
@@ -868,7 +868,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readECX(this.dataRepresentationECX);
+            const content: string = await this._window.simulator.readECX(this.dataRepresentationECX);
             if (this._ecx !== null) {
                 this.jumpToVirtualRamElement(content, this.dataRepresentationECX);
             }
@@ -885,7 +885,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readEDX(this.dataRepresentationEDX);
+            const content: string = await this._window.simulator.readEDX(this.dataRepresentationEDX);
             if (this._edx !== null) {
                 this.jumpToVirtualRamElement(content, this.dataRepresentationEDX);
             }
@@ -902,7 +902,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readESP(this.dataRepresentationESP);
+            const content: string = await this._window.simulator.readESP(this.dataRepresentationESP);
             if (this._esp !== null) {
                 this.jumpToVirtualRamElement(content, this.dataRepresentationESP);
             }
@@ -919,7 +919,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readEIP(this.dataRepresentationEIP);
+            const content: string = await this._window.simulator.readEIP(this.dataRepresentationEIP);
             if (this._eip !== null) {
                 this.jumpToVirtualRamElement(content, this.dataRepresentationEIP);
             }
@@ -936,7 +936,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readITP(this.dataRepresentationITP);
+            const content: string = await this._window.simulator.readITP(this.dataRepresentationITP);
             if (this._itp !== null) {
                 this.jumpToPhysicalRamElement(content, this.dataRepresentationITP);
             }
@@ -953,7 +953,7 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            let content: string = await this._window.simulator.readPTP(this.dataRepresentationPTP);
+            const content: string = await this._window.simulator.readPTP(this.dataRepresentationPTP);
             if (this._ptp !== null) {
                 this.jumpToPhysicalRamElement(content, this.dataRepresentationPTP);
             }
@@ -1537,7 +1537,7 @@ export class Renderer {
      * This method reads the content of the EIR register.
      * @param asInstruction Indicates, wethert to display the instruction in its textual representation or not.
      */
-    public async readEIR(asInstruction = false): Promise<void> {
+    public async readEIR(): Promise<void> {
         const content: string = await this._window.simulator.readEIR();
         if (this._eir !== null) {
             this._eir.children.namedItem("register-content")!.textContent = content;
@@ -1730,7 +1730,7 @@ export class Renderer {
      * This method reads the content of the EIP register.
      */
     public async readEIP(radix: NumberSystem): Promise<void> {
-        let content: string = await this._window.simulator.readEIP(radix);
+        const content: string = await this._window.simulator.readEIP(radix);
         if (this._eip !== null) {
             this._eip.children.namedItem("register-content")!.textContent = content;
             this.jumpToVirtualRamElement(content, radix);

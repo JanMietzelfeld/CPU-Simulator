@@ -1,4 +1,3 @@
-import { DoubleWord } from "../types/binary/DoubleWord";
 import { TranslationLookasideBuffer } from "../main/simulator/functional_units/TranslationLookasideBuffer";
 import { PageTableEntry } from "../types/binary/PageTableEntry";
 import { PageNumber } from "../types/binary/PageNumber";

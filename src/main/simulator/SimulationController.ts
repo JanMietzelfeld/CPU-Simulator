@@ -3,9 +3,10 @@ import { CPUCore } from "./execution_units/CPUCore";
 import { RAM } from "./functional_units/RAM";
 import { DoubleWord } from "../../types/binary/DoubleWord";
 import { DataSizes } from "../../types/enumerations/DataSizes";
-import { readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { DebugLogger } from "./Logger";
-import { WebContents } from "electron";
+import { Byte } from "../../types/binary/Byte";
+import { getMainWindow } from "../index";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -51,19 +52,19 @@ export class SimulationController {
      */
     public autoScrollForPageTableEnabled: boolean;
 
-    private webContents: WebContents;
-
     public readonly pathToOSFilesystem: string;
+
+    public readonly inDevMode: boolean;
 
     /**
      * Creates a new instance.
      * @param capacityOfMainMemory The initial capacity of the main memory. This value can not be modified after the simulator started.
      * @param pathToLanguageDefinition The path to the language definition file.
      * @param pathToOSFilesystem The path to the language definition file.
-     * @param webContents
      * @param [processingWidth=DataSizes.DOUBLEWORD] The processing width of the simulated CPU.
+     * @param [devMode=false] 
      */
-    private constructor(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, webContents: WebContents, processingWidth: DataSizes = DataSizes.DOUBLEWORD) {
+    private constructor(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, processingWidth: DataSizes = DataSizes.DOUBLEWORD, devMode: boolean = false) {
         this.mainMemory = new RAM(capacityOfMainMemory);
         this.pathToOSFilesystem = pathToOSFilesystem;
         this.core = new CPUCore(this.mainMemory, processingWidth, pathToOSFilesystem);
@@ -72,7 +73,7 @@ export class SimulationController {
         this.autoScrollForPageTableEnabled = true;
         this.autoScrollForPhysicalRAMEnabled = true;
         this.autoScrollForVirtualRAMEnabled = true;
-        this.webContents = webContents;
+        this.inDevMode = devMode;
     }
 
     /**
@@ -89,25 +90,31 @@ export class SimulationController {
      * @param pathToLanguageDefinition
      * @param pathToOSFilesystem
      * @param webContents
+     * @param [devMode=false] 
      * @returns 
      */
-    public static getInstanceOrCreate(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, webContents: WebContents): SimulationController {
+    public static getInstanceOrCreate(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, devMode: boolean = false): SimulationController {
         if (SimulationController._instance === null) {
-            SimulationController._instance = new SimulationController(capacityOfMainMemory, pathToLanguageDefinition, pathToOSFilesystem, webContents);
+            SimulationController._instance = new SimulationController(capacityOfMainMemory, pathToLanguageDefinition, pathToOSFilesystem, DataSizes.DOUBLEWORD, devMode);
             SimulationController._instance.bootKernel();
         }
         return SimulationController._instance;
     }
 
     /**
-     * This method returns the SimulatorController instance
-     * @returns 
+     * This method boots the operating system by loading its data into main memory. The address space,
+     * where the operating system is located in memory is sometimes called kernel space.
      */
-    public static getInstance(): SimulationController | undefined  {
-        if (SimulationController._instance === null) {
-            return undefined;
-        }
-        return SimulationController._instance;
+    public assemblyKernel(): void {
+
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/src/os_entry.asm", "ihmeOS");
+
+        //Assemble the init program (needed by the os)
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
+    
+
+        //Assemble the init program (needed by the os)
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
     }
 
     /**
@@ -120,29 +127,51 @@ export class SimulationController {
         // Enable real mode and disable memory virtualization.
         this.core.mmu.disableMemoryVirtualization();
 
-        const startOfKernelSpace = SimulationController.KERNEL_SPACE_START;
-
-        // Load kernel code into memory 
-        if (startOfKernelSpace != 0xC0000000) {
-            throw new EvalError("Unexpected begin of OS memory");
+        if (!existsSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin") || this.inDevMode)
+        {
+            this.assemblyKernel();
         }
 
-        const compiledOS: DoubleWord[] = this._assembler.assemble(readFileSync(this.pathToOSFilesystem + "/os/src/os_entry.asm", "utf-8"), startOfKernelSpace)
+        const buffer = readFileSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin");
 
-        //disassemble(compiledOS, kernelCodeStartAddress) //For debugging
+        const lenght =  buffer.length - (buffer.length % 4);
 
-        for (let i = 0; i < compiledOS.length; i++) {
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(startOfKernelSpace + i*DoubleWord.NUMBER_OF_BYTES), compiledOS[i])
+        for (let i = 0; i < lenght; i+=4) {
+            const value: DoubleWord = DoubleWord.fromBytes(
+                Byte.fromNumber(buffer[0]), 
+                Byte.fromNumber(buffer[1]), 
+                Byte.fromNumber(buffer[2]), 
+                Byte.fromNumber(buffer[3]));
+
+            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + i*DoubleWord.NUMBER_OF_BYTES), value)
+        }
+
+        if (buffer.length % 4 !== 0)
+        {
+            const value: DoubleWord = DoubleWord.fromBytes(
+                Byte.fromNumber(buffer[lenght]), 
+                Byte.fromNumber(buffer.length % 4 >= 2 ? buffer[lenght+1] : 0), 
+                Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
+                Byte.ZERO);
+
+            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + lenght*DoubleWord.NUMBER_OF_BYTES), value)
         }
         
-        this.core.eip.content = startOfKernelSpace;
+        this.core.eip.content = SimulationController.KERNEL_SPACE_START;
 
-        //Assemble the init program (needed by the os)
-        this.assembleProgram(this.pathToOSFilesystem + "/os/user/init.asm");
 
-        //Assemble the idle program (needed by the os)
-        this.assembleProgram(this.pathToOSFilesystem + "/os/user/idle.asm");
-        
+        if (!existsSync(this.pathToOSFilesystem + "/os/bin/init.bin"))
+        {
+            //Assemble the init program (needed by the os)
+            this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
+        }
+
+        if (!existsSync(this.pathToOSFilesystem + "/os/bin/idle.bin"))
+        {
+            //Assemble the init program (needed by the os)
+            this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
+        }
+
         this.createUtilityFiles();
 
         DebugLogger.log("");
@@ -151,9 +180,9 @@ export class SimulationController {
 
         this.core.cycle();       
         
-        this.webContents.send('clear_log');
+        getMainWindow().webContents.send('clear_log');
 
-        this.webContents.send('update_log', "OS Initialized");
+        getMainWindow().webContents.send('update_log', "OS Initialized");
 
         return;
     }
@@ -187,7 +216,7 @@ export class SimulationController {
             relativePathToCode = relativePathToCode.concat("\0");
         }
 
-        let buffer: number[] = [];
+        const buffer: number[] = [];
 
         for (let i = 0; i < relativePathToCode.length; i++) {
 
@@ -222,7 +251,47 @@ export class SimulationController {
             buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
         });
 
-        writeFileSync(pathToProgramCode.replace(".asm", ".bin"), buffer);
+        pathToProgramCode.replace(".asm", "");
+        pathToProgramCode = this.pathToOSFilesystem + "/bin" + pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
+        pathToProgramCode += ".bin";
+
+        writeFileSync(pathToProgramCode, buffer);
+    }
+
+    /**
+     * This method is used to assemble os code
+     * @param pathToProgramCode 
+     * @param [name=null] 
+     */
+    public assembleOSCode(pathToProgramCode: string, name: string | null = null): void {
+        
+        // Read the program code.
+        const fileContents: string = readFileSync(pathToProgramCode, "utf-8");
+        // Compile the program code.
+        const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents);
+
+        const buffer = Buffer.alloc(compiledProgram.length * 4);
+
+        compiledProgram.forEach((doubleWord, i) => {
+            const offset = i * 4;
+
+            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
+            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
+            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
+            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
+        });
+
+        pathToProgramCode = pathToProgramCode.replace(".asm", "");
+
+        if (name === null)
+        {
+            name = pathToProgramCode.substring(pathToProgramCode.lastIndexOf('/'));
+        }
+
+        pathToProgramCode = this.pathToOSFilesystem + "/os/bin/" + name;
+        pathToProgramCode += ".bin";
+
+        writeFileSync(pathToProgramCode, buffer);
     }
 
     /**
@@ -230,46 +299,55 @@ export class SimulationController {
      */
     public createUtilityFiles(): void {
         
-        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from([0]));
+        const newProcessNamePath = this.pathToOSFilesystem + "/os/util/new_process_name.bin"
 
-        let zeroFramePath = this.pathToOSFilesystem + "/os/util/zero_frame.bin"
-
-        let pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
-
-        let buffer = Buffer.alloc(4096 * 4);
-
-        writeFileSync(zeroFramePath, buffer);
-
-        buffer = Buffer.alloc((786432 + 262144) * 4);
-
-        for (let i = 0; i < 786432*4; i+=4) { //0x40000000
-            buffer[i] = 0x40;
+        if (!existsSync(newProcessNamePath))
+        {
+            writeFileSync(newProcessNamePath, Buffer.from([0]));
         }
 
-        for (let i = 0; i < 262144; i++) {
-            let index = 786432*4 + i*4;
-            if (i < 65536) //0xB0...
-            {
-                let value = DoubleWord.fromNumber(0xB0000000 + i + 786432);
-                buffer[index] = DoubleWord.getFirstByte(value);
-                buffer[index+1] = DoubleWord.getSecondByte(value);
-                buffer[index+2] = DoubleWord.getThirdByte(value);
-                buffer[index+3] = DoubleWord.getFourthByte(value);
-            }
-            else //0x90...
-            {
-                let value = DoubleWord.fromNumber(0x90000000 + i + 786432);
-                buffer[index] = DoubleWord.getFirstByte(value);
-                buffer[index+1] = DoubleWord.getSecondByte(value);
-                buffer[index+2] = DoubleWord.getThirdByte(value);
-                buffer[index+3] = DoubleWord.getFourthByte(value);
-            }
+        const zeroFramePath = this.pathToOSFilesystem + "/os/util/zero_frame.bin"
+
+        if (!existsSync(zeroFramePath))
+        {
+            const buffer = Buffer.alloc(4096 * 4);
+
+            writeFileSync(zeroFramePath, buffer);
         }
 
-        writeFileSync(pageTablePath, buffer);
+        const pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
+
+        if (!existsSync(pageTablePath))
+        {
+            const buffer = Buffer.alloc((786432 + 262144) * 4);
+
+            for (let i = 0; i < 786432*4; i+=4) { //0x40000000
+                buffer[i] = 0x40;
+            }
+
+            for (let i = 0; i < 262144; i++) {
+                const index = 786432*4 + i*4;
+                if (i < 65536) //0xB0...
+                {
+                    const value = DoubleWord.fromNumber(0xB0000000 + i + 786432);
+                    buffer[index] = DoubleWord.getFirstByte(value);
+                    buffer[index+1] = DoubleWord.getSecondByte(value);
+                    buffer[index+2] = DoubleWord.getThirdByte(value);
+                    buffer[index+3] = DoubleWord.getFourthByte(value);
+                }
+                else //0x90...
+                {
+                    const value = DoubleWord.fromNumber(0x90000000 + i + 786432);
+                    buffer[index] = DoubleWord.getFirstByte(value);
+                    buffer[index+1] = DoubleWord.getSecondByte(value);
+                    buffer[index+2] = DoubleWord.getThirdByte(value);
+                    buffer[index+3] = DoubleWord.getFourthByte(value);
+                }
+            }
+
+            writeFileSync(pageTablePath, buffer);
+        }
     }
-
-
 
     /**
      * This method triggers execution of the next instruction
@@ -277,14 +355,5 @@ export class SimulationController {
     public cycle(): void {
         
         this.core.cycle();
-    }
-
-    /**
-     * Send a message to be appended to the log-widget in the main window.
-     * @param message The message that gets appended to the log-widget.
-     */
-    public log(message: string): void {
-        this.webContents.send('update_log', message);
-        DebugLogger.log("  " + message);
     }
 }
