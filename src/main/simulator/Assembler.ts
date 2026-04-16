@@ -249,9 +249,9 @@ export class Assembler {
 					const jumpInstruction:string = "JMP @0b" + jumpAddress;
 					const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 					if (variableValue !== "") {
-						encodedInstruction.push(this.encodeBinaryValue(variableValue, lineNo));
+						encodedInstruction.push(this.encodeBinaryValue(variableValue));
 					} else {
-						encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+						encodedInstruction.push(this.encodeDecimalValue("0"));
 					}
 					encodedInstructions.push(...encodedInstruction);
 					lineEncoded = true;
@@ -271,9 +271,9 @@ export class Assembler {
 					const jumpInstruction:string = "JMP @0b" + jumpAddress;
 					const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 					if (variableValue !== "") {
-						encodedInstruction.push(this.encodeDecimalValue(variableValue, lineNo));
+						encodedInstruction.push(this.encodeDecimalValue(variableValue));
 					} else {
-						encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+						encodedInstruction.push(this.encodeDecimalValue("0"));
 					}
 					encodedInstructions.push(...encodedInstruction);
 					lineEncoded = true;
@@ -293,9 +293,9 @@ export class Assembler {
 					const jumpInstruction:string = "JMP @0b" + jumpAddress;
 					const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 					if (variableValue !== "") {
-						encodedInstruction.push(this.encodeHexadecimalValue(variableValue, lineNo));
+						encodedInstruction.push(this.encodeHexadecimalValue(variableValue));
 					} else {
-						encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+						encodedInstruction.push(this.encodeDecimalValue("0"));
 					}
 					encodedInstructions.push(...encodedInstruction);
 					lineEncoded = true;
@@ -657,13 +657,13 @@ export class Assembler {
 			operand32BitEncoded = DoubleWord.fromNumber(parseInt(jumpLabels.get(operand)!, 2));
 		} else if (operand.startsWith("$0b") || operand.startsWith("$-0b")) {
 			// Binary immediate found.
-			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$", ""), line);
+			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$", ""));
 		} else if (operand.startsWith("$-0x") || operand.startsWith("$0x")) {
 			// Hexadecimal immediate found.
-			operand32BitEncoded = this.encodeHexadecimalValue(operand.replace("$", ""), line);
+			operand32BitEncoded = this.encodeHexadecimalValue(operand.replace("$", ""));
 		} else if (operand.startsWith("$-") || operand.startsWith("$")) {
 			// Decimal immediate found.
-			operand32BitEncoded = this.encodeDecimalValue(operand.replace("$", ""), line);
+			operand32BitEncoded = this.encodeDecimalValue(operand.replace("$", ""));
 		} else if (operand.startsWith("@0b")) {
 			// Binary virtual memory address found.
 			operand32BitEncoded = this.encodeBinaryAddress(operand.replace("@0b", ""), line);
