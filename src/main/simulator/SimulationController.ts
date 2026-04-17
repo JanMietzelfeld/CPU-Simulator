@@ -89,7 +89,6 @@ export class SimulationController {
      * @param capacityOfMainMemory
      * @param pathToLanguageDefinition
      * @param pathToOSFilesystem
-     * @param webContents
      * @param [devMode=false] 
      * @returns 
      */
@@ -208,7 +207,7 @@ export class SimulationController {
             throw new EvalError("file must be in the os_filesystem")
         }
 
-        let programName = pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
+        const programName = pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
         let relativePathToCode = "/bin" + programName + "\0";
 
         while (relativePathToCode.length % 4 != 0)

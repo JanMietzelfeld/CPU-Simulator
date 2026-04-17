@@ -1535,7 +1535,6 @@ export class Renderer {
 
     /**
      * This method reads the content of the EIR register.
-     * @param asInstruction Indicates, wethert to display the instruction in its textual representation or not.
      */
     public async readEIR(): Promise<void> {
         const content: string = await this._window.simulator.readEIR();

@@ -43,35 +43,46 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 		{
 			label: "File",
 			submenu: [
+
 				{
-					label: "Open Assembly Program",
+					label: "Open OS Home Folder",
 					accelerator: "CmdOrCtrl+O",
 					click() {
-						dialog.showOpenDialog({
-							properties: ["openFile", "createDirectory"],
-							filters: [{ name: "Assembly Files", extensions: ['asm', 'bin'] }]
-						}).then(function(fileObj) {
-							if (!fileObj.canceled) {
-								simulator.createProcess(fileObj.filePaths[0]);
-								win.webContents.send("loaded_program", fileObj.filePaths);
-							}
-						}).catch((err) => win.webContents.send("on_error", err))
+						shell.openPath(simulator.pathToOSFilesystem + "/home")
+						.catch((err) => win.webContents.send("on_error", err));
 					}
 				},
 				{
 					label: "Assemble Program",
-					accelerator: "CmdOrCtrl+S",
+					accelerator: "CmdOrCtrl+A",
 					click() {
 						dialog.showOpenDialog({
+							defaultPath: simulator.pathToOSFilesystem + "/home",
 							properties: ["openFile", "createDirectory"],
-							filters: [{ name: "Assembly Files", extensions: ['asm'] }]
+							filters: [{ name: "Select Assembly File", extensions: ['asm'] }]
 						}).then(function(fileObj) {
 							if (!fileObj.canceled) {
 								simulator.assembleProgram(fileObj.filePaths[0]);
 								win.webContents.send("assembled_program", fileObj.filePaths);
 							}
 						}).catch((err) => win.webContents.send("on_error", err))
-					}
+					}				
+				},
+				{
+					label: "Start Program",
+					accelerator: "CmdOrCtrl+S",
+					click() {
+						dialog.showOpenDialog({
+							defaultPath: simulator.pathToOSFilesystem + "/bin",
+							properties: ["openFile", "createDirectory"],
+							filters: [{ name: "Select Binary", extensions: ['bin'] }]
+						}).then(function(fileObj) {
+							if (!fileObj.canceled) {
+								simulator.createProcess(fileObj.filePaths[0]);
+								win.webContents.send("loaded_program", fileObj.filePaths);
+							}
+						}).catch((err) => win.webContents.send("on_error", err))
+					}	
 				}
 			],
 		},
@@ -210,7 +221,6 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 			submenu: [
 				{
 					label: "Documentation",
-					accelerator: "CmdOrCtrl+H",
 					click() {
 						shell.openExternal("https://programmit.github.io/CPU-Simulator/")
 					}
@@ -247,8 +257,8 @@ const createWindow = (): void => {
 		pathToLanguageDefinition = `${process.resourcesPath}/settings/language_definition.json`;
 		pathToOSFilesystem = `${process.resourcesPath}/os_filesystem`;
 	} else {
-		pathToLanguageDefinition = "./settings/language_definition.json";
-		pathToOSFilesystem = "./os_filesystem";
+		pathToLanguageDefinition = process.cwd() +  "/settings/language_definition.json";
+		pathToOSFilesystem = process.cwd() + "/os_filesystem";
 	}
 	
 	const simulator = SimulationController.getInstanceOrCreate(
