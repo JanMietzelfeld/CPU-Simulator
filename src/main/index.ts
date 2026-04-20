@@ -293,6 +293,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		e.returnValue = MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY;
 	});
 	
+	ipcMain.removeHandler("readRangeFromPhysicalMemory");
 	ipcMain.handle("readRangeFromPhysicalMemory", async (event: Electron.IpcMainInvokeEvent, fromPhysicalAddress: DoubleWord, toPhysicalAddress: DoubleWord): Promise<Map<DoubleWord, Byte>> => {
 		const tmp: Map<DoubleWord, Byte> = new Map<DoubleWord, Byte>();
 		for (let i = fromPhysicalAddress; i <= toPhysicalAddress; ++i) {
@@ -302,11 +303,13 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return tmp;
 	});
 
+	ipcMain.removeHandler("readFromPhysicalMemory");
 	ipcMain.handle("readFromPhysicalMemory", async (event: Electron.IpcMainInvokeEvent, physicalAddress: DoubleWord): Promise<Byte > => {
 		const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
 		return byte;
 	});
 
+	ipcMain.removeHandler("readRangeFromVirtualMemory");
 	ipcMain.handle("readRangeFromVirtualMemory", async (event: Electron.IpcMainInvokeEvent, fromVirtualAddress: DoubleWord, toVirtualAddress: DoubleWord): Promise<Map<DoubleWord, Byte | undefined>> => {
 		const tmp: Map<DoubleWord, Byte | undefined> = new Map<DoubleWord, Byte | undefined>();
 		for (let i = fromVirtualAddress; i <= toVirtualAddress; ++i) {
@@ -322,6 +325,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return tmp;
 	});
 
+	ipcMain.removeHandler("readFromVirtualMemory");
 	ipcMain.handle("readFromVirtualMemory", async (event: Electron.IpcMainInvokeEvent, virtualAddress: DoubleWord): Promise<Byte | undefined> => {
 		try {
 			const physicalAddress:DoubleWord = simulator.core.mmu.translate(virtualAddress, false, false, true, true);
@@ -333,10 +337,12 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		
 	});
 
+	ipcMain.removeHandler("retrieveMainMemoryCells");
 	ipcMain.handle("retrieveMainMemoryCells", async (): Promise<Map<DoubleWord, Byte>> => {
 		return simulator.mainMemory.cells;
 	});
 
+	ipcMain.removeHandler("readPageTableEntries");
 	ipcMain.handle("readPageTableEntries", async (event: Electron.IpcMainInvokeEvent, firstPageNumberToRead: PageNumber, lastPageNumberToRead: PageNumber): Promise<Map<PageNumber, PageTableEntry>> => {
 		const tmp: Map<PageNumber, PageTableEntry> = new Map<PageNumber, PageTableEntry>();
 		const fromPhysicalAddressDec: number = firstPageNumberToRead + simulator.core.ptp.content;
@@ -352,6 +358,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return tmp;
 	});
 
+	ipcMain.removeHandler("readEAX");
 	ipcMain.handle("readEAX", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content: DoubleWord = simulator.core.eax.content;
 		let result: string;
@@ -365,6 +372,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readEBX");
 	ipcMain.handle("readEBX", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content: DoubleWord = simulator.core.ebx.content;
 		let result: string;
@@ -378,6 +386,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readECX");
 	ipcMain.handle("readECX", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content: DoubleWord = simulator.core.ecx.content;
 		let result: string;
@@ -391,6 +400,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readEDX");
 	ipcMain.handle("readEDX", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content: DoubleWord = simulator.core.edx.content;
 		let result: string;
@@ -404,6 +414,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readEIP");
 	ipcMain.handle("readEIP", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content = simulator.core.eip.content;
 		let result: string;
@@ -417,11 +428,13 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readFLAGS");
 	ipcMain.handle("readFLAGS", async (): Promise<string> => {
 		const content = simulator.core.flags.content;
 		return content.toString(2).padStart(8, "0");
 	});
 
+	ipcMain.removeHandler("readEIR");
 	ipcMain.handle("readEIR", async (event: IpcMainInvokeEvent, asInstruction: boolean): Promise<string> => {
 		if (asInstruction) {
 			// TODO
@@ -430,6 +443,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return content.toString(2).padStart(32, "0").replace(/(.{4})/g, "$1 ").trim();
 	});
 
+	ipcMain.removeHandler("readNPTP");
 	ipcMain.handle("readNPTP", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content = simulator.core.nptp.content;
 		let result: string;
@@ -443,6 +457,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readVMPTR");
 	ipcMain.handle("readVMPTR", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content = simulator.core.vmtpr.content;
 		let result: string;
@@ -456,6 +471,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readESP");
 	ipcMain.handle("readESP", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content = simulator.core.esp.content;
 		let result: string;
@@ -469,6 +485,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readITP");
 	ipcMain.handle("readITP", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content = simulator.core.itp.content;
 		let result: string;
@@ -482,6 +499,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readGPTP");
 	ipcMain.handle("readGPTP", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		if (simulator.core.gptp === null) {
 			return "-";
@@ -498,6 +516,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("readPTP");
 	ipcMain.handle("readPTP", async (event: IpcMainInvokeEvent, basis: NumberSystems): Promise<string> => {
 		const content = simulator.core.ptp.content;
 		let result: string;
@@ -511,6 +530,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return result;
 	});
 
+	ipcMain.removeHandler("nextCycle");
 	ipcMain.handle("nextCycle", async (): Promise<void> => {
 		try {
 			simulator.cycle();
@@ -521,31 +541,37 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		}
 	});
 
+	ipcMain.removeHandler("on_disable_auto_scroll_physical_ram");
 	ipcMain.handle("on_disable_auto_scroll_physical_ram", async (): Promise<void> => {
 		simulator.autoScrollForPhysicalRAMEnabled = false;
 		return;
 	});
 
+	ipcMain.removeHandler("on_ensable_auto_scroll_physical_ram");
 	ipcMain.handle("on_ensable_auto_scroll_physical_ram", async (): Promise<void> => {
 		simulator.autoScrollForPhysicalRAMEnabled = true;
 		return;
 	});
 
+	ipcMain.removeHandler("on_disable_auto_scroll_virtual_ram");
 	ipcMain.handle("on_disable_auto_scroll_virtual_ram", async (): Promise<void> => {
 		simulator.autoScrollForVirtualRAMEnabled = false;
 		return;
 	});
 
+	ipcMain.removeHandler("on_ensable_auto_scroll_virtual_ram");
 	ipcMain.handle("on_ensable_auto_scroll_virtual_ram", async (): Promise<void> => {
 		simulator.autoScrollForVirtualRAMEnabled = true;
 		return;
 	});
 
+	ipcMain.removeHandler("on_disable_auto_scroll_page_table");
 	ipcMain.handle("on_disable_auto_scroll_page_table", async (): Promise<void> => {
 		simulator.autoScrollForPageTableEnabled = false;
 		return;
 	});
 
+	ipcMain.removeHandler("on_enable_auto_scroll_page_table");
 	ipcMain.handle("on_enable_auto_scroll_page_table", async (): Promise<void> => {
 		simulator.autoScrollForPageTableEnabled = true;
 		return;
@@ -571,10 +597,6 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') {
 		app.quit();
-	}
-	else
-	{
-		ipcMain.removeAllListeners();
 	}
 });
 
