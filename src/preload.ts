@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld("simulator", {
 	readPTP: (radix: NumberSystems = 16): Promise<string> => ipcRenderer.invoke("readPTP", radix),
 	onLoadedAssemblyProgram: (callback: (filePath: string[]) => void) => 
 		ipcRenderer.on("loaded_program", (_event, filePath: string[]) => callback(filePath)),
-	onassembledProgram: (callback: (filePath: string[]) => void) => 
+	onAssembledProgram: (callback: (filePath: string[]) => void) => 
 		ipcRenderer.on("assembled_program", (_event, filePath: string[]) => callback(filePath)),
 	onError: (callback: (errorDescription: string) => void) => 
 		ipcRenderer.on("on_error", (_event, errorDescription: string) => callback(errorDescription)),

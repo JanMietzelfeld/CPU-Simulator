@@ -63,7 +63,11 @@ window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
 	await renderer.readITP(renderer.dataRepresentationITP);
 	await renderer.readNPTP(renderer.dataRepresentationNPTP);
 	await renderer.readVMPTR(renderer.dataRepresentationVMPTR);
-	alert("Assembly program at " + filePath + " loaded.");
+	alert("Program accepted. Execution may start on a subsequent timer interrupt.");
+});
+
+window.simulator.onAssembledProgram(async (filePath: string[]) => {
+	alert("Program assembled successfully");
 });
 
 window.simulator.onError((errorDescription: string) => {
