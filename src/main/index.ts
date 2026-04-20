@@ -49,7 +49,7 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 					label: "Open OS Home Folder",
 					accelerator: "CmdOrCtrl+O",
 					click() {
-						shell.openPath(simulator.pathToOSFilesystem + "/home")
+						shell.openPath(path.join(simulator.pathToOSFilesystem, "home"))
 						.catch((err) => win.webContents.send("on_error", err));
 					}
 				},
@@ -58,7 +58,7 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 					accelerator: "CmdOrCtrl+A",
 					click() {
 						dialog.showOpenDialog({
-							defaultPath: simulator.pathToOSFilesystem + "/home",
+							defaultPath: path.join(simulator.pathToOSFilesystem, "home"),
 							properties: ["openFile", "createDirectory"],
 							filters: [{ name: "Select Assembly File", extensions: ['asm'] }]
 						}).then(function(fileObj) {
@@ -74,7 +74,7 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 					accelerator: "CmdOrCtrl+S",
 					click() {
 						dialog.showOpenDialog({
-							defaultPath: simulator.pathToOSFilesystem + "/bin",
+							defaultPath: path.join(simulator.pathToOSFilesystem, "bin"),
 							properties: ["openFile", "createDirectory"],
 							filters: [{ name: "Select Binary", extensions: ['bin'] }]
 						}).then(function(fileObj) {
