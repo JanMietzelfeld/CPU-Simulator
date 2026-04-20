@@ -1,94 +1,178 @@
 import { Bit } from "./Bit";
-import { DataSizes } from "../enumerations/DataSizes";
+import { Byte } from "./Byte";
 
-export class Word {
-	protected static readonly MAX_POSITIVE_NUMBER_DEC: number = 32_767;
-	protected static readonly MAX_NEGATIVE_NUMBER_DEC: number = -32_768;
-	public static readonly NUMBER_OF_BITS_DEC: number = 16;
+export type Word = number & { __brand: "Word" };
+
+export namespace Word {
+
+	export const SIZE: number = 2**16;
+	export const MAX_POSITIVE_NUMBER: number = 16 - 1;
+	export const MAX_NEGATIVE_NUMBER: number = -(2**15);
+	export const NUMBER_OF_BITS: number = 16;
+	export const NUMBER_OF_BYTES: number = 2;
+
+	export const ZERO: Word = 0 as Word;
+
+	export type BitIndex =
+		| 0 | 1 | 2  | 3  | 4  | 5  | 6  | 7
+		| 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+	export type BitCount =
+	    | 1 | 2  | 3  | 4  | 5  | 6  | 7  | 8 
+		| 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
 
 	/**
-	 * The binary data this object holds.
+	 * This method creates a Word from a number.
+	 * @param number 
+	 * @returns
 	 */
-	protected _value: Array<Bit>;
+	export function fromNumber(number: number): Word {
+		return (number & MAX_POSITIVE_NUMBER) as Word;
+	}
 
 	/**
-	 * Instantiates a new object.
-	 * @param [value] The binary data to initialize the new object with.
-	 * @constructor
+	 * This method creates a Word from bytes.
+	 * @param high 
+	 * @param low 
+	 * @returns
 	 */
-	public constructor(value: Array<Bit> = new Array<Bit>(
-		0, 0, 0, 0,
-		0, 0, 0, 0,
-		0, 0, 0, 0,
-		0, 0, 0, 0
-	)){
-		this._value = value;
-	}
-	
-
-	public get value(): Array<Bit> {
-		return this._value;
-	}
-
-	public set value(newValue: Array<Bit>) {
-		if (newValue.length != DataSizes.WORD) {
-			throw new Error(`A new value must have exactly ${DataSizes.WORD} bits.`);
-		}
-		this._value = newValue;
+	export function fromBytes(high: Byte, low: Byte): Word {
+		return ((high << Byte.NUMBER_OF_BITS) | low) as Word;   
 	}
 
 	/**
-	 * For comparison, both binary values are converted to strings.
-	 * Conversion presarves the order of items, which is important for the comparison.
-	 * @param word The binary value to compare to.
-	 * @returns True, when both binary values are identical, false otherwise.
+	 * This method returns the least significant bit of this value.
+	 * @param word 
+	 * @returns The least significant bit.
 	 */
-	public equal(word: Word): boolean {
-		return word._value.toString() === this._value.toString();
+	export function getLeastSignificantBit(word: Word): Bit {
+		return (word & 1) as Bit;
 	}
 
 	/**
-	 * Converts the binary value into a string representation.
-	 * @param groupBytes When true, the bytes are grouped into two groups with 8 bits each.
+	 * This method returns the most significant bit of this value.
+	 * @param word 
+	 * @returns The most significant bit.
+	 */
+	export function getMostSignificantBit(word: Word): Bit {
+		return ((word >>> (NUMBER_OF_BITS - 1)) & 1) as Bit;
+	}
+
+	/**
+	 * This method returns the last bits of the binary value.
+	 * @param word 
+	 * @param count Amount of bits to include
 	 * @returns 
 	 */
-	public toString(groupBytes: boolean): string {
-		var result: string = "";
-		if (groupBytes) {
-			result = `${this.value[0]}${this.value[1]}${this._value[2]}${this._value[3]}${this.value[4]}${this.value[5]}${this._value[6]}${this._value[7]} `;
-			result += `${this.value[8]}${this.value[9]}${this._value[10]}${this._value[11]}${this.value[12]}${this.value[13]}${this._value[14]}${this._value[15]}`;
-		} else {
-			result = this._value.join("");
-		}
-		return result;
+	export function getLeastSignificantBits(word: Word, count: BitCount): Word {
+		return (word & ((1 << count) - 1)) as Word;
 	}
 
 	/**
-	 * This method creates an instance from the given number.
-	 * Throws an error, if the given number is not an integer.
-	 * @param integer The number to initialize the new instances value with.
-	 * @returns A new instance.
+	 * This method returns the first bits of the binary value.
+	 * @param word 
+	 * @param count Amount of bits to include
+	 * @returns 
 	 */
-	public static fromInteger(integer: number): Word {
-		if (!Number.isInteger(integer)) {
-			throw new Error("Given number is not an integer.");
-		}
+	export function getMostSignificantBits(word: Word, count: BitCount): Word {
+		return ((word >>> (NUMBER_OF_BITS - count)) & ((1 << count) - 1)) as Word;
+	}    
 
-		if (integer < Word.MAX_NEGATIVE_NUMBER_DEC || integer > Word.MAX_POSITIVE_NUMBER_DEC) {
-			throw new Error(`The given number cannot be expressed using ${Word.NUMBER_OF_BITS_DEC} bits, if the most significant bit should be treated as the sign bit.`);
-		}
-
-		var word: Word = new Word();
-
-		// A bit shift converts the given number to a signed 32-bit value.
-		var binaryNumber: string = (integer < 0) ? 
-			(integer >>> 0).toString(2) : 
-			integer.toString(2).padStart(Word.NUMBER_OF_BITS_DEC, "0");
-
-		binaryNumber.split("").slice(-Word.NUMBER_OF_BITS_DEC).forEach((bit, index) => {
-			word._value[index] = (bit === "0") ? 0 : 1;
-		});
-
-		return word;
+	/**
+	 * This method gets a bit at a specified index, were index 0 is MSB and Index size - 1 is LSB.
+	 * @param word
+	 * @param index The position of the bit to get.
+	 * @returns 
+	 */
+	export function getBit(word: Word, index: BitIndex): Bit {
+		return ((word >>> (NUMBER_OF_BITS - 1 - index)) & 1) as Bit;
 	}
+
+	/**
+	 * This method gets a range of bits from a specified start index
+	 * @param word
+	 * @param start The zero-based index number indicating the beginning of the range.
+	 * @param end Zero-based index number indicating the end of the range. The range includes the bit up to, but not including, the bit indicated by end.
+	 * @returns 
+	 */
+	export function getBitRange(word: Word, start: BitIndex, end: BitIndex | 16 = NUMBER_OF_BITS as 16): Word {
+		return ((word >>> (NUMBER_OF_BITS - end)) & ((1 << (end - start)) - 1)) as Word;
+	}
+
+	/**
+	 * This method gets a range of bits from a specified start index
+	 * @param word
+	 * @param start The zero-based index number indicating the beginning of the range.
+	 * @param count Number of bits to include after start
+	 * @returns 
+	 */
+	export function getBitsStartingAt(word: Word, start: BitIndex, count: BitCount = 1): Word {
+		const end = start + count;
+		return ((word >>> (NUMBER_OF_BITS - end)) & ((1 << (end - start)) - 1)) as Word;
+	}
+
+	/**
+	 * This method sets the bit at a specified index to the passed bit value, were index 0 is MSB and Index size - 1 is LSB.
+	 * @param word
+	 * @param index The position of the bit to set.
+	 * @param bit The binary value to set the bit to.
+	 * @returns 
+	 */
+	export function setBit(word: Word, index: BitIndex, bit: Bit): Word {
+		const mask = 1 << (NUMBER_OF_BITS - 1 - index); 
+		return (bit === 0 ? word & ~mask : word | mask) as Word;
+	}
+
+	/**
+	 * This method gets the upper Byte
+	 * @param word
+	 * @returns 
+	 */
+	export function getUpperByte(word: Word): Byte {
+		return Byte.fromNumber(word >>> Byte.NUMBER_OF_BITS);
+	} 
+
+	/**
+	 * This method gets the lower Byte
+	 * @param word
+	 * @returns 
+	 */
+	export function getLowerByte(word: Word): Byte {
+		return Byte.fromNumber(word);
+	} 
+
+	/**
+     * This method performs a logical shift on the given Word one bit to the right.
+     * @param operand The operand to perform a right shift on.
+     * @returns [result, shifted out bit]
+     */
+	export function logicalRightShift(operand: Word): [Word, Bit] {
+		const removedBit: Bit = Word.getLeastSignificantBit(operand);
+        operand = operand >>> 1 as Word;
+		return [operand, removedBit];
+	}
+
+	/**
+	 * This method performs an arithmetic shift on the given Word one bit to the right.
+	 * @param operand The operand to perform a right shift on.
+	 * @returns [result, shifted out bit]
+	 */
+	export function arithmeticRightShift(operand: Word): [Word, Bit] {
+		const removedBit: Bit = Word.getLeastSignificantBit(operand);
+		const msb: Bit = Word.getMostSignificantBit(operand);
+        // Arithmetic right shift by 1
+        operand = operand >>> 1 as Word;
+        Word.setBit(operand, 0, msb);
+		return [operand, removedBit];
+    }
+
+    /**
+     * This method performs an logical shift on the given Word one bit to the left.
+     * @param operand The operand to perform a left shift on.
+     * @returns [result, shifted out bit]
+     */
+    export function leftShift(operand: Word): [Word, Bit] {
+		const removedBit: Bit = Word.getMostSignificantBit(operand);
+        operand = Word.fromNumber(operand << 1);
+		return [operand, removedBit];
+    }
 }

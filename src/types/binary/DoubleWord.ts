@@ -1,166 +1,233 @@
-import { twosComplementToDecimal } from "../../helper";
-import { BinaryValue } from "./BinaryValue";
 import { Bit } from "./Bit";
-import { DataSizes } from "../enumerations/DataSizes";
+import { Byte } from "./Byte";
+import { Word } from "./Word";
 
-export class DoubleWord extends BinaryValue {
-	public static readonly MAXIMUM_NUMBER_DEC: number = 2_147_483_647;
-	public static readonly MINIMUM_NUMBER_DEC: number = -2_147_483_648;
-	public static readonly NUMBER_OF_BITS_DEC: number = 32;
+export type DoubleWord = number & { __brand: "DoubleWord" };
+
+export namespace DoubleWord {
+
+	export const SIZE: number = 2**32;
+	export const MAX_POSITIVE_NUMBER: number = 2**32 - 1;
+	export const MAX_NEGATIVE_NUMBER: number = -(2**31);
+	export const NUMBER_OF_BITS: number = 32;
+	export const NUMBER_OF_WORDS: number = 2;
+	export const NUMBER_OF_BYTES: number = 4;
+
+	export const ZERO: DoubleWord = 0 as DoubleWord;
+
+	export type BitIndex =
+		| 0  | 1  | 2  | 3  | 4  | 5  | 6  | 7
+		| 8  | 9  | 10 | 11 | 12 | 13 | 14 | 15
+		| 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23
+		| 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31;
+
+	export type BitCount =
+	    | 1  | 2  | 3  | 4  | 5  | 6  | 7  | 8  
+		| 9  | 10 | 11 | 12 | 13 | 14 | 15 | 16 
+		| 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 
+		| 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32;
 
 	/**
-	 * Instantiates a new object.
-	 * @param value The initial value of the doubleword.
-	 * @constructor
+	 * This method creates a DoubleWord from a number.
+	 * @param number
+	 * @returns
 	 */
-	public constructor(
-		value: Array<Bit> = new Array<Bit>(
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0
-		)
-	) {
-		super(new Array<Bit>(
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0
-		));
-		this.value = value;
+	export function fromNumber(number: number): DoubleWord {
+		return (number & MAX_POSITIVE_NUMBER) >>> 0 as DoubleWord;
 	}
 
 	/**
-	 * Accessor for reading the binary value.
-	 * @override
+	 * This method creates a DoubleWord from bytes.
+	 * @param high the high word
+	 * @param low the low word
+	 * @returns
 	 */
-	public get value(): Array<Bit> {
-		return this._value;
+	export function fromWords(high: Word, low: Word): DoubleWord {
+		return ((high << Word.NUMBER_OF_BITS) | low) >>> 0 as DoubleWord;   
 	}
 
 	/**
-	 * Accessor for setting the binary value.
-	 * @param newValue The new value.
-	 * @override
+	 * This method creates a DoubleWord from bytes.
+	 * @param firstByte Most Significant Byte
+	 * @param secondByte 
+	 * @param thirdByte 
+	 * @param fourthByte Least Significant Byte
+	 * @returns
 	 */
-	public set value(newValue: Array<Bit>) {
-		if (newValue.length != DataSizes.DOUBLEWORD) {
-			throw new Error(`A new value must have exactly ${DataSizes.DOUBLEWORD} bits: ${newValue.length} given.`);
-		}
-		this._value = newValue.slice();
+	export function fromBytes(firstByte: Byte, secondByte : Byte, thirdByte : Byte, fourthByte : Byte): DoubleWord {
+		return ((firstByte << (NUMBER_OF_BITS - Byte.NUMBER_OF_BITS)) | 
+				(secondByte << Word.NUMBER_OF_BITS) |
+				(thirdByte << Byte.NUMBER_OF_BITS) |
+				fourthByte) >>> 0 as DoubleWord;   
 	}
 
 	/**
-	 * This method checks whethter the current binary value is equal to the given one or not.
-	 * For comparison, both binary values are converted to strings.
-	 * Conversion presarves the order of items, which is important for the comparison.
-	 * @param other The binary value to compare to.
-	 * @returns True, if both binary values are identical, false otherwise.
+	 * This method returns the least significant bit of this value.
+	 * @param doubleWord 
+	 * @returns The least significant bit.
 	 */
-	public equal(other: DoubleWord): boolean {
-		return other.toString() === this.toString();
+	export function getLeastSignificantBit(doubleWord: DoubleWord): Bit {
+		return (doubleWord & 1) as Bit;
 	}
 
 	/**
-	 * This method checks whether the current binary value is smaller than the given one.
-	 * @param other The binary value to compare to.
-	 * @returns True, if this value is less than the one compared to, false otherwise.
+	 * This method returns the most significant bit of this value.
+	 * @param doubleWord 
+	 * @returns The most significant bit.
 	 */
-    public isSmallerThan(other: DoubleWord): boolean {
-		return twosComplementToDecimal(this) < twosComplementToDecimal(other);
+	export function getMostSignificantBit(doubleWord: DoubleWord): Bit {
+		return ((doubleWord >>> (NUMBER_OF_BITS - 1)) & 1) as Bit;
+	}
+
+	/**
+	 * This method returns the last bits of the binary value.
+	 * @param doubleWord 
+	 * @param count Amount of bits to include
+	 * @returns 
+	 */
+	export function getLeastSignificantBits(doubleWord: DoubleWord, count: BitCount): DoubleWord {
+		return (doubleWord & (count === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << count) - 1)) >>> 0 as DoubleWord;
+	}
+
+	/**
+	 * This method returns the first bits of the binary value.
+	 *  @param doubleWord 
+	 * @param count Amount of bits to include
+	 * @returns 
+	 */
+	export function getMostSignificantBits(doubleWord: DoubleWord, count: BitCount): DoubleWord {
+		return ((doubleWord >>> (NUMBER_OF_BITS - count)) & (count === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << count) - 1)) >>> 0 as DoubleWord;
+	}    
+
+	/**
+	 * This method gets a bit at a specified index, were index 0 is MSB and Index size - 1 is LSB.
+	 *  @param doubleWord 
+	 * @param index The position of the bit to get.
+	 * @returns 
+	 */
+	export function getBit(doubleWord: DoubleWord, index: BitIndex): Bit {
+		return ((doubleWord >>> (NUMBER_OF_BITS - 1 - index)) & 1) as Bit;
+	}
+
+	/**
+	 * This method gets a range of bits from a specified start index
+	 *  @param doubleWord 
+	 * @param start The zero-based index number indicating the beginning of the range.
+	 * @param end Zero-based index number indicating the end of the range. The range includes the bit up to, but not including, the bit indicated by end.
+	 * @returns 
+	 */
+	export function getBitRange(doubleWord: DoubleWord, start: BitIndex, end: BitIndex | 32 = NUMBER_OF_BITS as 32): DoubleWord {
+		return ((doubleWord >>> (NUMBER_OF_BITS - end)) & ((end - start) === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << (end - start)) - 1)) >>> 0 as DoubleWord;
+	}
+
+	/**
+	 * This method gets a range of bits from a specified start index
+	 * @param doubleWord 
+	 * @param start The zero-based index number indicating the beginning of the range.
+	 * @param count Number of bits to include after start
+	 * @returns 
+	 */
+	export function getBitsStartingAt(doubleWord: DoubleWord, start: BitIndex, count: BitCount = 1): DoubleWord {
+		const end = start + count;
+		return ((doubleWord >>> (NUMBER_OF_BITS - end)) & ((end - start) === NUMBER_OF_BITS ? MAX_POSITIVE_NUMBER : (1 << (end - start)) - 1)) >>> 0 as DoubleWord;
+	}
+
+	/**
+	 * This method sets the bit at a specified index to the passed bit value, were index 0 is MSB and Index size - 1 is LSB.
+	 * @param doubleWord 
+	 * @param index The position of the bit to set.
+	 * @param bit The binary value to set the bit to.
+	 * @returns 
+	 */
+	export function setBit(doubleWord: DoubleWord, index: BitIndex, bit: Bit): DoubleWord {
+		const mask = 1 << (NUMBER_OF_BITS - 1 - index); 
+		return (bit === 0 ? doubleWord & ~mask : doubleWord | mask) >>> 0 as DoubleWord;
+	}
+
+	/**
+	 * This method gets the upper Word
+	 * @param doubleWord 
+	 * @returns 
+	 */
+	export function getUpperWord(doubleWord: DoubleWord): Word {
+		return Word.fromNumber(doubleWord >>> Word.NUMBER_OF_BITS);
+	} 
+
+	/**
+	 * This method gets the lower Word
+	 * @param doubleWord 
+	 * @returns 
+	 */
+	export function getLowerWord(doubleWord: DoubleWord): Word {
+		return Word.fromNumber(doubleWord);
+	} 
+
+
+
+	/**
+	 * This method gets the first Byte (Most Significant Byte)
+	 * @param doubleWord 
+	 * @returns 
+	 */
+	export function getFirstByte(doubleWord: DoubleWord): Byte {
+		return Byte.fromNumber(doubleWord >>> (Word.NUMBER_OF_BITS + Byte.NUMBER_OF_BITS));
+	} 
+
+	/**
+	 * This method gets the second Byte
+	 * @param doubleWord 
+	 * @returns 
+	 */
+	export function getSecondByte(doubleWord: DoubleWord): Byte {
+		return Byte.fromNumber(doubleWord >>> Word.NUMBER_OF_BITS);
+	} 
+
+	/**
+	 * This method gets the third Byte
+	 * @param doubleWord 
+	 * @returns 
+	 */
+	export function getThirdByte(doubleWord: DoubleWord): Byte {
+		return Byte.fromNumber(doubleWord >>> Byte.NUMBER_OF_BITS);
+	} 
+
+	/**
+	 * This method gets the fourth Byte (Least Significant Byte)
+	 * @param doubleWord 
+	 * @returns 
+	 */
+	export function getFourthByte(doubleWord: DoubleWord): Byte {
+		return Byte.fromNumber(doubleWord);
+	} 
+
+	/**
+     * This method performs a logical shift on the given DoubleWord one bit to the right.
+     * @param operand The operand to perform a right shift on.
+     * @returns [result, shifted out bit]
+     */
+	export function logicalRightShift(operand: DoubleWord): [DoubleWord, Bit] {
+		const removedBit: Bit = (operand & 1) as Bit;
+		return [(operand >>> 1) >>> 0 as DoubleWord, removedBit];
+	}
+
+	/**
+	 * This method performs an arithmetic shift on the given DoubleWord one bit to the right.
+	 * @param operand The operand to perform a right shift on.
+	 * @returns [result, shifted out bit]
+	 */
+	export function arithmeticRightShift(operand: DoubleWord): [DoubleWord, Bit] {
+		const removedBit: Bit = (operand & 1) as Bit;
+		return [(operand >> 1) >>> 0 as DoubleWord, removedBit];
     }
 
-	/**
-	 * This method checks whether the current binary value is greater than the given one.
-	 * @param other The binary value to compare to.
-	 * @returns True, if this value is greater than the one compared to, false otherwise.
-	 */
-	public isGreaterThan(other: DoubleWord): boolean {
-		return twosComplementToDecimal(this) > twosComplementToDecimal(other);
-	}
-
-	/**
-	 * This method checks whether the current binary value is a binary zero or not.
-	 * @returns True, if the binary value is zero, false otherwise.
-	 */
-	public isZero(): boolean {
-		return this.equal(new DoubleWord());
-	}
-
-	/**
-	 * This method checks whether the current binary value is not a binary zero or not.
-	 * @returns True, if the binary value is not zero, false otherwise.
-	 */
-	public isNotZero(): boolean {
-		return !this.isZero();
-	}
-
-	/**
-	 * This method checks whether this binary value represents a negative number.
-	 * @returns True, if the most significant bit is set to 1, false otherwise.
-	 */
-	public isNegative(): boolean {
-		return this._value[0] === 1;
-	}
-
-	/**
-	 * This method checks whether this binary value represents a positive number.
-	 * @returns True, if the most significant bit is set to 0, false otherwise.
-	 */
-	public isPositive(): boolean {
-		return this._value[0] === 0;
-	}
-
-	/**
-	 * Converts the binary value into a string representation.
-	 * @param [groupBytes=false] If set to true, the string representation of the binary value is grouped into bytes.
-	 * @returns The string representation of the binary value.
-	 */
-	public toString(groupBytes = false): string {
-		let result = "";
-		if (groupBytes) {
-			result = `${this.value[0]}${this.value[1]}${this._value[2]}${this._value[3]}${this.value[4]}${this.value[5]}${this._value[6]}${this._value[7]} ${this.value[8]}${this.value[9]}${this._value[10]}${this._value[11]}${this.value[12]}${this.value[13]}${this._value[14]}${this._value[15]} ${this.value[16]}${this.value[17]}${this._value[18]}${this._value[19]}${this.value[20]}${this.value[21]}${this._value[22]}${this._value[23]} ${this.value[24]}${this.value[25]}${this._value[26]}${this._value[27]}${this.value[28]}${this.value[29]}${this._value[30]}${this._value[31]}`;
-		} else {
-			result = this._value.join("");
-		}
-		return result;
-	}
-
-	/**
-	 * This method creates an instance from the given number. 
-	 * Throws an error, if the given number is not an integer.
-	 * @param integer The number to initialize the new instances value with.
-	 * @returns A new instance.
-	 */
-	public static fromInteger(integer: number): DoubleWord {
-		if (!Number.isInteger(integer)) {
-			throw new Error("Given number is not an integer.");
-		}
-
-		if (integer < DoubleWord.MINIMUM_NUMBER_DEC || integer > DoubleWord.MAXIMUM_NUMBER_DEC) {
-			throw new Error(`The given number cannot be expressed using ${DataSizes.DOUBLEWORD} bits, if the most significant bit should be treated as the sign bit.`);
-		}
-
-		const doubleword: DoubleWord = new DoubleWord();
-
-		// A bit shift converts the given number to a signed 32-bit value.
-		const binaryNumber: string = (integer < 0) ? 
-			(integer >>> 0).toString(2) : 
-			integer.toString(2).padStart(DataSizes.DOUBLEWORD, "0");
-
-		binaryNumber.split("").forEach((bit, index) => {
-			doubleword._value[index] = (bit === "0") ? 0 : 1;
-		});
-
-		return doubleword;
-	}
-
+    /**
+     * This method performs an logical shift on the given DoubleWord one bit to the left.
+     * @param operand The operand to perform a right left on.
+     * @returns [result, shifted out bit]
+     */
+    export function leftShift(operand: DoubleWord): [DoubleWord, Bit] {
+		const removedBit: Bit = DoubleWord.getMostSignificantBit(operand);
+        operand = DoubleWord.fromNumber(operand << 1);
+		return [operand, removedBit];
+    }
 }
