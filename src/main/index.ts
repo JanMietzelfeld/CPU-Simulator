@@ -572,6 +572,10 @@ app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') {
 		app.quit();
 	}
+	else
+	{
+		ipcMain.removeAllListeners();
+	}
 });
 
 app.on('activate', () => {
