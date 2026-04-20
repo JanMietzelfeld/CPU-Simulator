@@ -167,10 +167,9 @@ export class SimulationController {
 
         if (!existsSync(this.pathToOSFilesystem + "/os/bin/idle.bin"))
         {
-            //Assemble the init program (needed by the os)
+            //Assemble the idle program (needed by the os)
             this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
         }
-
         this.createUtilityFiles();
 
         DebugLogger.log("");
@@ -179,9 +178,9 @@ export class SimulationController {
 
         this.core.cycle();       
         
-        getMainWindow().webContents.send('clear_log');
+        getMainWindow()?.webContents.send('clear_log');
 
-        getMainWindow().webContents.send('update_log', "OS Initialized");
+        getMainWindow()?.webContents.send('update_log', "OS Initialized");
 
         return;
     }

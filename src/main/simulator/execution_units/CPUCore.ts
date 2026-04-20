@@ -2947,7 +2947,7 @@ export class CPUCore {
      * @param message The message that gets appended to the log-widget.
      */
     public logToLogger(message: string): void {
-        getMainWindow().webContents.send('update_log', message);
+        getMainWindow()?.webContents.send('update_log', message);
         DebugLogger.log("  " + message);
     }
 }

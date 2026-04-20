@@ -43,7 +43,7 @@ window.onload = async () => {
 	await renderer.readVMPTR(renderer.dataRepresentationVMPTR);
 };
 
-window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
+window.simulator.onLoadedAssemblyProgram(async () => {
 	renderer.programLoaded = true;
 	await renderer.reloadPhysicalRAMView();
 	await renderer.createVirtualRAMView();
@@ -66,7 +66,7 @@ window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
 	alert("Program accepted. Execution may start on a subsequent timer interrupt.");
 });
 
-window.simulator.onAssembledProgram(async (filePath: string[]) => {
+window.simulator.onAssembledProgram(async () => {
 	alert("Program assembled successfully");
 });
 

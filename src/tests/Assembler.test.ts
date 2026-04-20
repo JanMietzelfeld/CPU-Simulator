@@ -69,7 +69,7 @@ describe('Encode instructions', () => {
         const result: DoubleWord[] = assembler.assemble(readFileSync("./os_filesystem/home/examples/loop.asm", "utf8"));
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b11011001001011101010000101100000),
-            DoubleWord.fromNumber(0b100),
+            DoubleWord.fromNumber(100),
             DoubleWord.fromNumber(0),
 
             DoubleWord.fromNumber(0b10011000001011101010000101100000),
@@ -82,6 +82,18 @@ describe('Encode instructions', () => {
 
             DoubleWord.fromNumber(0b11111000111011101110000100000000),
             DoubleWord.fromNumber(0b1100),
+            DoubleWord.fromNumber(0),
+
+            DoubleWord.fromNumber(0b11011001001011101010000101100000),
+            DoubleWord.fromNumber(305419896),
+            DoubleWord.fromNumber(3),
+
+            DoubleWord.fromNumber(0b11011001001011101010000101100000),
+            DoubleWord.fromNumber(17),
+            DoubleWord.fromNumber(0),
+
+            DoubleWord.fromNumber(4190019840),
+            DoubleWord.fromNumber(128),
             DoubleWord.fromNumber(0)
         ];
         expect(result).toEqual(expectedOutput);
