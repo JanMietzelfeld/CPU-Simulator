@@ -63,7 +63,7 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 							filters: [{ name: "Select Assembly File", extensions: ['asm'] }]
 						}).then(function(fileObj) {
 							if (!fileObj.canceled) {
-								simulator.assembleProgram(fileObj.filePaths[0]);
+								simulator.assembleProgram(fileObj.filePaths[0].replaceAll("\\", "/"));
 								win.webContents.send("assembled_program", fileObj.filePaths);
 							}
 						}).catch((err) => win.webContents.send("on_error", err))
@@ -79,7 +79,7 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 							filters: [{ name: "Select Binary", extensions: ['bin'] }]
 						}).then(function(fileObj) {
 							if (!fileObj.canceled) {
-								simulator.createProcess(fileObj.filePaths[0]);
+								simulator.createProcess(fileObj.filePaths[0].replaceAll("\\", "/"));
 								win.webContents.send("loaded_program", fileObj.filePaths);
 							}
 						}).catch((err) => win.webContents.send("on_error", err))
