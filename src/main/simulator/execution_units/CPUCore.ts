@@ -875,7 +875,7 @@ export class CPUCore {
             case DevOperations.IO_READ_BUFFER: {// 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
                 const bufferAddress = this.internal_pop();
                 const bufferSize = this.internal_pop();
-                const buffer = new DataView(new Uint8Array(bufferSize).buffer);
+                const buffer = new DataView(new ArrayBuffer(bufferSize));
                 const bytesRead = this.fs.io_read_buffer(op2, buffer, bufferSize);
                 this.eax.content = DoubleWord.fromNumber(bytesRead);
 
@@ -917,7 +917,7 @@ export class CPUCore {
             case DevOperations.IO_WRITE_BUFFER: {// 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
                 const writeBufferAddress = this.internal_pop();
                 const writeBufferSize = this.internal_pop();
-                const writeBuffer = new DataView(new Uint8Array(writeBufferSize).buffer);
+                const writeBuffer = new DataView(new ArrayBuffer(writeBufferSize));
 
                 const doubleWordBufferSize = writeBufferSize - (writeBufferSize % 4);
                 for (let index = 0; index < doubleWordBufferSize; index += 4) {

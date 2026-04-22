@@ -41,7 +41,7 @@ export class RAM {
             {
                 return;
             }
-            frame = new DataView(new Uint8Array(2**FrameOffset.NUMBER_OF_BITS).buffer);
+            frame = new DataView(new ArrayBuffer(2**FrameOffset.NUMBER_OF_BITS));
             this._cells.set(frameNumber, frame);
         }
 
@@ -63,7 +63,7 @@ export class RAM {
             {
                 return;
             }
-            frame = new DataView(new Uint8Array(2**FrameOffset.NUMBER_OF_BITS).buffer);
+            frame = new DataView(new ArrayBuffer(2**FrameOffset.NUMBER_OF_BITS));
             this._cells.set(frameNumber, frame);
         }
 

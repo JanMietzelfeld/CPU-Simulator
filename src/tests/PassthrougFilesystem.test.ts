@@ -96,7 +96,7 @@ describe('PassthroughFilesystem', () => {
             writeFileSync(join(tmp, filename), 'abcdef');
             const fd = fs.file_open(filename);
             expect(fs.io_seek(fd, 3, 0)).toBe(0);
-            const buffer = new DataView(new Uint8Array(3).buffer);
+            const buffer = new DataView(new ArrayBuffer(3));
             const bytesRead = fs.io_read_buffer(fd, buffer, 3);
             expect(bytesRead).toBe(3);
             expect(buffer.getUint8(0)).toBe(100);
@@ -117,7 +117,7 @@ describe('PassthroughFilesystem', () => {
             const filename = 'read.txt';
             writeFileSync(join(tmp, filename), new Uint8Array([1, 2, 3, 4, 5]));
             const fd = fs.file_open(filename);
-            const buffer = new DataView(new Uint8Array(3).buffer);
+            const buffer = new DataView(new ArrayBuffer(3));
             const bytesRead = fs.io_read_buffer(fd, buffer, 3);
             expect(bytesRead).toBe(3);
             expect(buffer.getUint8(0)).toBe(1);
@@ -131,7 +131,7 @@ describe('PassthroughFilesystem', () => {
             writeFileSync(join(tmp, filename), 'abc');
             const fd = fs.file_open(filename);
             fs.io_seek(fd, 4, 0); // Seek beyond file size
-            const buffer = new DataView(new Uint8Array(1).buffer);
+            const buffer = new DataView(new ArrayBuffer(1));
             const result = fs.io_read_buffer(fd, buffer, 1);
             expect(result).toBe(-2);
             fs.io_close(fd);

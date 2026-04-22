@@ -8,6 +8,7 @@ import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
 import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
+import { FrameOffset } from "../../types/binary/FrameOffset";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -112,7 +113,6 @@ export class SimulationController {
         //Assemble the init program (needed by the os)
         this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
     
-
         //Assemble the init program (needed by the os)
         this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
     }
@@ -137,12 +137,7 @@ export class SimulationController {
         const lenght =  buffer.length - (buffer.length % 4);
 
         for (let i = 0; i < lenght; i+=4) {
-            const value: DoubleWord = DoubleWord.fromBytes(
-                Byte.fromNumber(buffer[i]), 
-                Byte.fromNumber(buffer[i+1]), 
-                Byte.fromNumber(buffer[i+2]), 
-                Byte.fromNumber(buffer[i+3]));
-
+            const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i));
             this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
         }
 
@@ -215,15 +210,7 @@ export class SimulationController {
             relativePathToCode = relativePathToCode.concat("\0");
         }
 
-        const buffer: number[] = [];
-
-        for (let i = 0; i < relativePathToCode.length; i++) {
-
-            buffer.push(relativePathToCode.charCodeAt(i));
-        }
-
-
-        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from(buffer));
+        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from(relativePathToCode, "utf8"));
         
         return;
     }
@@ -239,16 +226,11 @@ export class SimulationController {
         // Compile the program code.
         const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents);
 
-        const buffer = Buffer.alloc(compiledProgram.length * 4);
+        const buffer = Buffer.allocUnsafe(compiledProgram.length * 4);
 
-        compiledProgram.forEach((doubleWord, i) => {
-            const offset = i * 4;
-
-            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
-            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
-            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
-            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
-        });
+        for (let index = 0; index < compiledProgram.length; index++) {
+            buffer.writeUInt32BE(compiledProgram[index], index * 4);
+        }
 
         pathToProgramCode = this.pathToOSFilesystem + "/bin" + pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
         pathToProgramCode = pathToProgramCode.replace(".asm", ".bin");;
@@ -269,16 +251,11 @@ export class SimulationController {
         // Compile the program code.
         const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents, baseOffeset);
 
-        const buffer = Buffer.alloc(compiledProgram.length * 4);
+        const buffer = Buffer.allocUnsafe(compiledProgram.length * 4);
 
-        compiledProgram.forEach((doubleWord, i) => {
-            const offset = i * 4;
-
-            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
-            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
-            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
-            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
-        });
+        for (let index = 0; index < compiledProgram.length; index++) {
+            buffer.writeUInt32BE(compiledProgram[index], index * 4);
+        }
 
         pathToProgramCode = pathToProgramCode.replace(".asm", "");
 
@@ -309,39 +286,38 @@ export class SimulationController {
 
         if (!existsSync(zeroFramePath))
         {
-            const buffer = Buffer.alloc(4096 * 4);
+            const buffer = Buffer.alloc((2**FrameOffset.NUMBER_OF_BITS) * 4);
 
             writeFileSync(zeroFramePath, buffer);
         }
 
         const pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
 
-        if (!existsSync(pageTablePath))
-        {
-            const buffer = Buffer.alloc((786432 + 262144) * 4);
+        if (!existsSync(pageTablePath)) {
 
-            for (let i = 0; i < 786432*4; i+=4) { //0x40000000
-                buffer[i] = 0x40;
+            const USER_SPACE_ENTRIES = 786432;
+            const KERNEL_SPACE_ENTRIES = 262144;
+            const OS_CODE_SPACE_SIZE = 65536;
+            const ENTRY_SIZE = 4;
+
+            const buffer = Buffer.alloc((USER_SPACE_ENTRIES + KERNEL_SPACE_ENTRIES) * ENTRY_SIZE);
+
+            // First region
+            for (let i = 0; i < USER_SPACE_ENTRIES; i++) {
+                buffer.writeUInt32BE(0x40000000, i * ENTRY_SIZE);
             }
 
-            for (let i = 0; i < 262144; i++) {
-                const index = 786432*4 + i*4;
-                if (i < 65536) //0xB0...
-                {
-                    const value = DoubleWord.fromNumber(0xB0000000 + i + 786432);
-                    buffer[index] = DoubleWord.getFirstByte(value);
-                    buffer[index+1] = DoubleWord.getSecondByte(value);
-                    buffer[index+2] = DoubleWord.getThirdByte(value);
-                    buffer[index+3] = DoubleWord.getFourthByte(value);
-                }
-                else //0x90...
-                {
-                    const value = DoubleWord.fromNumber(0x90000000 + i + 786432);
-                    buffer[index] = DoubleWord.getFirstByte(value);
-                    buffer[index+1] = DoubleWord.getSecondByte(value);
-                    buffer[index+2] = DoubleWord.getThirdByte(value);
-                    buffer[index+3] = DoubleWord.getFourthByte(value);
-                }
+            // Second region
+            const baseOffset = USER_SPACE_ENTRIES * ENTRY_SIZE;
+
+            for (let i = 0; i < KERNEL_SPACE_ENTRIES; i++) {
+                const index = baseOffset + i * ENTRY_SIZE;
+
+                const value = i < OS_CODE_SPACE_SIZE
+                    ? 0xB0000000 + i + USER_SPACE_ENTRIES
+                    : 0x90000000 + i + USER_SPACE_ENTRIES;
+
+                buffer.writeUInt32BE(value, index);
             }
 
             writeFileSync(pageTablePath, buffer);
