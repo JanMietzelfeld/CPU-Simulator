@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
+import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -142,7 +143,7 @@ export class SimulationController {
                 Byte.fromNumber(buffer[i+2]), 
                 Byte.fromNumber(buffer[i+3]));
 
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
         }
 
         if (buffer.length % 4 !== 0)
@@ -153,7 +154,7 @@ export class SimulationController {
                 Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
                 Byte.ZERO);
 
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
         }
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
@@ -304,7 +305,7 @@ export class SimulationController {
             writeFileSync(newProcessNamePath, Buffer.from([0]));
         }
 
-        const zeroFramePath = this.pathToOSFilesystem + "/os/util/zero_frame.bin"
+        const zeroFramePath = this.pathToOSFilesystem + "/os/util/empty_frame.bin"
 
         if (!existsSync(zeroFramePath))
         {

@@ -1,5 +1,5 @@
-import { PageTableEntry } from "../../../types/binary/PageTableEntry";
 import { PageNumber } from "../../../types/binary/PageNumber";
+import { PageTableEntry } from "../../../types/binary/PageTableEntry";
 
 export class TranslationLookasideBuffer {
     private _data: Map<PageNumber, [PageTableEntry, number]>;

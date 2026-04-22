@@ -23,6 +23,8 @@ import { DebugLogger } from "../Logger";
 import { ExceptionError } from "../../../types/errors/ExceptionError";
 import { RegisterNumbers } from "../../../types/enumerations/RegisterNumbers";
 import { getMainWindow } from "../../index";
+import { FrameNumber } from "../../../types/binary/FrameNumber";
+import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 
 /**
  * This class represents a CPU core which is capable of executing instructions.
@@ -873,20 +875,39 @@ export class CPUCore {
             case DevOperations.IO_READ_BUFFER: {// 00000010 - io_read_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_read=eax
                 const bufferAddress = this.internal_pop();
                 const bufferSize = this.internal_pop();
-                const buffer = new Uint8Array(bufferSize);
+                const buffer = new DataView(new Uint8Array(bufferSize).buffer);
                 const bytesRead = this.fs.io_read_buffer(op2, buffer, bufferSize);
                 this.eax.content = DoubleWord.fromNumber(bytesRead);
 
+                const doubleWordbytesRead = bytesRead - (bytesRead % 4);
+
+
                 if (this.mmu.isMemoryVirtualizationEnabled()) {
                     if (bytesRead > 0) {
-                        for (let index = 0; index < bytesRead; index++) {
-                            this.mmu.writeByteTo(DoubleWord.fromNumber(bufferAddress + index), Byte.fromNumber(buffer[index]));
+
+                        for (let index = 0; index < doubleWordbytesRead; index += 4) {
+                            this.mmu.writeDoublewordTo(PhysicalAddress.fromNumber(bufferAddress + index), buffer.getUint32(index) as DoubleWord, false);
+                        }
+
+                        for (let index = 0; index < bytesRead % 4; index++) {
+                            this.mmu.writeByteTo(PhysicalAddress.fromNumber(bufferAddress + index), buffer.getUint8(index) as Byte);
                         }
                     }
                 } else {
                     if (bytesRead > 0) {
-                        for (let index = 0; index < bytesRead; index++) {
-                            this.mainMemory.writeByteTo(DoubleWord.fromNumber(bufferAddress + index), Byte.fromNumber(buffer[index]));
+
+                        if (bytesRead > 0 && this.fs.fd_map.get(op2)?.filename === "os/util/empty_frame.bin")
+                        {
+                            this.mainMemory.clearFrame(FrameNumber.fromPhysicalAddress(PhysicalAddress.fromNumber(bufferAddress)));
+                            break;
+                        }
+                        
+                        for (let index = 0; index < doubleWordbytesRead; index += 4) {
+                            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(bufferAddress + index), buffer.getUint32(index) as DoubleWord);
+                        }
+
+                        for (let index = 0; index < bytesRead % 4; index++) {
+                            this.mainMemory.writeByteTo(PhysicalAddress.fromNumber(bufferAddress + index), buffer.getUint8(index) as Byte);
                         }
                     }
                 }
@@ -896,11 +917,19 @@ export class CPUCore {
             case DevOperations.IO_WRITE_BUFFER: {// 00000011 - io_write_buffer (fd=op2, buffer=stack, b_size=stack) -> bytes_written=eax
                 const writeBufferAddress = this.internal_pop();
                 const writeBufferSize = this.internal_pop();
-                const writeBuffer = new Uint8Array(writeBufferSize);
-                for (let index = 0; index < writeBufferSize; index++) {
-                    const byte = this.mmu.readByteFrom(DoubleWord.fromNumber(writeBufferAddress + index))
-                    writeBuffer[index] = byte;
+                const writeBuffer = new DataView(new Uint8Array(writeBufferSize).buffer);
+
+                const doubleWordBufferSize = writeBufferSize - (writeBufferSize % 4);
+                for (let index = 0; index < doubleWordBufferSize; index += 4) {
+                    const doubleWord = this.mmu.readDoublewordFrom(PhysicalAddress.fromNumber(writeBufferAddress + index), false)
+                    writeBuffer.setUint32(index, doubleWord);
                 }
+
+                for (let index = 0; index < writeBufferSize % 4; index++) {
+                    const byte = this.mmu.readByteFrom(PhysicalAddress.fromNumber(writeBufferAddress + index))
+                    writeBuffer.setUint8(index, byte);
+                }
+
                 const bytesWritten = this.fs.io_write_buffer(op2, writeBuffer, writeBufferSize);
                 this.eax.content = DoubleWord.fromNumber(bytesWritten);
                 break;
@@ -2249,7 +2278,7 @@ export class CPUCore {
         // Read contents of flags register from STACK into flags register.
         const content = this.mmu.readDoublewordFrom(this.esp.content, false);
         // Deallocate four bytes from STACK by incrementing the value in ESP.
-        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
+        this.mmu.writeDoublewordTo(this.esp.content, DoubleWord.ZERO, false);
 
         this.esp.content = DoubleWord.fromNumber(this.esp.content + 4);
 
@@ -2287,7 +2316,7 @@ export class CPUCore {
             this.writeRegister(value, target);
         }
         // Deallocate one doubleword from STACK by incrementing the value in ESP.
-        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
+        this.mmu.writeDoublewordTo(this.esp.content, DoubleWord.ZERO, false);
         // TODO: Call interrupt handler for deallocation of page frame in page table.
         this.esp.content = DoubleWord.fromNumber(this.esp.content + 4);
         return;
@@ -2386,7 +2415,7 @@ export class CPUCore {
         // Read the return address from the STACK.
         this.eip.content = this.mmu.readDoublewordFrom(this.esp.content, false);
         // Deallocate one doubleword from the STACK by incrementing ESP.
-        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
+        this.mmu.writeDoublewordTo(this.esp.content, DoubleWord.ZERO, false);
 
         this.esp.content = DoubleWord.fromNumber(this.esp.content + 4);
         return true;
@@ -2491,7 +2520,7 @@ export class CPUCore {
         this.ret();
         // Restore the old EFLAGS contents from the STACK.
         const eflagsValue = this.mmu.readDoublewordFrom(this.esp.content, false);
-        this.mmu.clearMemory(this.esp.content, DataSizes.DOUBLEWORD);
+        this.mmu.writeDoublewordTo(this.esp.content, DoubleWord.ZERO, false);
         this.esp.content = DoubleWord.fromNumber(this.esp.content + 4);
 
         // Restore the old STACK value.

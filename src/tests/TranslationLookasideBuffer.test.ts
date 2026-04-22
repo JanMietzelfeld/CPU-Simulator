@@ -1,8 +1,8 @@
 import { TranslationLookasideBuffer } from "../main/simulator/functional_units/TranslationLookasideBuffer";
-import { PageTableEntry } from "../types/binary/PageTableEntry";
 import { PageNumber } from "../types/binary/PageNumber";
 import { PageTableEntryFlags } from "../types/binary/PageTableEntryFlags";
 import { FrameNumber } from "../types/binary/FrameNumber";
+import { PageTableEntry } from "../types/binary/PageTableEntry";
 
 describe("Test TLB", () => {
     const translationLookasideBuffer: TranslationLookasideBuffer = new TranslationLookasideBuffer(2);
