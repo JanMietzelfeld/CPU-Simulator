@@ -66,8 +66,20 @@
                                 <option value="DECIMAL">Decimal</option>
                             </select>
                         </div>
-                        <div class="register widget" id="eflags" data-representation="BINARY">
-                            <div class="lg-text">EFLAGS</div>
+                        <div class="register widget" id="edx" data-representation="BINARY">
+                            <div class="lg-text">EDX</div>
+                            <div class="sm-text subtitle">General Purpose Register</div>
+                            <div name="register-content" class="register-content" data-value="">
+                                00000000 00000000 00000000 00000000
+                            </div>
+                            <select name="register-select-representation" title="Switch for changing representation of content">
+                                <option selected value="BINARY">Binary</option>
+                                <option value="HEXADECIMAL">Hexadecimal</option>
+                                <option value="DECIMAL">Decimal</option>
+                            </select>
+                        </div>
+                        <div class="register widget" id="flags" data-representation="BINARY">
+                            <div class="lg-text">FLAGS</div>
                             <div class="sm-text subtitle">State Register</div>
                             <div name="register-content" class="register-content" data-value="">
                                 11000000

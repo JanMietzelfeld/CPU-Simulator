@@ -33,3 +33,5 @@ declare module '*.icns' {
     const value: string;
     export default value;
 }
+
+declare module '*.css';

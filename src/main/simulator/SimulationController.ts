@@ -2,24 +2,11 @@ import { Assembler } from "./Assembler";
 import { CPUCore } from "./execution_units/CPUCore";
 import { RAM } from "./functional_units/RAM";
 import { DoubleWord } from "../../types/binary/DoubleWord";
-import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
-import { VirtualAddress } from "../../types/binary/VirtualAddress";
-import { Bit } from "../../types/binary/Bit";
-import { MemoryManagementUnit } from "./execution_units/MemoryManagementUnit";
 import { DataSizes } from "../../types/enumerations/DataSizes";
-import { PageFaultError } from "../../types/errors/PageFaultError";
-import { readFileSync, writeFileSync } from "fs";
-import { PageTableEntry } from "../../types/binary/PageTableEntry";
-import { InstructionOperand } from "../../types/binary/InstructionOperand";
-import { EncodedAddressingModes } from "../../types/enumerations/EncodedAdressingModes";
-import { AddressSpace } from "../../types/binary/AddressSpace";
-import { EncodedOperandTypes } from "../../types/enumerations/EncodedOperandTypes";
-import { Address } from "../../types/binary/Address";
-import { disassemble } from "./Disassembler";
-import { exit } from "process";
-import { PassthroughFilesystem } from "./os/PassthroughFilesystem";
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
-import { getMainWindow } from "..";
+import { getMainWindow } from "../index";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -48,16 +35,7 @@ export class SimulationController {
      * The size of the kernel space is exactly 1 gibibyte.
      * @readonly
      */
-    private static readonly KERNEL_SPACE:  AddressSpace<PhysicalAddress> = 
-        new AddressSpace<PhysicalAddress>(
-            PhysicalAddress.fromInteger(0xC0000000),
-            PhysicalAddress.fromInteger(0xFFFFFFFF)
-        );
-
-    /**
-     * This field stores the path to the assembly files.
-     */
-    private _pathToAssemblyFiles: string;
+    private static readonly KERNEL_SPACE_START: DoubleWord = DoubleWord.fromNumber(0xC0000000);
 
     /**
      * This field represents a flag, which enables automatic scroll for the GUIs virtual RAM widget.
@@ -74,22 +52,28 @@ export class SimulationController {
      */
     public autoScrollForPageTableEnabled: boolean;
 
+    public readonly pathToOSFilesystem: string;
+
+    public readonly inDevMode: boolean;
+
     /**
      * Creates a new instance.
      * @param capacityOfMainMemory The initial capacity of the main memory. This value can not be modified after the simulator started.
      * @param pathToLanguageDefinition The path to the language definition file.
-     * @param pathToAssemblyFiles The path to the assembly files.
+     * @param pathToOSFilesystem The path to the language definition file.
      * @param [processingWidth=DataSizes.DOUBLEWORD] The processing width of the simulated CPU.
+     * @param [devMode=false] 
      */
-    private constructor(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToAssemblyFiles: string, processingWidth: DataSizes = DataSizes.DOUBLEWORD) {
+    private constructor(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, processingWidth: DataSizes = DataSizes.DOUBLEWORD, devMode: boolean = false) {
         this.mainMemory = new RAM(capacityOfMainMemory);
-        this.core = new CPUCore(this.mainMemory, processingWidth);
-        this._assembler = new Assembler(pathToLanguageDefinition);
+        this.pathToOSFilesystem = pathToOSFilesystem;
+        this.core = new CPUCore(this.mainMemory, processingWidth, pathToOSFilesystem);
+        this._assembler = new Assembler(pathToLanguageDefinition, pathToOSFilesystem);
         this._programmLoaded = true;
         this.autoScrollForPageTableEnabled = true;
         this.autoScrollForPhysicalRAMEnabled = true;
         this.autoScrollForVirtualRAMEnabled = true;
-        this._pathToAssemblyFiles = pathToAssemblyFiles;
+        this.inDevMode = devMode;
     }
 
     /**
@@ -101,15 +85,16 @@ export class SimulationController {
     }
 
     /**
-     * This method can be used to retrieve an initialized instance of the simulator.
+     * This method returns the SimulatorController instance or creates one if not present
      * @param capacityOfMainMemory
      * @param pathToLanguageDefinition
-     * @param pathToAssemblyFiles
+     * @param pathToOSFilesystem
+     * @param [devMode=false] 
      * @returns 
      */
-    public static getInstance(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToAssemblyFiles: string): SimulationController {
+    public static getInstanceOrCreate(capacityOfMainMemory: number, pathToLanguageDefinition: string, pathToOSFilesystem: string, devMode: boolean = false): SimulationController {
         if (SimulationController._instance === null) {
-            SimulationController._instance = new SimulationController(capacityOfMainMemory, pathToLanguageDefinition, pathToAssemblyFiles);
+            SimulationController._instance = new SimulationController(capacityOfMainMemory, pathToLanguageDefinition, pathToOSFilesystem, DataSizes.DOUBLEWORD, devMode);
             SimulationController._instance.bootKernel();
         }
         return SimulationController._instance;
@@ -119,45 +104,83 @@ export class SimulationController {
      * This method boots the operating system by loading its data into main memory. The address space,
      * where the operating system is located in memory is sometimes called kernel space.
      */
+    public assemblyKernel(): void {
+
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/src/os_entry.asm", "ihmeOS", SimulationController.KERNEL_SPACE_START);
+
+        //Assemble the init program (needed by the os)
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
+    
+
+        //Assemble the init program (needed by the os)
+        this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
+    }
+
+    /**
+     * This method boots the operating system by loading its data into main memory. The address space,
+     * where the operating system is located in memory is sometimes called kernel space.
+     */
     private bootKernel(): void {
-
-
         // Enter kernel mode.
-        this.core.eflags.enterKernelMode();
+        this.core.flags.enterKernelMode();
         // Enable real mode and disable memory virtualization.
         this.core.mmu.disableMemoryVirtualization();
 
-        const startOfKernelSpace = SimulationController.KERNEL_SPACE.lowAddressToDecimal();
-
-        // Load kernel code into memory 
-        const kernelCodeStartAddress = startOfKernelSpace;
-        if (kernelCodeStartAddress != 0xC0000000) {
-            throw new EvalError("Unexpected begin of OS memory");
+        if (!existsSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin") || this.inDevMode)
+        {
+            this.assemblyKernel();
         }
 
-        const compiledOS: DoubleWord[] = this._assembler.assemble(readFileSync(`${process.cwd()}/os_filesystem/os/src/os_entry.asm`, "utf-8"), kernelCodeStartAddress)
+        const buffer = readFileSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin");
 
-        //disassemble(compiledOS, kernelCodeStartAddress) //For debugging
+        const lenght =  buffer.length - (buffer.length % 4);
 
-        for (let i = 0; i < compiledOS.length; i++) {
-            this.mainMemory.writeDoublewordTo(PhysicalAddress.fromInteger(kernelCodeStartAddress + i*DoubleWord.SIZE_IN_BYTES), compiledOS[i])
+        for (let i = 0; i < lenght; i+=4) {
+            const value: DoubleWord = DoubleWord.fromBytes(
+                Byte.fromNumber(buffer[i]), 
+                Byte.fromNumber(buffer[i+1]), 
+                Byte.fromNumber(buffer[i+2]), 
+                Byte.fromNumber(buffer[i+3]));
+
+            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
+        }
+
+        if (buffer.length % 4 !== 0)
+        {
+            const value: DoubleWord = DoubleWord.fromBytes(
+                Byte.fromNumber(buffer[lenght]), 
+                Byte.fromNumber(buffer.length % 4 >= 2 ? buffer[lenght+1] : 0), 
+                Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
+                Byte.ZERO);
+
+            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
         }
         
-        this.core.setEIP(Address.fromInteger(kernelCodeStartAddress));
+        this.core.eip.content = SimulationController.KERNEL_SPACE_START;
 
-        //Assemble the init program (needed by the os)
-        this.assembleProgram(process.cwd() + "/os_filesystem/os/user/init.asm");
 
-        //Assemble the idle program (needed by the os)
-        this.assembleProgram(process.cwd() + "/os_filesystem/os/user/idle.asm");
-        
+        if (!existsSync(this.pathToOSFilesystem + "/os/bin/init.bin"))
+        {
+            //Assemble the init program (needed by the os)
+            this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
+        }
+
+        if (!existsSync(this.pathToOSFilesystem + "/os/bin/idle.bin"))
+        {
+            //Assemble the idle program (needed by the os)
+            this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
+        }
         this.createUtilityFiles();
+
+        DebugLogger.log("");
+        DebugLogger.log("Starting Execution");
+        DebugLogger.log("");
 
         this.core.cycle();       
         
-        getMainWindow().webContents.send('clear_log');
+        getMainWindow()?.webContents.send('clear_log');
 
-        getMainWindow().webContents.send('update_log', "OS Initialized");
+        getMainWindow()?.webContents.send('update_log', "OS Initialized");
 
         return;
     }
@@ -167,7 +190,6 @@ export class SimulationController {
     /**
      * This method is used to initialize a process and prepare its execution.
      * @param pathToProgramCode 
-     * @returns 
      */
     public createProcess(pathToProgramCode: string): void {
 
@@ -184,15 +206,15 @@ export class SimulationController {
             throw new EvalError("file must be in the os_filesystem")
         }
 
-        let relativePathToCode = pathToProgramCode.substring(pathToProgramCode.indexOf("/os_filesystem/") + "/os_filesystem/".length)
-        relativePathToCode = relativePathToCode.concat("\0");
+        const programName = pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
+        let relativePathToCode = "/bin" + programName + "\0";
 
         while (relativePathToCode.length % 4 != 0)
         {
             relativePathToCode = relativePathToCode.concat("\0");
         }
 
-        let buffer: number[] = [];
+        const buffer: number[] = [];
 
         for (let i = 0; i < relativePathToCode.length; i++) {
 
@@ -200,7 +222,7 @@ export class SimulationController {
         }
 
 
-        writeFileSync(process.cwd() + "/os_filesystem/os/util/new_process_name.bin", Buffer.from(buffer));
+        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from(buffer));
         
         return;
     }
@@ -208,7 +230,6 @@ export class SimulationController {
     /**
      * This method is used to assemble a program
      * @param pathToProgramCode 
-     * @returns 
      */
     public assembleProgram(pathToProgramCode: string): void {
         
@@ -217,127 +238,114 @@ export class SimulationController {
         // Compile the program code.
         const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents);
 
-        const binaryProgram: number[] = [];
+        const buffer = Buffer.alloc(compiledProgram.length * 4);
 
-        compiledProgram.forEach(word => {
-            
-            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
+        compiledProgram.forEach((doubleWord, i) => {
+            const offset = i * 4;
+
+            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
+            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
+            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
+            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
         });
 
-        const buffer = Buffer.from(binaryProgram);
+        pathToProgramCode = this.pathToOSFilesystem + "/bin" + pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
+        pathToProgramCode = pathToProgramCode.replace(".asm", ".bin");;
 
-        writeFileSync(pathToProgramCode.replace(".asm", ".bin"), buffer);
-
-        return;
+        writeFileSync(pathToProgramCode, buffer);
     }
 
     /**
-     * This method is used to load a binary program
+     * This method is used to assemble os code
      * @param pathToProgramCode 
-     * @returns program code
+     * @param [name=null] 
+     * @param [baseOffeset=0] 
      */
-    public loadBinaryProgram(code: string): Array<DoubleWord> {
+    public assembleOSCode(pathToProgramCode: string, name: string | null = null, baseOffeset: number = 0): void {
         
-        const data: Array<DoubleWord> = new Array<DoubleWord>;
+        // Read the program code.
+        const fileContents: string = readFileSync(pathToProgramCode, "utf-8");
+        // Compile the program code.
+        const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents, baseOffeset);
 
-        for (let i = 0; i < code.length - 4; i += 4) {
-            
-            let bits: Bit[] = [];
+        const buffer = Buffer.alloc(compiledProgram.length * 4);
 
-            for (let j = 0; j < 4; j++) {
-                const character = code.at(i + j);
-                const charBits = character?.charCodeAt(0)
-                    .toString(2)
-                    .padStart(8, '0') // ensure 8-bit representation
-                    .split("")
-                    .map(bit => bit === "0" ? 0 : 1 as Bit);
+        compiledProgram.forEach((doubleWord, i) => {
+            const offset = i * 4;
 
-                bits.push(...charBits!);
-            }
-        
+            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
+            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
+            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
+            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
+        });
 
-            data.push(new DoubleWord(bits));
+        pathToProgramCode = pathToProgramCode.replace(".asm", "");
+
+        if (name === null)
+        {
+            name = pathToProgramCode.substring(pathToProgramCode.lastIndexOf('/'));
         }
 
-        return data;
+        pathToProgramCode = this.pathToOSFilesystem + "/os/bin/" + name;
+        pathToProgramCode += ".bin";
+
+        writeFileSync(pathToProgramCode, buffer);
     }
 
-        /**
+    /**
      * This method is used to assemble a program
-     * @param pathToProgramCode 
-     * @returns 
      */
     public createUtilityFiles(): void {
         
-        writeFileSync(process.cwd() + "/os_filesystem/os/util/new_process_name.bin", Buffer.from([0]));
+        const newProcessNamePath = this.pathToOSFilesystem + "/os/util/new_process_name.bin"
 
-        let zeroFramePath = process.cwd() + "/os_filesystem/os/util/zero_frame.bin"
-
-        let pageTablePath = process.cwd() + "/os_filesystem/os/util/page_table.bin"
-
-
-        let fileContents: Array<DoubleWord> = [];
-
-        for (let i = 0; i < 4096; i++) {
-            fileContents.push(DoubleWord.fromInteger(0))
+        if (!existsSync(newProcessNamePath))
+        {
+            writeFileSync(newProcessNamePath, Buffer.from([0]));
         }
 
-        let binaryProgram: number[] = [];
+        const zeroFramePath = this.pathToOSFilesystem + "/os/util/zero_frame.bin"
 
-        fileContents.forEach(word => {
-            
-            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
-        });
+        if (!existsSync(zeroFramePath))
+        {
+            const buffer = Buffer.alloc(4096 * 4);
 
-        let buffer = Buffer.from(binaryProgram);
-
-        writeFileSync(zeroFramePath, buffer);
-
-        fileContents = [];
-
-        for (let i = 0; i < 786432; i++) {
-            fileContents.push(DoubleWord.fromInteger(1073741824)); //0x40000000 = 1073741824
+            writeFileSync(zeroFramePath, buffer);
         }
 
-        for (let i = 0; i < 262144; i++) {
-            if (i < 65536)
-            {
-                let value = 2415919104;  //0xB0000000 = 2415919104
+        const pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
 
-                fileContents.push(DoubleWord.fromInteger(value + i + 786432));
+        if (!existsSync(pageTablePath))
+        {
+            const buffer = Buffer.alloc((786432 + 262144) * 4);
+
+            for (let i = 0; i < 786432*4; i+=4) { //0x40000000
+                buffer[i] = 0x40;
             }
-            else
-            {
-                let value = 2952790016;  //0x90000000 = 2952790016
 
-                fileContents.push(DoubleWord.fromInteger(value + i + 786432));
+            for (let i = 0; i < 262144; i++) {
+                const index = 786432*4 + i*4;
+                if (i < 65536) //0xB0...
+                {
+                    const value = DoubleWord.fromNumber(0xB0000000 + i + 786432);
+                    buffer[index] = DoubleWord.getFirstByte(value);
+                    buffer[index+1] = DoubleWord.getSecondByte(value);
+                    buffer[index+2] = DoubleWord.getThirdByte(value);
+                    buffer[index+3] = DoubleWord.getFourthByte(value);
+                }
+                else //0x90...
+                {
+                    const value = DoubleWord.fromNumber(0x90000000 + i + 786432);
+                    buffer[index] = DoubleWord.getFirstByte(value);
+                    buffer[index+1] = DoubleWord.getSecondByte(value);
+                    buffer[index+2] = DoubleWord.getThirdByte(value);
+                    buffer[index+3] = DoubleWord.getFourthByte(value);
+                }
             }
+
+            writeFileSync(pageTablePath, buffer);
         }
-
-        binaryProgram = [];
-
-        fileContents.forEach(word => {
-            
-            binaryProgram.push(new Byte(word.getMostSignificantByte()).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(16).slice(8)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getMostSignificantBits(24).slice(16)).toUnsignedNumber());
-            binaryProgram.push(new Byte(word.getLeastSignificantByte()).toUnsignedNumber());
-        });
-
-        buffer = Buffer.from(binaryProgram);
-
-        writeFileSync(pageTablePath, buffer);
-
-        return;
     }
-
-
 
     /**
      * This method triggers execution of the next instruction

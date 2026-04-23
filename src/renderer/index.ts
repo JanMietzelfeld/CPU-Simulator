@@ -18,7 +18,7 @@ import { Renderer } from './renderer';
 
 const renderer: Renderer = new Renderer(document, window);
 
-window.onload = async (event) => {
+window.onload = async () => {
 	document.getElementById("next_cycle")?.setAttribute("src", next_cycle);
 	document.getElementById("cycle-btn")?.addEventListener("click", async () => {
 		renderer.cycle();
@@ -32,7 +32,8 @@ window.onload = async (event) => {
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);
 	await renderer.readECX(renderer.dataRepresentationECX);
-	await renderer.readEFLAGS();
+	await renderer.readEDX(renderer.dataRepresentationEDX);
+	await renderer.readFLAGS();
 	await renderer.readEIP(renderer.dataRepresentationEIP);
 	await renderer.readESP(renderer.dataRepresentationESP);
 	await renderer.readPTP(renderer.dataRepresentationPTP);
@@ -42,7 +43,7 @@ window.onload = async (event) => {
 	await renderer.readVMPTR(renderer.dataRepresentationVMPTR);
 };
 
-window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
+window.simulator.onLoadedAssemblyProgram(async () => {
 	renderer.programLoaded = true;
 	await renderer.reloadPhysicalRAMView();
 	await renderer.createVirtualRAMView();
@@ -51,7 +52,8 @@ window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);
 	await renderer.readECX(renderer.dataRepresentationECX);
-	await renderer.readEFLAGS();
+	await renderer.readEDX(renderer.dataRepresentationEDX);
+	await renderer.readFLAGS();
 	await renderer.readEIP(renderer.dataRepresentationEIP);
 	// TODO: Hide until a new place for the GUI element, representing the EIR register, is found.
 	// await renderer.readEIR();
@@ -61,7 +63,11 @@ window.simulator.onLoadedAssemblyProgram(async (filePath: string[]) => {
 	await renderer.readITP(renderer.dataRepresentationITP);
 	await renderer.readNPTP(renderer.dataRepresentationNPTP);
 	await renderer.readVMPTR(renderer.dataRepresentationVMPTR);
-	alert("Assembly program at " + filePath + " loaded.");
+	alert("Program accepted. Execution may start on a subsequent timer interrupt.");
+});
+
+window.simulator.onAssembledProgram(async () => {
+	alert("Program assembled successfully");
 });
 
 window.simulator.onError((errorDescription: string) => {

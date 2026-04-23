@@ -1,60 +1,48 @@
-import { Bit } from "./Bit";
-import { DoubleWord } from "./DoubleWord";
+import { InstructionTypes } from "../enumerations/InstructionTypes";
+import { Instructions } from "../enumerations/IntructionSet";
+import { InstructionOperand } from "./InstructionOperand";
 
 /**
- * This class represents an 32-bit instruction.
+ * This class represents a decoded (non-binary) instruction, ready for execution.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
-export class Instruction extends DoubleWord {
+export class Instruction {
 	/**
-	 * Instantiates a new object.
-	 * @constructor
+	 * The instructions type.
 	 */
-	public constructor(value: Array<Bit>) {
-		super(value);
-	}
-
-	/**
-	 * Accessor for reading the binary value.
-	 * @override
-	 */
-	public get value(): Array<Bit> {
-		return this._value;
-	}
+	private readonly _type: InstructionTypes;
 	
 	/**
-	 * Accessor for setting the binary value.
-	 * @param newValue The new value.
-	 * @override
+	 * The instructions operation.
 	 */
-	public set value(newValue: Array<Bit>) {
-		if (newValue.length != DoubleWord.NUMBER_OF_BITS_DEC) {
-			throw new Error(`A new value must have exactly ${this._value.length} bits.`);
-		}
-		this._value = newValue.slice();
-	}
+	private readonly _instruction: Instructions;
 
 	/**
-	 * For comparison, both binary values are converted to strings.
-	 * Conversion presarves the order of items, which is important for the comparison.
-	 * @param other The instruction to compare to.
-	 * @returns True, when both binary values are identical, false otherwise.
+	 * A list of the operations operands or undefined, if no operand is present.
 	 */
-	public equal(other: Instruction): boolean {
-		return other.value.toString() === this.value.toString();
-	}
+	private readonly _operands: [InstructionOperand | undefined, InstructionOperand | undefined];
 
 	/**
-	 * Converts the binary value into a string representation.
-	 * @returns The string representation of the binary value.
+	 * Constructs a new instance from the given arguments.
+	 * @param type The instructions type.
+	 * @param instruction The instruction.
+	 * @param operands The instructions operands.
 	 */
-	public toString(groupBytes: boolean = false): string {
-		var result: string = "";
-		if (groupBytes) {
-			result = `${this.value[0]}${this.value[1]}${this._value[2]}${this._value[3]}${this.value[4]}${this.value[5]}${this._value[6]}${this._value[7]} ${this.value[8]}${this.value[9]}${this._value[10]}${this._value[11]}${this.value[12]}${this.value[13]}${this._value[14]}${this._value[15]} ${this.value[16]}${this.value[17]}${this._value[18]}${this._value[19]}${this.value[20]}${this.value[21]}${this._value[22]}${this._value[23]} ${this.value[24]}${this.value[25]}${this._value[26]}${this._value[27]}${this.value[28]}${this.value[29]}${this._value[30]}${this._value[31]}`;
-		} else {
-			result = this._value.join("");
-		}
-		return result;
+    public constructor(type: InstructionTypes, instruction: Instructions, operands: [InstructionOperand | undefined, InstructionOperand | undefined] = [undefined, undefined]) {
+        this._type = type;
+        this._instruction = instruction;
+        this._operands = operands;
+    }
+
+	public get type(): InstructionTypes {
+		return this._type;
+	}
+
+	public get instruction(): Instructions {
+		return this._instruction;
+	}
+
+	public get operands(): [InstructionOperand | undefined, InstructionOperand | undefined] {
+		return this._operands;
 	}
 }

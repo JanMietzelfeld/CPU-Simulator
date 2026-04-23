@@ -6,12 +6,3 @@ export enum InterruptNumbers {
 	TIMER = 0x20,
 	SYSTEM_CALL = 0x80,
 }
-
-export function interruptNameByValue(value: number): string {
-	for (const [key, val] of Object.entries(InterruptNumbers)) {
-		if (val === value) {
-			return key;
-		}
-	}
-	return "unknown"
-}

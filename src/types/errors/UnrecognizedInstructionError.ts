@@ -9,6 +9,7 @@ export class UnrecognizedInstructionError extends Error {
 	 */
     constructor(description: string) {
 		super(description);
+		this.name = "UnrecognizedInstructionError";
         // Set the prototype explicitly to enable typechecking.
         Object.setPrototypeOf(this, UnrecognizedInstructionError.prototype);
     }

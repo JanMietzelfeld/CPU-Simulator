@@ -1,19 +1,13 @@
-import { Bit } from "../../../types/binary/Bit";
 import { Byte } from "../../../types/binary/Byte";
 import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
-import { PageFaultError } from "../../../types/errors/PageFaultError";
-import { PageFrameNotExecutableError } from "../../../types/errors/PageFrameNotExecutableError";
-import { PageFrameNotWritableError } from "../../../types/errors/PageFrameNotWritableError";
-import { PrivilegeViolationError } from "../../../types/errors/PrivilegeViolationError";
 import { PageTableEntry } from "../../../types/binary/PageTableEntry";
-import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
-import { VirtualAddress } from "../../../types/binary/VirtualAddress";
-import { EFLAGS } from "../functional_units/EFLAGS";
-import { PointerRegister } from "../functional_units/PointerRegister";
-import { RAM } from "../functional_units/RAM";
 import { TranslationLookasideBuffer } from "../functional_units/TranslationLookasideBuffer";
-import { ArithmeticLogicUnit } from "./ArithmeticLogicUnit";
+import { CPUCore } from "./CPUCore";
+import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
+import { ExceptionError } from "../../../types/errors/ExceptionError";
+import { PageNumber } from "../../../types/binary/PageNumber";
+import { PageTableEntryFlags } from "../../../types/binary/PageTableEntryFlags";
 
 /**
  * This class represents a Memory Management Unit (MMU). This specialized execution unit is responsible
@@ -26,26 +20,6 @@ export class MemoryManagementUnit {
      * @readonly
      */
     public static readonly NUMBER_BITS_OFFSET: number = 12;
-
-    /**
-     * This class member stores the number of bits used for the page table entries flag bits.
-     * @readonly
-     */
-    public static readonly NUMBER_FLAG_BITS: number = 12;
-
-    /**
-     * This class member stores the number of bits representing the page number.
-     * The page number can be extracted from a virtual memory address by removing the offset bits from the right.
-     * @readonly
-     */
-    public static readonly NUMBER_BITS_PAGE_ADDRESS: number = DataSizes.DOUBLEWORD - MemoryManagementUnit.NUMBER_BITS_OFFSET;
-
-    /**
-     * This class member stores the number of bits representing the page frame number.
-     * The page frame number can be extracted from a phyiscal memory address by removing the offset bits from the right.
-     * @readonly
-     */
-    public static readonly NUMBER_BITS_PAGE_FRAME_ADDRESS: number = MemoryManagementUnit.NUMBER_BITS_PAGE_ADDRESS;
 
     /**
      * This class member stores the index of the present flag bit.
@@ -88,89 +62,70 @@ export class MemoryManagementUnit {
      * This member stores a reference to the Translation Lookaside Buffer.
      * @readonly
      */
-    private readonly _tlb: TranslationLookasideBuffer;
+    private readonly _tlb: TranslationLookasideBuffer = new TranslationLookasideBuffer(128);;
 
     /**
      * This member stores a reference to the Page Table Pointer register of the CPU core, this MMU
      * instance is associated with.
      * @readonly
      */
-    private readonly _ptp: PointerRegister;
-
-    /**
-     * This member stores a reference to the main memory.
-     * @readonly
-     */
-    private readonly _mainMemory: RAM;
-
-    /**
-     * This member stores a reference to the status register (EFLAGS) of the CPU core, this MMU
-     * instance is associated with.
-     * @readonly
-     */
-    private readonly _flags: EFLAGS;
+    private readonly _cpu: CPUCore;
 
     /**
      * This member indicates whether memory virtualization is enabled.
      */
-    private _memoryVirtualizationEnabled: boolean;
+    private _memoryVirtualizationEnabled: boolean = false;
+
+    public pageFaultAddress: DoubleWord | undefined = undefined;
+
 
     /**
      * Constructs a new instance from the given references of the RAM, Page Table Pointer (PTP) register, the ALU and the EFLAGS register.
-     * @param mainMemory A reference to the main memory of this computer system.
-     * @param ptp A reference to the Page Table Pointer of the CPU core, this MMU is associated with.
-     * @param alu A reference to the ALU of the CPU core, this MMU is associated with.
-     * @param eflags A reference to the EFLAGS register of the CPU core, this MMU is associated with.
-     * @constructor
+     * @param cpu A reference to the cpu.
      */
-    public constructor(mainMemory: RAM, ptp: PointerRegister, alu: ArithmeticLogicUnit, eflags: EFLAGS) {
-        this._tlb = new TranslationLookasideBuffer(64);
-        this._memoryVirtualizationEnabled = false;
-        this._mainMemory = mainMemory;
-        this._ptp = ptp;
-        this._flags = eflags;
+    public constructor(cpu: CPUCore) {
+        this._cpu = cpu;
     }
-
 
     /**
      * This method retruns if memory virtualization is enabled 1 = eabled | 0 = disabled.
+     * @returns
      */
     public isMemoryVirtualizationEnabled(): number {
         return this._memoryVirtualizationEnabled ? 1 : 0;
     }
+
     /**
      * This method enables memory virtualization.
      */
-    public enableMemoryVirtualization() {
+    public enableMemoryVirtualization(): void {
         this._memoryVirtualizationEnabled = true;
     }
 
     /**
      * This method disables memory virtualization.
      */
-    public disableMemoryVirtualization() {
+    public disableMemoryVirtualization(): void {
         this._memoryVirtualizationEnabled = false;
     }
 
     /**
      * This method invalidates the TLB.
      */
-    public invalidateTLB() {
+    public invalidateTLB(): void {
         this._tlb.clear();
     }
 
     /**
      * This methods writes a doubleword (4-byte) value to memory to the specified memory address.
-     * @param physicalAddress A binary virtual memory address to write the doubleword-sized data to.
+     * @param virtualAddress A binary virtual memory address to write the doubleword-sized data to.
      * @param doubleword Doubleword-sized data to write.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @param attemptsToExecute 
+     * @throws {ExceptionError} If an exception was generated
      */
-    public writeDoublewordTo(virtualAddress: VirtualAddress, doubleword: DoubleWord, attemptsToExecute: boolean): void {
-        const physicalAddress: PhysicalAddress = this.translate(virtualAddress, true, attemptsToExecute);
-        this._mainMemory.writeDoublewordTo(physicalAddress, doubleword);
+    public writeDoublewordTo(virtualAddress: DoubleWord, doubleword: DoubleWord, attemptsToExecute: boolean): void {
+        const physicalAddress: DoubleWord = this.translate(virtualAddress, true, attemptsToExecute);
+        this._cpu.mainMemory.writeDoubleWordTo(physicalAddress, doubleword);
         return;
     }
 
@@ -178,15 +133,12 @@ export class MemoryManagementUnit {
      * This method reads doubleword sized data from the main memory starting at the specified physical memory address.
      * @param virtualAddress A binary virtual memory address to read the doubleword-sized data from.
      * @param attemptsToExecute Whether the reading process attempts to execute the content to read.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      * @returns Doubleword-sized binary data.
      */
-    public readDoublewordFrom(virtualAddress: VirtualAddress, attemptsToExecute: boolean): DoubleWord {
-        const physicalAddress: PhysicalAddress = this.translate(virtualAddress, false, attemptsToExecute);
-        return this._mainMemory.readDoublewordFrom(physicalAddress);
+    public readDoublewordFrom(virtualAddress: DoubleWord, attemptsToExecute: boolean): DoubleWord {
+        const physicalAddress: DoubleWord = this.translate(virtualAddress, false, attemptsToExecute);
+        return this._cpu.mainMemory.readDoublewordFrom(physicalAddress);
     }
 
     /**
@@ -194,14 +146,11 @@ export class MemoryManagementUnit {
      * in the main memory. Throws an error, if the data exeeds a byte.
      * @param virtualAddress A binary value representing a virtual memory address to write the data to.
      * @param data Byte-sized data to write to the specified pyhsical memory address.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      */
-    public writeByteTo(virtualAddress: VirtualAddress, data: Byte): void {
-        const physicalAddress: PhysicalAddress = this.translate(virtualAddress, true, false);
-        this._mainMemory.writeByteTo(physicalAddress, data);
+    public writeByteTo(virtualAddress: DoubleWord, data: Byte): void {
+        const physicalAddress: DoubleWord = this.translate(virtualAddress, true, false);
+        this._cpu.mainMemory.writeByteTo(physicalAddress, data);
         return;
     }
 
@@ -210,47 +159,34 @@ export class MemoryManagementUnit {
      * Returns a binary zero for address not conatined in the
      * map in order to simulate a full size memory.
      * @param virtualAddress A binary value representing a virtual memory address to write the data to.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      * @returns The byte of data found at the specified address.
      */
-    public readByteFrom(virtualAddress: VirtualAddress): Byte {
-        /**
-         * Translate virtual memory address into physical memory address.
-         * As one single byte can not be executed, the parameter, which indicats whether the process
-         * wants to execute the retrieved binary value, is set to false.
-         */
-        const physicalAddress: PhysicalAddress = this.translate(virtualAddress, false, false);
-        // Read byte from main memory.
-        return this._mainMemory.readByteFrom(physicalAddress);
+    public readByteFrom(virtualAddress: DoubleWord): Byte {
+        const physicalAddress: DoubleWord = this.translate(virtualAddress, false, false);
+        return this._cpu.mainMemory.readByteFrom(physicalAddress);
     }
 
     /**
      * This method clears all bits at the specified locations, depending on the given number of bytes.
      * @param virtualAddress The virtual address to clear all bits at.
      * @param length The number of bytes to clear, starting at the given physical address.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If an exception was generated
      */
-    public clearMemory(virtualAddress: VirtualAddress, length: DataSizes): void {
+    public clearMemory(virtualAddress: DoubleWord, length: DataSizes): void {
         // The first virtual memory address to translate and to clear all bits at.
-        const startVirtualAddress: number = virtualAddress.toUnsignedNumber();
         // Calculate the number of cells, which should get cleared.
         const numberOfCellsToClear : number = length/DataSizes.BYTE;
         for (let i = 0; i < numberOfCellsToClear; ++i) {
             // Create virtual memory address from 
-            const currentVirtualAddress: VirtualAddress = VirtualAddress.fromInteger(startVirtualAddress + i);
+            const currentVirtualAddress: DoubleWord = DoubleWord.fromNumber(virtualAddress + i);
             /**
              * Translate virtual memory address to physical memory address.
              * As this method attempts to clear all bits at the specified address, the corresponding parameter is set to true.
              */
-            const physicalAddress: PhysicalAddress | null = this.translate(currentVirtualAddress, true, false);
+            const physicalAddress: DoubleWord | null = this.translate(currentVirtualAddress, true, false);
             // Clear all bits at the resulting physical memory address.
-            this._mainMemory.clearByte(physicalAddress);
+            this._cpu.mainMemory.clearByte(physicalAddress);
         }
     }
 
@@ -263,62 +199,52 @@ export class MemoryManagementUnit {
      * @param attemptsToExecute Indicates whether the process attempts to write data to the page frame associated with the given virtual address.
      * @param ignorePermissionFlags Disables the privilege violation check with the EFLAGS.
      * @param disableTlbLookUp Disables the usage of the TLB while translating an address.
-     * @throws {PageFaultError} If the page the given virtual address is part of, is currently not associated with a page frame.
-     * @throws {PrivilegeViolationError} If the page frame associated with this page is not accessable in user mode.
-     * @throws {PageFrameNotExecutableError} If the page frame associated with this page is not executable.
-     * @throws {PageFrameNotWritableError} If the page frame associated with this page is not writable.
+     * @throws {ExceptionError} If the page the given virtual address is part of, is currently not associated with a page frame.
      * @returns The physical memory address associated with the given virtual address.
      */
-    public translate(virtualAddress: VirtualAddress, attemptsToWrite: boolean, attemptsToExecute: boolean, ignorePermissionFlags: boolean = false, disableTlbLookUp: boolean = false): PhysicalAddress {
+    public translate(virtualAddress: DoubleWord, attemptsToWrite: boolean, attemptsToExecute: boolean, ignorePermissionFlags: boolean = false, disableTlbLookUp: boolean = false): DoubleWord {
         if (!this._memoryVirtualizationEnabled) {
             return virtualAddress;
         }
-        let pageTableEntry: PageTableEntry;
-        if (this._tlb.has(virtualAddress)) {
-            pageTableEntry = this._tlb.get(virtualAddress)!;
-        } else {
-            pageTableEntry = this.searchPageTable(virtualAddress);
-        }
+
+        const pageNumber = PageNumber.fromVirtualAddress(virtualAddress);
+        const pageTableEntry: PageTableEntry = this._tlb.get(pageNumber) ?? this.searchPageTable(virtualAddress);
+        const pageTableEntryFlags: PageTableEntryFlags = PageTableEntry.getFlags(pageTableEntry);
+
         // Check if a page frame is connected to the page to which the specified virtual address refers.
-        if (!pageTableEntry.isPresent()) {
-            // There is currently no page frame associated with the page.
-            throw new PageFaultError(
-                `The page associated with the virtual memory address ${virtualAddress} is currently not present.`,
-                pageTableEntry.flagBits,
-                new PhysicalAddress(virtualAddress.value)
-            );
+        if (!PageTableEntryFlags.isPresent(pageTableEntryFlags)) {
+
+            this.pageFaultAddress = virtualAddress;
+            
+            throw new ExceptionError(InterruptNumbers.PAGE_FAULT);
         }
         if (!ignorePermissionFlags) {
             // Check if the page frame is accessable only in kernel mode.
-            if (pageTableEntry.isAccessableOnlyInKernelMode() && !this._flags.isInKernelMode()) {
-                throw new PrivilegeViolationError("Process tries to access a page frame, which is accessible only in kernel mode.");
+            if (PageTableEntryFlags.isKernelModeOnly(pageTableEntryFlags) && !this._cpu.flags.isInKernelMode()) {
+                throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             }
             // Check if the page frames contents are executable.
-            if (false){ //(attemptsToExecute && !pageTableEntry.isExecutable()) { // TODO remove workaround
-                throw new PageFrameNotExecutableError("The process tries to execute a page frames contents that are marked as not executable.");
+            if (attemptsToExecute && !this._cpu.flags.isInKernelMode() && !PageTableEntryFlags.isExecutable(pageTableEntryFlags)) {
+                throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             }
             // Check if the page frames contents are writable.
-            if (attemptsToWrite && (!this._flags.isInKernelMode() && !pageTableEntry.isWritable())) {
-                throw new PageFrameNotWritableError("The process tries to write to a page frame, which is marked as read-only.");
+            if (attemptsToWrite && !this._cpu.flags.isInKernelMode() && !PageTableEntryFlags.isWritable(pageTableEntryFlags)) {
+                throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             }
         }
         
         if (attemptsToWrite) {
             // Set changed flag bit.
-            pageTableEntry.setChangedFlag();
-            // Copy the flag bits.
-            const tmpFlagBits = pageTableEntry.flagBits.slice();
+            PageTableEntryFlags.setChangedFlagBit(pageTableEntryFlags, 1);
             // Update flag bits of page table entry in memory as well.
-            this._mainMemory.writeDoublewordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), new DoubleWord(tmpFlagBits.concat(pageTableEntry.frameNbr)));
+            this._cpu.mainMemory.writeDoubleWordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), pageTableEntry);
         }
         // Page frame is present and operation is permitted.
         // Create a valid physical memory address from the page frame number and the offset extracted from the given virtual memory address.
-        const physicalAddress: PhysicalAddress = new PhysicalAddress(
-            pageTableEntry.frameNbr.concat(virtualAddress.getLeastSignificantBits(MemoryManagementUnit.NUMBER_BITS_OFFSET))
-        );
+        const physicalAddress: DoubleWord = DoubleWord.fromNumber((PageTableEntry.getFrameNumber(pageTableEntry) << MemoryManagementUnit.NUMBER_BITS_OFFSET) | DoubleWord.getLeastSignificantBits(virtualAddress, MemoryManagementUnit.NUMBER_BITS_OFFSET as DoubleWord.BitCount));
         // Update or insert the physical memory address into the Translation Lookaside Buffer.
-        if (!disableTlbLookUp) {
-            this._tlb.insert([virtualAddress, pageTableEntry]);
+        if (!disableTlbLookUp && !this._tlb.has(pageNumber)) {
+            this._tlb.insert([pageNumber, pageTableEntry]);
         }
         return physicalAddress;
         
@@ -330,19 +256,13 @@ export class MemoryManagementUnit {
      * @param virtualAddress The virtual address to compute the physical address of the page table entry for.
      * @returns The physical address of the page table entry.
      */
-    private calcPhysicalAddressOfPageTableEntry(virtualAddress: VirtualAddress): PhysicalAddress {
-        // Extract the page number from the given virtual address, which represents the index in the page table where the entry is located.
-        const pageNbr: DoubleWord = new DoubleWord(
-            new Array<Bit>(MemoryManagementUnit.NUMBER_BITS_OFFSET).fill(0).concat(virtualAddress.getMostSignificantBits(MemoryManagementUnit.NUMBER_BITS_PAGE_ADDRESS)));
-        const pageNbrDec: number = parseInt(pageNbr.toString(), 2) * 4;
-        // Read the page table base address from the page table pointer register and convert it to a decimal value.
-        const pageTableBaseAddressDec: number = this._ptp.content.toUnsignedNumber();
+    private calcPhysicalAddressOfPageTableEntry(virtualAddress: DoubleWord): DoubleWord {
         /* 
-         * Add the result to the physical page table base address to get the address of the page table entry.
+         * Add the page number * 4 to the physical page table base address to get the address of the page table entry.
          * Because every page table entry is 4 bytes long, the page number needs to be multiplied by 4 before 
          * adding it to the page tables base address.
          */
-        return PhysicalAddress.fromInteger(pageTableBaseAddressDec + pageNbrDec);
+        return DoubleWord.fromNumber(this._cpu.ptp.content + PageNumber.fromVirtualAddress(virtualAddress) * 4);
     }
 
     /**
@@ -353,24 +273,20 @@ export class MemoryManagementUnit {
      * to the page to which the given virtual memory address is assigned. The page table entry includes some status 
      * bits and possibly the physical base address of a page frame.
      * @param virtualAddress The virtual memory address to look up in the page table.
-     * @returns The page table entry.
      */
-    private searchPageTable(virtualAddress: VirtualAddress): PageTableEntry {
-        const wasInKernelMode: boolean = this._flags.isInKernelMode();
+    private searchPageTable(virtualAddress: DoubleWord): PageTableEntry {
+        const wasInKernelMode: boolean = this._cpu.flags.isInKernelMode();
         // Enter kernel mode in order to be able to search the page table.
-        this._flags.enterKernelMode();
+        this._cpu.flags.enterKernelMode();
         // Compute the physical address, where the page table resides in the page table.
-        const addressOfPageTableEntry: PhysicalAddress = this.calcPhysicalAddressOfPageTableEntry(virtualAddress);
+        const addressOfPageTableEntry: DoubleWord = this.calcPhysicalAddressOfPageTableEntry(virtualAddress);
         // Read page table entry from memory.
-        const contentOfPageTableEntry: DoubleWord = this._mainMemory.readDoublewordFrom(addressOfPageTableEntry);
+        const contentOfPageTableEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(addressOfPageTableEntry);
         // Create object from this content.
-        const pageTableEntry: PageTableEntry = new PageTableEntry(
-            contentOfPageTableEntry.value.slice(0, MemoryManagementUnit.NUMBER_FLAG_BITS),
-            contentOfPageTableEntry.value.slice(-MemoryManagementUnit.NUMBER_BITS_PAGE_FRAME_ADDRESS)
-        );
+        const pageTableEntry: PageTableEntry = PageTableEntry.fromDoubleWord(contentOfPageTableEntry);
         if (!wasInKernelMode) {
             // Enter user mode.
-            this._flags.enterUserMode();
+            this._cpu.flags.enterUserMode();
         }
         return pageTableEntry;
     }

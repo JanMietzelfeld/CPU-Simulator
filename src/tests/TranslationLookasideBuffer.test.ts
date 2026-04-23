@@ -1,72 +1,71 @@
 import { TranslationLookasideBuffer } from "../main/simulator/functional_units/TranslationLookasideBuffer";
-import { Bit } from "../types/binary/Bit";
 import { PageTableEntry } from "../types/binary/PageTableEntry";
-import { PhysicalAddress } from "../types/binary/PhysicalAddress";
-import { VirtualAddress } from "../types/binary/VirtualAddress";
+import { PageNumber } from "../types/binary/PageNumber";
+import { PageTableEntryFlags } from "../types/binary/PageTableEntryFlags";
+import { FrameNumber } from "../types/binary/FrameNumber";
 
 describe("Test TLB", () => {
     const translationLookasideBuffer: TranslationLookasideBuffer = new TranslationLookasideBuffer(2);
 
-    const virtualAddress1: VirtualAddress = VirtualAddress.fromInteger(0x00001000);
-    const pageFrameNbr1: Array<Bit> = PhysicalAddress.fromInteger(1).getMostSignificantBits(20);
-    const pageFlagBits1: Array<Bit> = new Array<Bit>(1,1,0,0, 1,0,0,0, 0,0,0,0);
-    const pageTableEntry1: PageTableEntry = new PageTableEntry(pageFlagBits1, pageFrameNbr1);
+    const pageNbr1: PageNumber = PageNumber.fromNumber(10);
+    const frameNbr1: FrameNumber = FrameNumber.fromNumber(1);
+    const flagBits1: PageTableEntryFlags= PageTableEntryFlags.fromNumber(0b110010000000);
+    const pageTableEntry1: PageTableEntry = PageTableEntry.fromFlagAndFrameNumber(flagBits1, frameNbr1);
 
-    const virtualAddress2: VirtualAddress = VirtualAddress.fromInteger(0x00002000);
-    const pageFrameNbr2: Array<Bit> = PhysicalAddress.fromInteger(10).getMostSignificantBits(20);
-    const pageFlagBits2: Array<Bit> = new Array<Bit>(1,0,1,0, 1,0,0,0, 0,0,0,0);
-    const pageTableEntry2: PageTableEntry = new PageTableEntry(pageFlagBits2, pageFrameNbr2);
+    const pageNbr2: PageNumber = PageNumber.fromNumber(20);
+    const frameNbr2: FrameNumber = FrameNumber.fromNumber(2);
+    const flagBits2: PageTableEntryFlags= PageTableEntryFlags.fromNumber(0b101010000000);
+    const pageTableEntry2: PageTableEntry = PageTableEntry.fromFlagAndFrameNumber(flagBits2, frameNbr2);
 
-    const virtualAddress3: VirtualAddress = VirtualAddress.fromInteger(0x00003000);
-    const pageFrameNbr3: Array<Bit> = PhysicalAddress.fromInteger(10).getMostSignificantBits(20);
-    const pageFlagBits3: Array<Bit> = new Array<Bit>(1,0,1,0, 1,0,0,0, 0,0,0,0);
-    const pageTableEntry3: PageTableEntry = new PageTableEntry(pageFlagBits3, pageFrameNbr3);
+    const pageNbr3: PageNumber = PageNumber.fromNumber(30);
+    const frameNbr3: FrameNumber = FrameNumber.fromNumber(3);
+    const flagBits3: PageTableEntryFlags = PageTableEntryFlags.fromNumber(0b101010000000);
+    const pageTableEntry3: PageTableEntry = PageTableEntry.fromFlagAndFrameNumber(flagBits3, frameNbr3);
     
     test("Insert first entry", () => {
-        translationLookasideBuffer.insert([virtualAddress1, pageTableEntry1]);
+        translationLookasideBuffer.insert([pageNbr1, pageTableEntry1]);
 
-        expect(translationLookasideBuffer.data).toEqual([
-            [1, [virtualAddress1.getMostSignificantBits(20), pageTableEntry1]]
-        ]);
+        expect(translationLookasideBuffer.toString()).toEqual([
+            [pageNbr1, [pageTableEntry1, 1]],
+        ].toString());
     });
 
     test("Get entry", () => {
-        translationLookasideBuffer.get(VirtualAddress.fromInteger(0x00001000));
-        expect(translationLookasideBuffer.data).toEqual([
-            [2, [virtualAddress1.getMostSignificantBits(20), pageTableEntry1]]
-        ]);
+        translationLookasideBuffer.get(pageNbr1);
+        expect(translationLookasideBuffer.toString()).toEqual([
+            [pageNbr1, [pageTableEntry1, 2]],
+        ].toString());
     });
 
     test("Insert second entry", () => {
-        translationLookasideBuffer.insert([virtualAddress2, pageTableEntry2]);
-        expect(translationLookasideBuffer.data).toEqual([
-            [2, [virtualAddress1.getMostSignificantBits(20), pageTableEntry1]], 
-            [1, [virtualAddress2.getMostSignificantBits(20), pageTableEntry2]]
-        ]);
+        translationLookasideBuffer.insert([pageNbr2, pageTableEntry2]);
+        expect(translationLookasideBuffer.toString()).toEqual([
+            [pageNbr1, [pageTableEntry1, 2]],
+            [pageNbr2, [pageTableEntry2, 1]]
+        ].toString());
     });
 
     test("Get entry", () => {
-        translationLookasideBuffer.get(VirtualAddress.fromInteger(0x00001000));
-        expect(translationLookasideBuffer.data).toEqual([
-            [3, [VirtualAddress.fromInteger(0x00001000).getMostSignificantBits(20), pageTableEntry1]], 
-            [1, [VirtualAddress.fromInteger(0x00002000).getMostSignificantBits(20), pageTableEntry2]]
-        ]);
+        translationLookasideBuffer.get(pageNbr1);
+        expect(translationLookasideBuffer.toString()).toEqual([
+            [pageNbr1, [pageTableEntry1, 3]],
+            [pageNbr2, [pageTableEntry2, 1]]
+        ].toString());
     });
 
     test("Insert third entry", () => {
-        translationLookasideBuffer.insert([virtualAddress3, pageTableEntry3]);
-        expect(translationLookasideBuffer.data)
-            .toEqual([
-                [3, [virtualAddress1.getMostSignificantBits(20), pageTableEntry1]],
-                [1, [virtualAddress3.getMostSignificantBits(20), pageTableEntry3]]
-            ]);
+        translationLookasideBuffer.insert([pageNbr3, pageTableEntry3]);
+        expect(translationLookasideBuffer.toString()).toEqual([
+            [pageNbr1, [pageTableEntry1, 3]],
+            [pageNbr3, [pageTableEntry3, 1]]
+            ].toString());
     });
 
     test("Get entry", () => {
-        translationLookasideBuffer.get(VirtualAddress.fromInteger(0x00001000));
-        expect(translationLookasideBuffer.data).toEqual([
-            [4, [virtualAddress1.getMostSignificantBits(20), pageTableEntry1]],
-            [1, [VirtualAddress.fromInteger(0x00003000).getMostSignificantBits(20), pageTableEntry3]]
-        ]);
+        translationLookasideBuffer.get(pageNbr1);
+        expect(translationLookasideBuffer.toString()).toEqual([
+            [pageNbr1, [pageTableEntry1, 4]],
+            [pageNbr3, [pageTableEntry3, 1]]
+        ].toString());
     });
 });

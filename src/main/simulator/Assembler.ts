@@ -4,19 +4,20 @@ import { Bit } from "../../types/binary/Bit";
 import { AssemblyLanguageDefinition } from "./compiler/AssemblyLanguageDefinition";
 import { DataSizes } from "../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../types/binary/DoubleWord";
-import { VirtualAddress } from "../../types/binary/VirtualAddress";
+import { Byte } from "../../types/binary/Byte";
 
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
 	public readonly languageDefinition: AssemblyLanguageDefinition;
-
+ 	public readonly pathToOSFilesystem: string
 	/**
 	 * Constructs a new assembler object with the given processing width.
-	 * @param processingWidth The processing width of the computer system the assembler is used for.
 	 * @param pathToLanguageDefinition The path to the language definition file of the assembly language used by this assembler.
+	 * @param pathToOSFilesystem 
 	 */
-	public constructor(pathToLanguageDefinition: string) {
+	public constructor(pathToLanguageDefinition: string, pathToOSFilesystem: string) {
 		this.languageDefinition = JSON.parse(readFileSync(pathToLanguageDefinition, "utf-8"));
+		this.pathToOSFilesystem = pathToOSFilesystem;
 	}
 
 	/**
@@ -30,7 +31,7 @@ export class Assembler {
 	private preprocess(fileContents: string): Map<number, string> {
 		const lines: Map<number, string> = new Map();
 
-		let includedContent: string = this.replaceIncludeLabels(fileContents);
+		const includedContent: string = this.replaceIncludeLabels(fileContents);
 
 		// Split file contents into lines of code, remove comments and mark empty lines for deletion
 		const commentRegex = new RegExp(this.languageDefinition.comment_format, "gim");
@@ -57,7 +58,7 @@ export class Assembler {
 
 		// Replace the Include with the content
 		const includeRegex = new RegExp(this.languageDefinition.include_format, "gim");
-		fileContents.split(Assembler.NEW_LINE_REGEX).forEach((line, lineNo) => {
+		fileContents.split(Assembler.NEW_LINE_REGEX).forEach((line) => {
 			
 			let lineContent: string = line;
 			const regexMatch: RegExpMatchArray | null = includeRegex.exec(line);
@@ -66,7 +67,7 @@ export class Assembler {
 				let fileName: string = regexMatch[0].toString();
 				fileName = fileName.substring(fileName.indexOf("\"") + 1, fileName.lastIndexOf("\""));
 
-				let fileContents: string = readFileSync(process.cwd() + "/os_filesystem/" + fileName + ".asm", "utf-8");
+				let fileContents: string = readFileSync(this.pathToOSFilesystem + "/" + fileName + ".asm", "utf-8");
 				fileContents = this.replaceIncludeLabels(fileContents)
 
 				lineContent = line.replace(includeRegex, () => fileContents);
@@ -207,12 +208,12 @@ export class Assembler {
 			}
 		}
 		if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-			let regexExp = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
-			let regexMatch = regexExp.exec(line);
+			const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
+			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
-				let value: string = regexMatch[0].toString().trim();
-				let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
-				let constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
+				const value: string = regexMatch[0].toString().trim();
+				const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+				const constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 				if (constants.has(constantName)) {
 					const stringConstantAddress = constants.get(constantName)!;
 					const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, constantValue, stringConstantAddress);
@@ -221,12 +222,12 @@ export class Assembler {
 				}
 			}
 		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationString, "gim"))) {
-			let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationString, "gim");
-			let regexMatch = regexExp.exec(line);
+			const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationString, "gim");
+			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
-				let value: string = regexMatch[0].toString().trim();
-				let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-				let variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
+				const value: string = regexMatch[0].toString().trim();
+				const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+				const variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 				if (variables.has(variableName)) {
 					const stringConstantAddress = variables.get(variableName)!;
 					const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, jumpLabels, variableValue, stringConstantAddress);
@@ -235,66 +236,66 @@ export class Assembler {
 				}
 			}
 		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim"))) {
-			let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim");
-			let regexMatch = regexExp.exec(line);
+			const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim");
+			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
-				let value: string = regexMatch[0].toString().trim();
-				let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-				let variableValue = value.substring(value.lastIndexOf(" ") + 1).trim();
+				const value: string = regexMatch[0].toString().trim();
+				const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+				const variableValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 				if (variables.has(variableName)) {
 					const variableStartAddress: string = variables.get(variableName)!.replace(/^0b/gim, "");
 					//The memory address after the Integer with the next instruction
-					const jumpAddress:string = VirtualAddress.fromInteger(parseInt(variableStartAddress, 2) + 4).toString();
+					const jumpAddress:string = (parseInt(variableStartAddress, 2) + 4).toString(2);
 					const jumpInstruction:string = "JMP @0b" + jumpAddress;
 					const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 					if (variableValue !== "") {
-						encodedInstruction.push(this.encodeBinaryValue(variableValue, lineNo));
+						encodedInstruction.push(this.encodeBinaryValue(variableValue));
 					} else {
-						encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+						encodedInstruction.push(this.encodeDecimalValue("0"));
 					}
 					encodedInstructions.push(...encodedInstruction);
 					lineEncoded = true;
 				}
 			}
 		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim"))) {
-			let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim");
-			let regexMatch = regexExp.exec(line);
+			const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim");
+			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
-				let value: string = regexMatch[0].toString().trim();
-				let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-				let variableValue = value.substring(value.lastIndexOf(" ") + 1).trim();
+				const value: string = regexMatch[0].toString().trim();
+				const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+				const variableValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 				if (variables.has(variableName)) {
 					const variableStartAddress: string = variables.get(variableName)!.replace(/^0b/gim, "");
 					//The memory address after the Integer with the next instruction
-					const jumpAddress:string = VirtualAddress.fromInteger(parseInt(variableStartAddress, 2) + 4).toString();
+					const jumpAddress:string = (parseInt(variableStartAddress, 2) + 4).toString(2);
 					const jumpInstruction:string = "JMP @0b" + jumpAddress;
 					const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 					if (variableValue !== "") {
-						encodedInstruction.push(this.encodeDecimalValue(variableValue, lineNo));
+						encodedInstruction.push(this.encodeDecimalValue(variableValue));
 					} else {
-						encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+						encodedInstruction.push(this.encodeDecimalValue("0"));
 					}
 					encodedInstructions.push(...encodedInstruction);
 					lineEncoded = true;
 				}
 			}
 		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim"))) {
-			let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim");
-			let regexMatch = regexExp.exec(line);
+			const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim");
+			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
-				let value: string = regexMatch[0].toString().trim();
-				let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-				let variableValue = value.substring(value.lastIndexOf(" ") + 1).trim();
+				const value: string = regexMatch[0].toString().trim();
+				const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+				const variableValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 				if (variables.has(variableName)) {
 					const variableStartAddress: string = variables.get(variableName)!.replace(/^0b/gim, "");
 					//The memory address after the Integer with the next instruction
-					const jumpAddress:string = VirtualAddress.fromInteger(parseInt(variableStartAddress, 2) + 4).toString();
+					const jumpAddress:string = (parseInt(variableStartAddress, 2) + 4).toString(2);
 					const jumpInstruction:string = "JMP @0b" + jumpAddress;
 					const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 					if (variableValue !== "") {
-						encodedInstruction.push(this.encodeHexadecimalValue(variableValue, lineNo));
+						encodedInstruction.push(this.encodeHexadecimalValue(variableValue));
 					} else {
-						encodedInstruction.push(this.encodeDecimalValue("0", lineNo));
+						encodedInstruction.push(this.encodeDecimalValue("0"));
 					}
 					encodedInstructions.push(...encodedInstruction);
 					lineEncoded = true;
@@ -331,46 +332,46 @@ export class Assembler {
 			if (line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentStart)) || line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentEnd))) {
 				lines.delete(lineNo);
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim");
-				let	regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim");
+				const	regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
-					let constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+					const constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 					constants.set(constantName, constantValue);
 					lines.delete(lineNo);
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim");
-				let	regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim");
+				const	regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
-					let constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+					const constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 					constants.set(constantName, constantValue);
 					lines.delete(lineNo);
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim");
-				let	regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim");
+				const	regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
-					let constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+					const constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 					constants.set(constantName, constantValue);
 					lines.delete(lineNo);
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
-				let regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
+				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
-					let constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
+					const value: string = regexMatch[0].toString().trim();
+					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+					const constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
 					constants.set(
 						constantName, 
-						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
@@ -378,58 +379,58 @@ export class Assembler {
 					programLocationCounter += stringMemSize + 12;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim");
-				let regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim");
+				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
 					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
 					programLocationCounter += 16;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim");
-				let regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim");
+				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
 					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
 					programLocationCounter += 16;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim");
-				let regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim");
+				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
 					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
 					programLocationCounter += 16;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationString, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.variable_formats.declarationString, "gim");
-				let regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationString, "gim");
+				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-					let variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
+					const value: string = regexMatch[0].toString().trim();
+					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+					const variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
 					variables.set(
 						variableName, 
-						"0b" + VirtualAddress.fromInteger(programLocationCounter+12).toString()
+						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
@@ -437,14 +438,14 @@ export class Assembler {
 					programLocationCounter += stringMemSize + 12;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
-				let regexExp = new RegExp(this.languageDefinition.label_formats.declaration, "gim");
-				let regexMatch = regexExp.exec(line);
+				const regexExp = new RegExp(this.languageDefinition.label_formats.declaration, "gim");
+				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
-					let value: string = regexMatch[0].toString().trim();
-					let jumpLabel = value.substring(value.indexOf(".") + 1, value.lastIndexOf(":")).trim();
+					const value: string = regexMatch[0].toString().trim();
+					const jumpLabel = value.substring(value.indexOf(".") + 1, value.lastIndexOf(":")).trim();
 					jumpLabels.set(
 						jumpLabel, 
-						VirtualAddress.fromInteger(programLocationCounter).toString()
+						programLocationCounter.toString(2)
 					);
 					lines.delete(lineNo);
 				}
@@ -505,7 +506,7 @@ export class Assembler {
 		const stringStartAddress: string = stringAddress.replace(/^0b/gim, "");
 		const stringMemSize = Math.ceil((Buffer.byteLength(stringValue) / 4)) * 4;
 		//The memory address after the string array with the next instruction
-		const jumpAddress:string = VirtualAddress.fromInteger(parseInt(stringStartAddress, 2) + stringMemSize).toString();
+		const jumpAddress:string = (parseInt(stringStartAddress, 2) + stringMemSize).toString(2);
 		const jumpInstruction:string = "JMP @0b" + jumpAddress;
 		const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 		encodedInstructions.push(...encodedInstruction);
@@ -517,44 +518,22 @@ export class Assembler {
 		//Slice the part of the buffer that is divisible by four (in byte) into 32 bit big segments
 		//and encode each segment into binary values.
 		if (continuousBufferSegmentSize > 0) {
-			for (let i = 0; i <= stringByteLength - 4; i += 4) {
-				const bufferSegment = stringBuffer.toString("hex", 0 + i, 4 + i);
-				const binaryString = parseInt(bufferSegment, 16).toString(2).padStart(32, "0");
-				const bitArray: Array<Bit> = new Array<Bit>(
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0,
-					0, 0, 0, 0
-				)
-				binaryString.split("").forEach((bit, index) => {
-					bitArray[index] = (bit === "0") ? 0 : 1;
-				})
-				const encodedStringPart = new DoubleWord(bitArray);
+			for (let i = 0; i < continuousBufferSegmentSize; i += 4) {
+				const byte1 = Byte.fromNumber(stringBuffer[i]);
+				const byte2 = Byte.fromNumber(stringBuffer[i+1]);
+				const byte3 = Byte.fromNumber(stringBuffer[i+2]);
+				const byte4 = Byte.fromNumber(stringBuffer[i+3]);
+				const encodedStringPart = DoubleWord.fromBytes(byte1, byte2, byte3, byte4);
 				encodedInstructions.push(encodedStringPart);
 			}
 		}
 		//Get the last bytes from the buffer
 		if (restOfBufferSize > 0) {
-			const bufferSegment = stringBuffer.toString("hex", continuousBufferSegmentSize, stringByteLength);
-			const binaryString = parseInt(bufferSegment, 16).toString(2).padStart((8 * restOfBufferSize), "0");
-			const bitArray: Array<Bit> = new Array<Bit>(
-				0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0,
-				0, 0, 0, 0
-			)
-			binaryString.split("").forEach((bit, index) => {
-				bitArray[index] = (bit === "0") ? 0 : 1;
-			})
-			const encodedStringPart = new DoubleWord(bitArray);
+			const byte1 = Byte.fromNumber(stringBuffer[continuousBufferSegmentSize]);
+			const byte2 = Byte.fromNumber(restOfBufferSize > 1 ? stringBuffer[continuousBufferSegmentSize+1] : 0);
+			const byte3 = Byte.fromNumber(restOfBufferSize > 2 ? stringBuffer[continuousBufferSegmentSize+2] : 0);
+			const byte4 = Byte.ZERO;
+			const encodedStringPart = DoubleWord.fromBytes(byte1, byte2, byte3, byte4);
 			encodedInstructions.push(encodedStringPart);
 		}
 		stringEncoded = true;
@@ -574,13 +553,12 @@ export class Assembler {
 	 * @returns An array containing the binary equivalent of the given instruction and its operand values.
 	 */
 	private encodeInstruction(regexMatchArrayInstruction: RegExpMatchArray, line: number, jumpLabels: Map<string, string>): DoubleWord[] {
-		const encodedInstruction: DoubleWord = new DoubleWord();
 		let addressingModeOperand1: Array<Bit> = new Array<Bit>(2);
 		let typeOperand1: Array<Bit> = new Array<Bit>(7);
 		let addressingModeOperand2: Array<Bit> = new Array<Bit>(2);
 		let typeOperand2: Array<Bit> = new Array<Bit>(7);
-		let encodedOperandValue1: DoubleWord = new DoubleWord();
-		let encodedOperandValue2: DoubleWord = new DoubleWord();
+		let encodedOperandValue1: DoubleWord;
+		let encodedOperandValue2: DoubleWord;
 		let instructionType: Array<Bit> = new Array<Bit>(3);
 		const opcode: Array<Bit> = new Array<Bit>(7);
 		const instructionMnemonic: string = regexMatchArrayInstruction[1];
@@ -627,11 +605,15 @@ export class Assembler {
 			encodedOperandValue1 = this.encodeOperandValue("", line, jumpLabels);
 		}
 
-		encodedInstruction.value = [
+		let finalInstruction: Array<Bit> = new Array<Bit>();
+		finalInstruction = [ 
 			...instructionType, ... delimeter, ... opcode, ... delimeter, 
 			... addressingModeOperand1, ... typeOperand1, 
 			... addressingModeOperand2, ... typeOperand2
 		];
+
+
+		const encodedInstruction = DoubleWord.fromNumber(parseInt(finalInstruction.join(""), 2));
 		
 		return [encodedInstruction, encodedOperandValue1, encodedOperandValue2];
 	}
@@ -669,19 +651,19 @@ export class Assembler {
 	private encodeOperandValue(operand: string, line: number, jumpLabels: Map<string, string>): DoubleWord {
 		let operand32BitEncoded: DoubleWord;
 		if (operand.length === 0) {
-			operand32BitEncoded = new DoubleWord();
+			operand32BitEncoded = DoubleWord.ZERO;
 		} else if (jumpLabels.has(operand)) {
 			// Operand is jump label.
-			operand32BitEncoded = VirtualAddress.fromInteger(parseInt(jumpLabels.get(operand)!, 2));
-		} else if (operand.startsWith("$0b")) {
+			operand32BitEncoded = DoubleWord.fromNumber(parseInt(jumpLabels.get(operand)!, 2));
+		} else if (operand.startsWith("$0b") || operand.startsWith("$-0b")) {
 			// Binary immediate found.
-			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$0b", ""), line);
+			operand32BitEncoded = this.encodeBinaryValue(operand.replace("$", ""));
 		} else if (operand.startsWith("$-0x") || operand.startsWith("$0x")) {
 			// Hexadecimal immediate found.
-			operand32BitEncoded = this.encodeHexadecimalValue(operand.replace("$", ""), line);
+			operand32BitEncoded = this.encodeHexadecimalValue(operand.replace("$", ""));
 		} else if (operand.startsWith("$-") || operand.startsWith("$")) {
 			// Decimal immediate found.
-			operand32BitEncoded = this.encodeDecimalValue(operand.replace("$", ""), line);
+			operand32BitEncoded = this.encodeDecimalValue(operand.replace("$", ""));
 		} else if (operand.startsWith("@0b")) {
 			// Binary virtual memory address found.
 			operand32BitEncoded = this.encodeBinaryAddress(operand.replace("@0b", ""), line);
@@ -709,53 +691,60 @@ export class Assembler {
 	 * @param line The line of code which this operand originates from.
 	 * @returns The 32-bit binary representation of the given immediate operand.
 	 */
-	private encodeBinaryValue(operand: string, line: number): DoubleWord {
-		if (operand.length > DataSizes.DOUBLEWORD) {
-			throw Error(`In line ${line + 1}: Binary immediate consists of more than ${DataSizes.DOUBLEWORD} bits.`);
-		}
+	private encodeBinaryValue(operand: string): DoubleWord {
+
+		let operandDec = 0;
+		operand = operand.replace("0b", "");
+
+		const negative = operand.startsWith("-");
+		operand = negative ? operand.replace("-", "") : operand;
+
 		// Sign extend binary value.
 		operand = operand.padStart(DataSizes.DOUBLEWORD, operand.charAt(0));
-		const binaryValue: DoubleWord = new DoubleWord();
-		operand.split("").map((bit, index) => {
-			binaryValue.value[index] = (bit === "0") ? 0 : 1;
-		})
-		return binaryValue;
+		
+		if (negative) {
+			// Negative binary value.
+			operandDec = parseInt(operand, 2) * -1;
+		} else {
+			// Positive binary value.
+			operandDec = parseInt(operand, 2);
+		}
+		return DoubleWord.fromNumber(operandDec);
 	}
 
 	/**
 	 * This method encodes an operands hexadecimal value into its 32-bit binary representation.
 	 * @param operand The hexadecimal value to encode.
-	 * @param line The line of code which this operand originates from.
 	 * @returns The 32-bit binary representation of the given immediate operand.
 	 */
-	private encodeHexadecimalValue(operand: string, line: number): DoubleWord {
+	private encodeHexadecimalValue(operand: string): DoubleWord {
 		let operandDec = 0;
+		operand = operand.replace("0x", "");
 		if (operand.startsWith("-")) {
 			// Negative hex value.
-			operandDec = (parseInt(operand.replace("-", ""), 16) * -1);
+			operandDec = parseInt(operand.replace("-", ""), 16) * -1;
 		} else {
 			// Positive hex value.
 			operandDec = parseInt(operand, 16);
 		}
-		return DoubleWord.fromInteger(operandDec);
+		return DoubleWord.fromNumber(operandDec);
 	}
 
 	/**
 	 * This method encodes an operands decimal value into its 32-bit binary representation.
 	 * @param operand The decimal value to encode.
-	 * @param line The line of code which this operand originates from.
 	 * @returns The 32-bit binary representation of the given immediate operand.
 	 */
-	private encodeDecimalValue(operand: string, line: number): DoubleWord {
+	private encodeDecimalValue(operand: string): DoubleWord {
 		let operandDec = 0;
 		if (operand.startsWith("-")) {
 			// Negative dec value.
-			operandDec = (parseInt(operand.replace("-", ""), 10) * -1);
+			operandDec = parseInt(operand.replace("-", ""), 10) * -1;
 		} else {
 			// Positive dec value.
 			operandDec = parseInt(operand, 10);
 		}
-		return DoubleWord.fromInteger(operandDec);
+		return DoubleWord.fromNumber(operandDec);
 	}
 
 	/**
@@ -765,13 +754,13 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given virtual memory address.
 	 * @throws An error if the given operands binary memory address is invalid.
 	 */
-	private encodeBinaryAddress(operand: string, line: number): VirtualAddress {
+	private encodeBinaryAddress(operand: string, line: number): DoubleWord {
 		if (operand.length > DataSizes.DOUBLEWORD) {
 			throw Error(`In line ${line + 1}: Binary memory address consists of more than ${DataSizes.DOUBLEWORD} bits.`);
 		}
 		// Extend binary address with zeros if necessary.
 		operand = operand.padStart(DataSizes.DOUBLEWORD, "0");
-		return VirtualAddress.fromInteger(parseInt(operand, 2));
+		return DoubleWord.fromNumber(parseInt(operand, 2));
 	}
 
 	/**
@@ -781,11 +770,11 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given virtual memory address.
 	 * @throws An error if the given operands hexadecimal memory address is invalid.
 	 */
-	private encodeHexadecimalAddress(operand: string, line: number): VirtualAddress {
-		let virtualAddress: VirtualAddress;
+	private encodeHexadecimalAddress(operand: string, line: number): DoubleWord {
+		let virtualAddress: DoubleWord;
 		try {
-			virtualAddress = VirtualAddress.fromInteger(parseInt(operand, 16));
-		} catch (error) {
+			virtualAddress = DoubleWord.fromNumber(parseInt(operand, 16));
+		} catch {
 			throw Error(`In line ${line + 1}: Invalid hexadecimal memory address.`);
 		}
 		return virtualAddress;
@@ -798,11 +787,11 @@ export class Assembler {
 	 * @returns The 32-bit binary representation of the given virtual memory address.
 	 * @throws An error if the given operands decimal memory address is invalid.
 	 */
-	private encodeDecimalAddress(operand: string, line: number): VirtualAddress {
-		let virtualAddress: VirtualAddress;
+	private encodeDecimalAddress(operand: string, line: number): DoubleWord {
+		let virtualAddress: DoubleWord;
 		try {
-			virtualAddress = VirtualAddress.fromInteger(parseInt(operand, 10));
-		} catch (error) {
+			virtualAddress = DoubleWord.fromNumber(parseInt(operand, 10));
+		} catch {
 			throw Error(`In line ${line + 1}: Invalid hexadecimal memory address.`);
 		}
 		return virtualAddress;
@@ -844,9 +833,9 @@ export class Assembler {
 		for (const reg of this.languageDefinition.addressable_registers) {
 			if (register === reg.name.toLowerCase()) {
 				const tmp: string = reg.code.padStart(DataSizes.DOUBLEWORD, "0");
-				const encodedRegister: DoubleWord = new DoubleWord();
+				let encodedRegister: DoubleWord = DoubleWord.ZERO;
 				tmp.split("").forEach((bit, index) => {
-					encodedRegister.value[index] = (bit === "0") ? 0 : 1;
+					encodedRegister = DoubleWord.setBit(encodedRegister, index as DoubleWord.BitIndex, (bit === "0") ? 0 : 1);
 				});
 				return encodedRegister;
 			}
