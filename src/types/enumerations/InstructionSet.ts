@@ -2,7 +2,7 @@
  * An enum representing the available instructions and their binary codes.
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
-export enum Instructions {
+export enum InstructionSet {
 	ADD = 0b0000000,
 	ADC = 0b0000001,
 	SUB = 0b0000010,

@@ -15,7 +15,7 @@ export namespace PageTableEntryFlags {
 		| 8 | 9 | 10 | 11;
 
 
-    export enum FlagBits {
+    export const enum FlagBits {
         
         PRESENT = 0,
         WRITABLE = 1,

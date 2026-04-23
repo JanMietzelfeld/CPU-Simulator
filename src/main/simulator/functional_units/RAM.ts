@@ -3,6 +3,7 @@ import { DoubleWord } from "../../../types/binary/DoubleWord";
 import { FrameNumber } from "../../../types/binary/FrameNumber";
 import { FrameOffset } from "../../../types/binary/FrameOffset";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
+import { AddressOutOfRangeError } from "../../../types/errors/AddressOutOfRangeError";
 
 export class RAM {
     private readonly capacity: number;
@@ -20,9 +21,13 @@ export class RAM {
     /**
      * This methods writes a doubleword (32-bit- or 4-byte-) value to memory to the specified memory address.
      * @param physicalAddress A physical memory address to write the doubleword-sized data to.
+     * @throws AddressOutOfRangeError - If the physical memory address is out of range.
      * @param data Doubleword-sized data to write.
      */
     public writeDoubleWordTo(physicalAddress: PhysicalAddress, data: DoubleWord): void {
+        if ((physicalAddress + 3) >>> 0 >= this.capacity) {
+            throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
+        }
 
         if (physicalAddress % 4 !== 0)
         {
@@ -55,6 +60,10 @@ export class RAM {
      * @param data Byte-sized data to write to the specified pyhsical memory address.
      */
     public writeByteTo(physicalAddress: PhysicalAddress, data: Byte): void {
+        if (physicalAddress >= this.capacity) {
+            throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
+        }
+
         const frameNumber = FrameNumber.fromPhysicalAddress(physicalAddress);
         let frame = this._cells.get(frameNumber);
 
@@ -77,7 +86,10 @@ export class RAM {
      * @returns Doubleword-sized binary data.
      */
     public readDoublewordFrom(physicalAddress: PhysicalAddress): DoubleWord {
-        
+        if ((physicalAddress + 3) >>> 0 >= this.capacity) {
+            throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
+        }
+
         if (physicalAddress % 4 !== 0)
         {
             const b1 = this.readByteFrom(physicalAddress);
@@ -99,10 +111,13 @@ export class RAM {
      * @returns The byte-sized data found at the specified address.
      */
     public readByteFrom(physicalAddress: PhysicalAddress): Byte {
+        if ((physicalAddress + 3) >>> 0 >= this.capacity) {
+            throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
+        }
+
         const frame = this._cells.get(FrameNumber.fromPhysicalAddress(physicalAddress));
         return frame?.getUint8(FrameOffset.fromPhysicalAddress(physicalAddress)) as Byte ?? Byte.ZERO
     }
-
 
     /**
      * Removes a frame from memory.
@@ -110,7 +125,6 @@ export class RAM {
     public clearFrame(frameNumber: FrameNumber): void {
         this.cells.delete(frameNumber);
     }
-
 
     /**
      * A public accessable getter for the memory cells.

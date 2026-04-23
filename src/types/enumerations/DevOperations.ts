@@ -1,4 +1,4 @@
-export enum DevOperations {
+export const enum DevOperations {
 	IO_SEEK = 0b0000000,
 	IO_CLOSE = 0b0000001,
 	IO_READ_BUFFER = 0b0000010,
