@@ -29,8 +29,8 @@ export class RAM {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
 
-        if (physicalAddress % 4 !== 0)
-        {
+        const frameOffset = FrameOffset.fromPhysicalAddress(physicalAddress);
+        if (frameOffset + 3 >= FrameOffset.MAX_POSITIVE_NUMBER) {
             this.writeByteTo(physicalAddress, DoubleWord.getFirstByte(data));
             this.writeByteTo(PhysicalAddress.fromNumber(physicalAddress+1), DoubleWord.getSecondByte(data));
             this.writeByteTo(PhysicalAddress.fromNumber(physicalAddress+2), DoubleWord.getThirdByte(data));
@@ -42,15 +42,14 @@ export class RAM {
         let frame = this._cells.get(frameNumber);
 
         if (frame === undefined) {
-            if (data === DoubleWord.ZERO)
-            {
+            if (data === DoubleWord.ZERO) {
                 return;
             }
             frame = new DataView(new ArrayBuffer(2**FrameOffset.NUMBER_OF_BITS));
             this._cells.set(frameNumber, frame);
         }
 
-        frame.setUint32(FrameOffset.fromPhysicalAddress(physicalAddress), data);
+        frame.setUint32(frameOffset, data);
     }
 
     /**
@@ -68,8 +67,7 @@ export class RAM {
         let frame = this._cells.get(frameNumber);
 
         if (frame === undefined) {
-            if (data === Byte.ZERO)
-            {
+            if (data === Byte.ZERO) {
                 return;
             }
             frame = new DataView(new ArrayBuffer(2**FrameOffset.NUMBER_OF_BITS));
@@ -90,8 +88,8 @@ export class RAM {
             throw new AddressOutOfRangeError(`Memory address out of range [0, ${this.capacity.toString()}].`)
         }
 
-        if (physicalAddress % 4 !== 0)
-        {
+        const frameOffset = FrameOffset.fromPhysicalAddress(physicalAddress)
+        if (frameOffset + 3 >= FrameOffset.MAX_POSITIVE_NUMBER) {
             const b1 = this.readByteFrom(physicalAddress);
             const b2 = this.readByteFrom(PhysicalAddress.fromNumber(physicalAddress+1));
             const b3 = this.readByteFrom(PhysicalAddress.fromNumber(physicalAddress+2));
@@ -100,7 +98,7 @@ export class RAM {
         }
 
         const frame = this._cells.get(FrameNumber.fromPhysicalAddress(physicalAddress));
-        return frame?.getUint32(FrameOffset.fromPhysicalAddress(physicalAddress)) as DoubleWord ?? DoubleWord.ZERO
+        return frame?.getUint32(frameOffset) as DoubleWord ?? DoubleWord.ZERO
     }
 
     /**

@@ -63,7 +63,7 @@ export class MemoryManagementUnit {
      * This member stores a reference to the Translation Lookaside Buffer.
      * @readonly
      */
-    private readonly _tlb: TranslationLookasideBuffer = new TranslationLookasideBuffer(128);;
+    private readonly _tlb: TranslationLookasideBuffer = new TranslationLookasideBuffer();
 
     /**
      * This member stores a reference to the Page Table Pointer register of the CPU core, this MMU
@@ -188,10 +188,12 @@ export class MemoryManagementUnit {
      * @throws {ExceptionError} If the page the given virtual address is part of, is currently not associated with a page frame.
      * @returns The physical memory address associated with the given virtual address.
      */
-    public translate(virtualAddress: VirtualAddress, attemptsToWrite: boolean, attemptsToExecute: boolean, ignorePermissionFlags: boolean = false, disableTlb: boolean = false): PhysicalAddress {
+    public translate(virtualAddress: VirtualAddress, attemptsToWrite: boolean, attemptsToExecute: boolean, ignorePermissionFlags: boolean = false, disableTlb: boolean = true): PhysicalAddress {
         if (!this._memoryVirtualizationEnabled) {
             return virtualAddress as PhysicalAddress;
         }
+
+        disableTlb = false;
 
         const pageNumber = PageNumber.fromVirtualAddress(virtualAddress);
         const pageTableEntry: PageTableEntry = disableTlb ? this.searchPageTable(virtualAddress)

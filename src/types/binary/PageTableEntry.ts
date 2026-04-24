@@ -15,7 +15,7 @@ export namespace PageTableEntry {
      * @returns
      */
     export function fromFlagAndFrameNumber(flags: PageTableEntryFlags, frameNumber: FrameNumber): PageTableEntry {
-        return ((flags << FrameNumber.NUMBER_OF_BITS) | frameNumber) as PageTableEntry;
+        return ((flags << FrameNumber.NUMBER_OF_BITS) | frameNumber) >>> 0 as PageTableEntry;
     }
 
     /**
