@@ -188,12 +188,10 @@ export class MemoryManagementUnit {
      * @throws {ExceptionError} If the page the given virtual address is part of, is currently not associated with a page frame.
      * @returns The physical memory address associated with the given virtual address.
      */
-    public translate(virtualAddress: VirtualAddress, attemptsToWrite: boolean, attemptsToExecute: boolean, ignorePermissionFlags: boolean = false, disableTlb: boolean = true): PhysicalAddress {
+    public translate(virtualAddress: VirtualAddress, attemptsToWrite: boolean, attemptsToExecute: boolean, ignorePermissionFlags: boolean = false, disableTlb: boolean = false): PhysicalAddress {
         if (!this._memoryVirtualizationEnabled) {
             return virtualAddress as PhysicalAddress;
         }
-
-        disableTlb = false;
 
         const pageNumber = PageNumber.fromVirtualAddress(virtualAddress);
         const pageTableEntry: PageTableEntry = disableTlb ? this.searchPageTable(virtualAddress)
