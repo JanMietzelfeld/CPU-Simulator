@@ -529,7 +529,7 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 	ipcMain.removeHandler("nextCycle");
 	ipcMain.handle("nextCycle", async (): Promise<void> => {
 		try {
-			simulator.cycle();
+			simulator.core.cycle();
 		} catch (error) {
 			if (error instanceof Error) {
 				win.webContents.send("error", error.message);

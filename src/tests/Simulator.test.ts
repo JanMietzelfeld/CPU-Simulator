@@ -22,7 +22,7 @@ describe('Test Simulator', () => {
     console.time("execution");
 
     while (simulator.core.edx.content !== DoubleWord.fromNumber(0x12345678)) {
-      simulator.cycle();
+      simulator.core.cycle();
     }
 
     console.timeEnd("execution");

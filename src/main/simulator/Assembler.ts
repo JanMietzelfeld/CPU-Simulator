@@ -5,6 +5,10 @@ import { AssemblyLanguageDefinition } from "./compiler/AssemblyLanguageDefinitio
 import { DataSizes } from "../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../types/binary/DoubleWord";
 import { Byte } from "../../types/binary/Byte";
+import { InstructionTypes } from "../../types/enumerations/InstructionTypes";
+import { InstructionSet } from "../../types/enumerations/InstructionSet";
+import { AddressingModes } from "../../types/enumerations/AdressingModes";
+import { OperandTypes } from "../../types/enumerations/OperandTypes";
 
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
@@ -93,15 +97,38 @@ export class Assembler {
 		const variables: Map<string, string> = new Map();
 		const jumpLabels: Map<string, string> = new Map();
 
-		this.locateSymbols(lines, jumpLabels, constants, variables, baseOffset);
-		this.replaceSymbols(lines, constants, variables);
+		const instructionMap: Map<number, [string, number]> = this.createInstructionMap(lines)
+
+		this.locateSymbols(instructionMap, jumpLabels, constants, variables, baseOffset);
+		this.replaceSymbols(instructionMap, constants, variables);
 		
 		// Iterate lines of code.
-		for (const [lineNo, line] of lines.entries()) {
-			const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, line, jumpLabels, constants, variables);
+		for (const [lineNo, line] of instructionMap.entries()) {
+			const encodedInstruction: DoubleWord[] = this.encodeLine(lineNo, line[0], jumpLabels, constants, variables);
 			encodedInstructions.push(...encodedInstruction);	
 		}
 		return encodedInstructions;
+	}
+
+	private createInstructionMap(lines: Map<number, string>): Map<number, [string, number]> {
+		
+		const instructionMap: Map<number, [string, number]> = new Map();
+		
+		for (const [lineNo, line] of lines.entries()) {
+
+			let instructionSize = 1;
+
+			for (const instruction of this.languageDefinition.instructions) {
+				if (line.trimStart().startsWith(instruction.mnemonic)) {
+					instructionSize = ((instruction.operands?.length ?? 0) + 1) * 4;
+					break;
+				}
+			}
+			
+			instructionMap.set(lineNo, [line, instructionSize]);	
+		}
+
+		return instructionMap;
 	}
 
 	/**
@@ -192,9 +219,9 @@ export class Assembler {
 						break;
 					}
 				}
-					if (lineEncoded) {
-						break;
-					}
+				if (lineEncoded) {
+					break;
+				}
 			} else {
 				// Instruction has no operands.
 				const regexInstruction = new RegExp(instruction.regex, "gim");
@@ -316,130 +343,130 @@ export class Assembler {
 	 * mapped to their symbolic name.
 	 * The lines with symbolic integer constants get removed, since their symbolic name gets replaced by their value later.
 	 * For symbolic variables their (virtual) memory start address gets mapped to their symbolic name.
-	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
+	 * @param instructionMap A map, which maps line numbers to strings representing the original programs lines of code.
 	 * @param jumpLabels An empty map, which will be used to store jump labels and their associated (virtual) memory address.
 	 * @param constants An empty map, which will be used to store constants and their associated (virtual) memory address or value.
 	 * @param variables An empty map, which will be used to store variables and their associated (virtual) memory addresses.
 	 */
-	private locateSymbols(lines: Map<number, string>, jumpLabels: Map<string, string>, constants: Map<string, string>, variables: Map<string, string>, baseOffset: number = 0) : void {
+	private locateSymbols(instructionMap: Map<number, [string, number]>, jumpLabels: Map<string, string>, constants: Map<string, string>, variables: Map<string, string>, baseOffset: number = 0) : void {
 		/**
 		 * Use this variable in order to count the instructions, that need to be encoded
 		 * later, because the keys in the map do not have to be consecutive, as blank lines 
 		 * have been removed from the original source text.
 		 */
 		let programLocationCounter = baseOffset;
-		for (const [lineNo, line] of lines.entries()) {
-			if (line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentStart)) || line.match(new RegExp(this.languageDefinition.variable_formats.dataSegmentEnd))) {
-				lines.delete(lineNo);
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
+		for (const [lineNo, line] of instructionMap.entries()) {
+			if (line[0].match(new RegExp(this.languageDefinition.variable_formats.dataSegmentStart)) || line[0].match(new RegExp(this.languageDefinition.variable_formats.dataSegmentEnd))) {
+				instructionMap.delete(lineNo);
+			} else if (line[0].match(new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationBinary, "gim");
-				const	regexMatch = regexExp.exec(line);
+				const	regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
 					const constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 					constants.set(constantName, constantValue);
-					lines.delete(lineNo);
+					instructionMap.delete(lineNo);
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationDecimal, "gim");
-				const	regexMatch = regexExp.exec(line);
+				const	regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
 					const constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 					constants.set(constantName, constantValue);
-					lines.delete(lineNo);
+					instructionMap.delete(lineNo);
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationHexadecimal, "gim");
-				const	regexMatch = regexExp.exec(line);
+				const	regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
 					const constantValue = value.substring(value.lastIndexOf(" ") + 1).trim();
 					constants.set(constantName, constantValue);
-					lines.delete(lineNo);
+					instructionMap.delete(lineNo);
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.constant_formats.declarationString, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationString, "gim");
-				const regexMatch = regexExp.exec(line);
+				const regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
 					const constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
-					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
+					//programLocationCounter +8 since the jump instruction will be located in front of the string memory array.
 					constants.set(
 						constantName, 
-						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
+						"0b" + (programLocationCounter+8).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
 					const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
-					programLocationCounter += stringMemSize + 12;
+					programLocationCounter += stringMemSize + 8;
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim");
-				const regexMatch = regexExp.exec(line);
+				const regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
+					//programLocationCounter +8 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
+						"0b" + (programLocationCounter+8).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
-					programLocationCounter += 16;
+					programLocationCounter += 12;
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationDecimal, "gim");
-				const regexMatch = regexExp.exec(line);
+				const regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
+					//programLocationCounter +8 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
+						"0b" + (programLocationCounter+8).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
-					programLocationCounter += 16;
+					programLocationCounter += 12;
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationHexadecimal, "gim");
-				const regexMatch = regexExp.exec(line);
+				const regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
-					//programLocationCounter +12 since the jump instruction will be located in front of the integer memory address.
+					//programLocationCounter +8 since the jump instruction will be located in front of the integer memory address.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
+						"0b" + (programLocationCounter+8).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Size of jump instruction plus 32bit integer
-					programLocationCounter += 16;
+					programLocationCounter += 12;
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationString, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.variable_formats.declarationString, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationString, "gim");
-				const regexMatch = regexExp.exec(line);
+				const regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
 					const variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
-					//programLocationCounter +12 since the jump instruction will be located in front of the string memory array.
+					//programLocationCounter +8 since the jump instruction will be located in front of the string memory array.
 					variables.set(
 						variableName, 
-						"0b" + (programLocationCounter+12).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
+						"0b" + (programLocationCounter+8).toString(2).padStart(DataSizes.DOUBLEWORD, "0")
 					);
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
 					const stringMemSize = Math.ceil((Buffer.byteLength(variableValue) / 4)) * 4;
-					programLocationCounter += stringMemSize + 12;
+					programLocationCounter += stringMemSize + 8;
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
+			} else if (line[0].match(new RegExp(this.languageDefinition.label_formats.declaration, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.label_formats.declaration, "gim");
-				const regexMatch = regexExp.exec(line);
+				const regexMatch = regexExp.exec(line[0]);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
 					const jumpLabel = value.substring(value.indexOf(".") + 1, value.lastIndexOf(":")).trim();
@@ -447,10 +474,10 @@ export class Assembler {
 						jumpLabel, 
 						programLocationCounter.toString(2)
 					);
-					lines.delete(lineNo);
+					instructionMap.delete(lineNo);
 				}
 			} else {
-				programLocationCounter += 12;
+				programLocationCounter += line[1];
 			}
 		}
 	}
@@ -460,35 +487,35 @@ export class Assembler {
 	 * (virtual) memory address.
 	 * Symbolic integer constants get replaced by their value.
 	 * Symbolic strings and symbolic variables get replaced by their associated (virtual) memory address.
-	 * @param lines A map, which maps line numbers to strings representing the original programs lines of code.
+	 * @param instructionMap A map, which maps line numbers to strings representing the original programs lines of code.
 	 * @param constants A map, which maps the symbolic name of constants to their value or (virtual) memory start address.
 	 * @param variables A map, which maps the symbolic name of variables to their (virtual) memory start address.
 	 * @returns 
 	 */
-	private replaceSymbols(lines: Map<number, string>, constants: Map<string, string>, variables: Map<string, string>) : Map<number, string> {
-		for (const [lineNo, line] of lines.entries()) {	
-			if (line.match(new RegExp(this.languageDefinition.constant_formats.usage, "gim"))) {
+	private replaceSymbols(instructionMap: Map<number, [string, number]>, constants: Map<string, string>, variables: Map<string, string>) : Map<number, [string, number]> {
+		for (const [lineNo, line] of instructionMap.entries()) {	
+			if (line[0].match(new RegExp(this.languageDefinition.constant_formats.usage, "gim"))) {
 				//Test if constant name is included in line and replace it with its value
 				constants.forEach((constantValue, constantName) => {
 					const regex = new RegExp("[$%@]" + constantName , "m");
-					if (line.match(regex) !== null) {
-						const replacedLine = line.replace(constantName,constantValue);
-						lines.set(lineNo, replacedLine);
+					if (line[0].match(regex) !== null) {
+						const replacedLine = line[0].replace(constantName,constantValue);
+						instructionMap.set(lineNo, [replacedLine, line[1]]);
 					}
 				});
 			}
-			if (line.match(new RegExp(this.languageDefinition.variable_formats.usage, "gim"))) {
+			if (line[0].match(new RegExp(this.languageDefinition.variable_formats.usage, "gim"))) {
 				//Test if variable name is included in line and replace it with its value
 				variables.forEach((variableValue, variableName) => {
 					const regex = new RegExp("[$%@]" + variableName , "m");
-					if (line.match(regex) !== null) {
-						const replacedLine = line.replace(variableName,variableValue);
-						lines.set(lineNo, replacedLine);
+					if (line[0].match(regex) !== null) {
+						const replacedLine = line[0].replace(variableName,variableValue);
+						instructionMap.set(lineNo, [replacedLine, line[1]]);
 					}
 				});
 			}
 		}
-		return lines;
+		return instructionMap;
 	}
 
 	/**
@@ -553,44 +580,29 @@ export class Assembler {
 	 * @returns An array containing the binary equivalent of the given instruction and its operand values.
 	 */
 	private encodeInstruction(regexMatchArrayInstruction: RegExpMatchArray, line: number, jumpLabels: Map<string, string>): DoubleWord[] {
-		let addressingModeOperand1: Array<Bit> = new Array<Bit>(2);
-		let typeOperand1: Array<Bit> = new Array<Bit>(7);
-		let addressingModeOperand2: Array<Bit> = new Array<Bit>(2);
-		let typeOperand2: Array<Bit> = new Array<Bit>(7);
-		let encodedOperandValue1: DoubleWord;
-		let encodedOperandValue2: DoubleWord;
-		let instructionType: Array<Bit> = new Array<Bit>(3);
-		const opcode: Array<Bit> = new Array<Bit>(7);
-		const instructionMnemonic: string = regexMatchArrayInstruction[1];
-		const delimeter: Array<Bit> = new Array<Bit>(1, 1);
+		const instruction = this.languageDefinition.instructions.find(e => {
+			return regexMatchArrayInstruction[1].toLowerCase() === e.mnemonic.toLowerCase();
+		});
 
-		for (const instruction of this.languageDefinition.instructions) {
-			if (instructionMnemonic.toLowerCase() === instruction.mnemonic.toLowerCase()) {
-				instructionType = this.encodeInstructionType(instruction.type, line);
-				instruction.opcode.split("").forEach((bit, index) => {
-					opcode[index] = (bit === "0") ? 0 : 1;
-				});
-				break;
-			}
+		if (instruction === undefined) {
+			throw new UnrecognizedInstructionError(`Unrecognized or invalid instruction found in line ${line + 1}: ${regexMatchArrayInstruction[1]}`);
+		}
+
+		const instructionType = this.encodeInstructionType(instruction.type, line);
+
+		const opcode: number = parseInt(instruction.opcode, 2);
+		if (!(opcode in InstructionSet)) {
+			throw new UnrecognizedInstructionError(`Unrecognized or invalid instruction found in line ${line + 1}: ${regexMatchArrayInstruction[1]}`);
 		}
 			
 		let handleLabelsAsImmediate = false;
-		if (instructionMnemonic == "MOV") {
+		if (opcode === InstructionSet.MOV) {
 			handleLabelsAsImmediate = true;
 		}
 
-		// Check for second operand
-		if (regexMatchArrayInstruction.length > 3) {
-			// A second operand given
-			addressingModeOperand2 = this.encodeOperandAddressingMode(regexMatchArrayInstruction[3], line);
-			typeOperand2 = this.encodeOperandType(regexMatchArrayInstruction[3], line, handleLabelsAsImmediate);
-			encodedOperandValue2 = this.encodeOperandValue(regexMatchArrayInstruction[3], line, jumpLabels);
-		} else {
-			// No second operand given
-			addressingModeOperand2 = this.encodeOperandAddressingMode("", line);
-			typeOperand2 = this.encodeOperandType("", line);
-			encodedOperandValue2 = this.encodeOperandValue("", line, jumpLabels);
-		}
+		let addressingModeOperand1: AddressingModes = AddressingModes.DIRECT;
+		let typeOperand1: OperandTypes = OperandTypes.NO;
+		let encodedOperandValue1: DoubleWord | null = null;
 
 		// Check for first operand
 		if (regexMatchArrayInstruction.length > 2) {
@@ -598,35 +610,52 @@ export class Assembler {
 			addressingModeOperand1 = this.encodeOperandAddressingMode(regexMatchArrayInstruction[2], line);
 			typeOperand1 = this.encodeOperandType(regexMatchArrayInstruction[2], line, handleLabelsAsImmediate);
 			encodedOperandValue1 = this.encodeOperandValue(regexMatchArrayInstruction[2], line, jumpLabels);
-		} else {
-			// No operand given
-			addressingModeOperand1 = this.encodeOperandAddressingMode("", line);
-			typeOperand1 = this.encodeOperandType("", line);
-			encodedOperandValue1 = this.encodeOperandValue("", line, jumpLabels);
 		}
 
-		let finalInstruction: Array<Bit> = new Array<Bit>();
-		finalInstruction = [ 
-			...instructionType, ... delimeter, ... opcode, ... delimeter, 
-			... addressingModeOperand1, ... typeOperand1, 
-			... addressingModeOperand2, ... typeOperand2
-		];
+		let addressingModeOperand2: AddressingModes = AddressingModes.DIRECT;
+		let typeOperand2: OperandTypes = OperandTypes.NO;
+		let encodedOperandValue2: DoubleWord | null = null;
 
+		// Check for second operand
+		if (regexMatchArrayInstruction.length > 3) {
+			// A second operand given
+			addressingModeOperand2 = this.encodeOperandAddressingMode(regexMatchArrayInstruction[3], line);
+			typeOperand2 = this.encodeOperandType(regexMatchArrayInstruction[3], line, handleLabelsAsImmediate);
+			encodedOperandValue2 = this.encodeOperandValue(regexMatchArrayInstruction[3], line, jumpLabels);
+		}
 
-		const encodedInstruction = DoubleWord.fromNumber(parseInt(finalInstruction.join(""), 2));
+		let finalInstruction: DoubleWord = DoubleWord.fromNumber(
+			(instructionType << (7 + 2 + 7 + 2 + 2 + 7 + 2))
+			+ (0b11 << (7 + 2 + 7 + 2 + 2 + 7))
+			+ (opcode << (7 + 2 + 7 + 2 + 2))
+			+ (0b11 << (7 + 2 + 7 + 2))
+			+ (addressingModeOperand1 << (7 + 2 + 7))
+			+ (typeOperand1 << (7 + 2))
+			+ (addressingModeOperand2 << 7)
+			+ typeOperand2);
 		
-		return [encodedInstruction, encodedOperandValue1, encodedOperandValue2];
+  		const result: DoubleWord[] = [finalInstruction];
+
+		if (encodedOperandValue1 !== null) {
+			result.push(encodedOperandValue1);
+		}
+
+		if (encodedOperandValue2 !== null) {
+			result.push(encodedOperandValue2);
+		}
+
+		return result;
 	}
 
 	/**
 	 * This method extracts the addressing mode from the given operand and returns the binary encoded version.
 	 * @param operand The operand to extract the addressing mode from.
 	 * @param line The original computer programs line of code which is currently encoded.
-	 * @returns The binary encoded addressing mode.
+	 * @returns The addressing mode.
 	 */
-	private encodeOperandAddressingMode(operand: string, line: number): Array<Bit> {		
+	private encodeOperandAddressingMode(operand: string, line: number): AddressingModes {		
 		if (operand.startsWith("*%")) {
-			return new Array<Bit>(2).fill(1);
+			return AddressingModes.INDIRECT;
 		}
 
 		if (operand.startsWith("*@") || operand.startsWith("*$")) {
@@ -635,7 +664,7 @@ export class Assembler {
 			);
 		}
 
-		return new Array<Bit>(1, 0);
+		return AddressingModes.DIRECT;
 	}
 
 	/**
@@ -804,16 +833,16 @@ export class Assembler {
 	 * @param handleLabelsAsImmediate By default labels will be interpreted as addresses. Set to true to use the label address as immediate value.
 	 * @returns The binary encoded operands type.
 	 */
-	private encodeOperandType(operand: string, line: number, handleLabelsAsImmediate: boolean = false): Array<Bit> {
-		let encodedType: Array<Bit> = new Array<Bit>(7);
+	private encodeOperandType(operand: string, line: number, handleLabelsAsImmediate: boolean = false): OperandTypes {
+		let encodedType: OperandTypes;
 		if (operand.length === 0) {
-			encodedType = new Array<Bit>(7).fill(0);
+			encodedType = OperandTypes.NO;
 		} else if (operand.startsWith("*%") || operand.startsWith("%")) {
-			encodedType = new Array<Bit>(1, 1, 0, 0, 0, 0, 0);
+			encodedType = OperandTypes.REGISTER;
 		} else if (operand.startsWith("$") || (operand.match(this.languageDefinition.label_formats.usage) && handleLabelsAsImmediate)) {
-			encodedType = new Array<Bit>(1, 0, 1, 0, 0, 0, 0);
+			encodedType = OperandTypes.IMMEDIATE;
 		} else if (operand.startsWith("@") || (operand.match(this.languageDefinition.label_formats.usage) && !handleLabelsAsImmediate)) {
-			encodedType = new Array<Bit>(1, 1, 1, 0, 0, 0, 0);
+			encodedType = OperandTypes.MEMORY_ADDRESS;
 		} else {
 			throw Error(`In line ${line + 1}: Unrecognized type of operand.`);
 		}
@@ -844,27 +873,18 @@ export class Assembler {
 	}
 
 	/**
-	 * This method encodes a command type as a sequence of bits. Throws
+	 * This method encodes a command type.
 	 * @param type The type of the instruction. Can be either "R", "I" or "J".
 	 * @param line The original computer programs line of code which is currently encoded.
-	 * @returns A string of zeros and ones representing the instructions type.
+	 * @throws
+	 * @returns
 	 */
-	private encodeInstructionType(type: string, line: number): Array<Bit> {
-		let encodedType: Array<Bit> = new Array<Bit>(3).fill(0);
-		switch (type.toUpperCase()) {
-		case "R":
-			encodedType = new Array<Bit>(1, 0, 0);
-			break;
-		case "I":
-			encodedType = new Array<Bit>(1, 1, 0);
-			break;
-		case "J":
-			encodedType = new Array<Bit>(1, 1, 1);
-			break;
-		default:
-			throw Error(`In line ${line}: Unrecognized instruction type.`);
+	private encodeInstructionType(type: string, line: number): InstructionTypes {
+		if (!Object.keys(InstructionTypes).includes(type)) {
+			throw new Error(`In line ${line}: Unrecognized instruction type.`);
 		}
-		return encodedType;
+
+		return InstructionTypes[type as keyof typeof InstructionTypes];
 	}
 
 	/**

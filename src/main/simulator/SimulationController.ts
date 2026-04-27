@@ -145,8 +145,8 @@ export class SimulationController {
         {
             const value: DoubleWord = DoubleWord.fromBytes(
                 Byte.fromNumber(buffer[lenght]), 
-                Byte.fromNumber(buffer.length % 4 >= 2 ? buffer[lenght+1] : 0), 
-                Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
+                Byte.fromNumber(buffer.length % 4 > 1 ? buffer[lenght+1] : 0), 
+                Byte.fromNumber(buffer.length % 4 > 2 ? buffer[lenght+2] : 0), 
                 Byte.ZERO);
 
             this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
@@ -322,13 +322,5 @@ export class SimulationController {
 
             writeFileSync(pageTablePath, buffer);
         }
-    }
-
-    /**
-     * This method triggers execution of the next instruction
-     */
-    public cycle(): void {
-        
-        this.core.cycle();
     }
 }

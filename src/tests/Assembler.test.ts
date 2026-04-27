@@ -29,8 +29,6 @@ describe('Encode instructions', () => {
         const result: DoubleWord[] = assembler.assemble("NOP");
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b10011111111111100000000100000000),
-            DoubleWord.fromNumber(0),
-            DoubleWord.fromNumber(0)
         ];
         expect(result).toEqual(expectedOutput);
     });
@@ -82,7 +80,6 @@ describe('Encode instructions', () => {
 
             DoubleWord.fromNumber(0b11111000111011101110000100000000),
             DoubleWord.fromNumber(0b1100),
-            DoubleWord.fromNumber(0),
 
             DoubleWord.fromNumber(0b11011001001011101010000101100000),
             DoubleWord.fromNumber(305419896),
@@ -94,7 +91,6 @@ describe('Encode instructions', () => {
 
             DoubleWord.fromNumber(4190019840),
             DoubleWord.fromNumber(128),
-            DoubleWord.fromNumber(0)
         ];
         expect(result).toEqual(expectedOutput);
     });
