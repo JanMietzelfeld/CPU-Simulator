@@ -64,7 +64,7 @@ export class Assembler {
 			const regexMatch: RegExpMatchArray | null = includeRegex.exec(line);
 			if (regexMatch !== null) {
 				// Include found.
-				let fileName: string = regexMatch[1];
+				const fileName: string = regexMatch[1];
 
 				let fileContents: string = readFileSync(this.pathToOSFilesystem + "/" + fileName + ".asm", "utf-8");
 				fileContents = this.replaceIncludeLabels(fileContents)
@@ -98,7 +98,7 @@ export class Assembler {
 
 		// Second pass (encode all possible lines)
 		let byteCount = baseOffset;
-		const encodedInstructionsWithSymbols: Map<number, DoubleWord[] | String> = new Map();
+		const encodedInstructionsWithSymbols: Map<number, DoubleWord[] | string> = new Map();
 		for (const [lineNo, line] of lines.entries()) {
 			const encodedLine = this.encodeLine(lineNo, line, jumpLabels, constants, variables, byteCount);
 			if (typeof encodedLine === "number") {
@@ -176,7 +176,7 @@ export class Assembler {
 
 			if (constants.has(name)) {
 				let address = constants.get(name)!;
-				let encodedString = this.encodeString(lineNo, line, value);
+				const encodedString = this.encodeString(lineNo, line, value);
 				if (typeof address === "number") {
 					address = (byteCount + DoubleWord.NUMBER_OF_BYTES).toString();
 				}
@@ -207,7 +207,7 @@ export class Assembler {
 			const value = regexMatch[2];
 			if (variables.has(name)) {
 				let address = variables.get(name)!;
-				let encodedString = this.encodeString(lineNo, line, value);
+				const encodedString = this.encodeString(lineNo, line, value);
 				if (typeof address === "number") {
 					address = (byteCount + DoubleWord.NUMBER_OF_BYTES).toString();
 				}
@@ -612,7 +612,7 @@ export class Assembler {
 			throw new UnrecognizedInstructionError(`Unrecognized or invalid instruction found in line ${lineNo + 1}: ${regexMatch[1]}`);
 		}
 			
-		let handleLabelsAsImmediate = opcode === OpCode.MOV;
+		const handleLabelsAsImmediate = opcode === OpCode.MOV;
 
 		let typeOperand1: EncodedOperandTypes = EncodedOperandTypes.NO;
 		let encodedOperandValue1: DoubleWord | null = null;
@@ -623,7 +623,7 @@ export class Assembler {
 				if (typeof jumpLabels.get(regexMatch[2]) === "number") {
 					let hasUnpackedSecondOperand = false;
 					if (regexMatch.length > 3) { // Check for second operand
-						let type = this.encodeOperandType(regexMatch[3], lineNo, handleLabelsAsImmediate);
+						const type = this.encodeOperandType(regexMatch[3], lineNo, handleLabelsAsImmediate);
 
 						switch (type) {
 							case EncodedOperandTypes.REGISTER_DIRECT:
@@ -713,7 +713,7 @@ export class Assembler {
 			}
 		}
 
-		let finalInstruction: DoubleWord = DoubleWord.fromNumber(
+		const finalInstruction: DoubleWord = DoubleWord.fromNumber(
 			+ (opcode << (8 * 3))
 			+ (typeOperand1 << (8 * 2 + 4))
 			+ (typeOperand2 << (8 * 2))

@@ -1,5 +1,4 @@
 import { DoubleWord } from "./DoubleWord";
-import { EncodedOperandTypes } from "../enumerations/EncodedOperandTypes";
 import { DecodedOperandTypes } from "../enumerations/DecodedOperandTypes";
 
 // Operand types: Immediate, Register, Memory address

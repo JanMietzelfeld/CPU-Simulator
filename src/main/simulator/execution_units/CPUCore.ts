@@ -378,6 +378,7 @@ export class CPUCore {
             case EncodedOperandTypes.EMBEDDED_IMMEDIATE:
             case EncodedOperandTypes.EMBEDDED_MEMORY_ADDRESS:
                 decodedFirstOperandType ^= 0b1000; 
+                // fallthrough
             case EncodedOperandTypes.REGISTER_DIRECT:
             case EncodedOperandTypes.REGISTER_INDIRECT:
                 decodedFirstOperand = new InstructionOperand(
@@ -405,6 +406,7 @@ export class CPUCore {
             case EncodedOperandTypes.EMBEDDED_IMMEDIATE:
             case EncodedOperandTypes.EMBEDDED_MEMORY_ADDRESS:
                 decodedSecondOperandType ^= 0b1000; 
+                // fallthrough
             case EncodedOperandTypes.REGISTER_DIRECT:
             case EncodedOperandTypes.REGISTER_INDIRECT:
                 decodedSecondOperand = new InstructionOperand(
@@ -468,7 +470,6 @@ export class CPUCore {
             this.logToLogger(log);
         }
 
-        let jumpPerformed = false;
         switch (operation) {
             case OpCode.NOT:
                 this.not(
@@ -573,43 +574,42 @@ export class CPUCore {
                 break;
             case OpCode.JMP:
                 this.jmp(this._decodedInstruction.operand1!);
-                jumpPerformed = true;
                 break;
             case OpCode.JE:
-                jumpPerformed = this.je(this._decodedInstruction.operand1!);
+                this.je(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JA:
-                jumpPerformed = this.ja(this._decodedInstruction.operand1!);
+                this.ja(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JAE:
-                jumpPerformed = this.jae(this._decodedInstruction.operand1!);
+                this.jae(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JB:
-                jumpPerformed = this.jb(this._decodedInstruction.operand1!);
+                this.jb(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JBE:
-                jumpPerformed = this.jle(this._decodedInstruction.operand1!);
+                this.jle(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JG:
-                jumpPerformed = this.jg(this._decodedInstruction.operand1!);
+                this.jg(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JL:
-                jumpPerformed = this.jl(this._decodedInstruction.operand1!);
+                this.jl(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JGE:
-                jumpPerformed = this.jge(this._decodedInstruction.operand1!);
+                this.jge(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JLE:
-                jumpPerformed = this.jle(this._decodedInstruction.operand1!);
+                this.jle(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JNE:
-                jumpPerformed = this.jne(this._decodedInstruction.operand1!);
+                this.jne(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JNZ:
-                jumpPerformed = this.jnz(this._decodedInstruction.operand1!);
+                this.jnz(this._decodedInstruction.operand1!);
                 break;
             case OpCode.JZ:
-                jumpPerformed = this.jz(this._decodedInstruction.operand1!);
+                this.jz(this._decodedInstruction.operand1!);
                 break;
             case OpCode.LEA:
                 this.lea(
@@ -621,10 +621,10 @@ export class CPUCore {
                 this.nop();
                 break;
             case OpCode.CALL:
-                jumpPerformed = this.call(this._decodedInstruction.operand1!);
+                this.call(this._decodedInstruction.operand1!);
                 break;
             case OpCode.RET:
-                jumpPerformed = this.ret();
+                this.ret();
                 break;
             case OpCode.MOV:
                 this.mov(
@@ -633,11 +633,10 @@ export class CPUCore {
                 );
                 break;
             case OpCode.INT:
-                jumpPerformed = this.int(this._decodedInstruction.operand1!);
+                this.int(this._decodedInstruction.operand1!);
                 break;
             case OpCode.IRET:
                 this.iret();
-                jumpPerformed = true;
                 break;
             case OpCode.SYSENTER:
                 this.sysenter(this._decodedInstruction.operand1!);
