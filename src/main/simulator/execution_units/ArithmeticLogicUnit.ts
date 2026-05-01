@@ -41,15 +41,14 @@ export class ArithmeticLogicUnit {
      * @param operand A binary value.
      */
     private checkForParity(operand: DoubleWord): void {
-        let value = DoubleWord.getFourthByte(operand);
+        let value: number = DoubleWord.getFourthByte(operand);
 
         let parity = 0;
 
         // count bits using bitwise ops
         for (let i = 0; i < 8; i++) {
-            const resukt = Byte.logicalRightShift(value);
-            value = resukt[0];
-            parity ^= resukt[1];
+            parity ^= value & 0b1;
+            value = value >>> 1;
         }
         
         if (parity === 0) {

@@ -303,14 +303,12 @@ export class CPUCore {
         }
     }
 
-    public i = 0;
     /**
      * This method performs a single instruction cycle.
      */
     private internalCycle(): void {
 
         try {
-            this.i++;
             this.fetch();
             this.decode();
             this.execute();

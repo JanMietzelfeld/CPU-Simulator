@@ -59,15 +59,14 @@ describe('Encode instructions', () => {
     test("Encode assembly programs", () => {        
         const result: DoubleWord[] = assembler.assemble(readFileSync("./os_filesystem/home/examples/loop.asm", "utf8"));
         const expectedOutput: DoubleWord[] = [
-            DoubleWord.fromNumber(312082432),
-            DoubleWord.fromNumber(100000),
+            DoubleWord.fromNumber(0x121A6400),
 
             DoubleWord.fromNumber(35258624),
 
             DoubleWord.fromNumber(119144448),
 
             DoubleWord.fromNumber(247988224),
-            DoubleWord.fromNumber(8),
+            DoubleWord.fromNumber(4),
 
             DoubleWord.fromNumber(312082435),
             DoubleWord.fromNumber(305419896),

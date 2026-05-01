@@ -19,7 +19,6 @@ describe('Test Simulator', () => {
     simulator.createProcess(simulator.pathToOSFilesystem + "/home/examples/loop.asm");
     console.timeEnd("load");
 
-    simulator.core.i =0;
     console.time("execution");
 
     while (simulator.core.edx.content !== DoubleWord.fromNumber(0x12345678)) {
@@ -27,8 +26,6 @@ describe('Test Simulator', () => {
     }
 
     console.timeEnd("execution");
-
-    console.log(simulator.core.i);
 
     console.timeEnd("total");
 
