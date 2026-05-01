@@ -1,1 +1,1 @@
-MOV $0, @0b1
+MOV $0, @0xFFFFFFFF

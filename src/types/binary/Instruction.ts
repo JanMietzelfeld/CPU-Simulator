@@ -1,5 +1,4 @@
-import { InstructionSet } from "../enumerations/InstructionSet";
-import { InstructionTypes } from "../enumerations/InstructionTypes";
+import { OpCode } from "../enumerations/OpCode";
 import { InstructionOperand } from "./InstructionOperand";
 
 /**
@@ -8,14 +7,9 @@ import { InstructionOperand } from "./InstructionOperand";
  */
 export class Instruction {
 	/**
-	 * The instructions type.
-	 */
-	public type: InstructionTypes;
-	
-	/**
 	 * The instructions operation.
 	 */
-	public instruction: InstructionSet;
+	public instruction: OpCode;
 
 	/**
 	 * A list of the operations operands or undefined, if no operand is present.
@@ -30,8 +24,7 @@ export class Instruction {
 	 * @param instruction The instruction.
 	 * @param operands The instructions operands.
 	 */
-    public constructor(type: InstructionTypes, instruction: InstructionSet, operand1: InstructionOperand | null, operand2: InstructionOperand | null) {
-        this.type = type;
+    public constructor(instruction: OpCode, operand1: InstructionOperand | null, operand2: InstructionOperand | null) {
         this.instruction = instruction;
         this.operand1 = operand1;
 		this.operand2 = operand2;

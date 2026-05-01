@@ -2,7 +2,6 @@ import { FLAGS as FLAGS } from "../functional_units/FLAGS";
 import { RAM } from "../functional_units/RAM";
 import { GeneralPurposeRegister } from "../functional_units/GeneralPurposeRegister";
 import { MemoryManagementUnit } from "./MemoryManagementUnit";
-import { AddressingModes} from "../../../types/enumerations/AdressingModes";
 import { DataSizes } from "../../../types/enumerations/DataSizes";
 import { DoubleWord } from "../../../types/binary/DoubleWord";
 import { ArithmeticLogicUnit } from "./ArithmeticLogicUnit";
@@ -12,8 +11,6 @@ import { InstructionOperand } from "../../../types/binary/InstructionOperand";
 import { Instruction } from "../../../types/binary/Instruction";
 import { Byte } from "../../../types/binary/Byte";
 import { Register } from "../functional_units/Register";
-import { InstructionTypes } from "../../../types/enumerations/InstructionTypes";
-import { OperandTypes } from "../../../types/enumerations/OperandTypes";
 import { DevOperations } from "../../../types/enumerations/DevOperations";
 import { PassthroughFilesystem } from "../os/PassthroughFilesystem";
 import { InterruptNumbers } from "../../../types/enumerations/InterruptNumbers";
@@ -24,7 +21,9 @@ import { RegisterNumbers } from "../../../types/enumerations/RegisterNumbers";
 import { getMainWindow } from "../../index";
 import { FrameNumber } from "../../../types/binary/FrameNumber";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
-import { InstructionSet } from "../../../types/enumerations/InstructionSet";
+import { OpCode } from "../../../types/enumerations/OpCode";
+import { DecodedOperandTypes } from "../../../types/enumerations/DecodedOperandTypes";
+import { EncodedOperandTypes } from "../../../types/enumerations/EncodedOperandTypes";
 
 /**
  * This class represents a CPU core which is capable of executing InstructionSet.
@@ -168,7 +167,7 @@ export class CPUCore {
     /**
      *  The binary encoded type of the currently executed instruction.
      */
-    private _decodedInstruction: Instruction = new Instruction(InstructionTypes.I, InstructionSet.ADD, null, null);
+    private _decodedInstruction: Instruction = new Instruction(OpCode.ADD, null, null);
     
     public fs: PassthroughFilesystem;
 
@@ -281,8 +280,7 @@ export class CPUCore {
         const returnValue = this.eip.content;
 
         this.int(new InstructionOperand(
-            AddressingModes.DIRECT,
-            OperandTypes.IMMEDIATE,
+            EncodedOperandTypes.IMMEDIATE,
             DoubleWord.fromNumber(number)
         ));
 
@@ -305,12 +303,14 @@ export class CPUCore {
         }
     }
 
+    public i = 0;
     /**
      * This method performs a single instruction cycle.
      */
     private internalCycle(): void {
 
         try {
+            this.i++;
             this.fetch();
             this.decode();
             this.execute();
@@ -332,6 +332,7 @@ export class CPUCore {
      */
     private fetch(): void {
         this.eir.content = this.mmu.readDoublewordFrom(this.eip.content, true);
+        this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
     }
 
     /**
@@ -339,107 +340,93 @@ export class CPUCore {
      */
     private decode(): void {
         // Split instruction into its components.
-        const binaryEncodedInstructionType: number = DoubleWord.getBitRange(this.eir.content, 0, 3);
-        const binaryEncodedOperation: number =  DoubleWord.getBitRange(this.eir.content, 5, 12);
-        const binaryEncodedAddressingModeFirstOperand: number =  DoubleWord.getBitRange(this.eir.content, 14, 16);
-        const binaryEncodedTypeFirstOperand: number =  DoubleWord.getBitRange(this.eir.content, 16, 23);
-        const binaryEncodedAddressingModeSecondOperand: number =  DoubleWord.getBitRange(this.eir.content, 23, 25);
-        const binaryEncodedTypeSecondOperand: number =  DoubleWord.getBitRange(this.eir.content, 25);
+        const encodedOpCode: Byte =  DoubleWord.getFirstByte(this.eir.content);
+        const encodedFirstOperandType: number =  DoubleWord.getBitRange(this.eir.content, 8, 12);
+        const encodedSecondOperandType: number =  DoubleWord.getBitRange(this.eir.content, 12, 16);
         // Decode instruction.
         // Decode instruction type.
 
-        if (!(binaryEncodedInstructionType in InstructionTypes)) {
+        if (!(encodedOpCode in OpCode)) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
-        const decodedInstructionType: InstructionTypes = binaryEncodedInstructionType as InstructionTypes;
-
-
-        if (!(binaryEncodedOperation in InstructionSet)) {
-            throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
-        }
-
-        const decodedOperation: InstructionSet = binaryEncodedOperation as InstructionSet;
+        const decodedOpCode: OpCode = encodedOpCode as OpCode;
 
         // Decode type of first operand.
 
-        if (!(binaryEncodedTypeFirstOperand in OperandTypes)) {
+        if (!(encodedFirstOperandType in EncodedOperandTypes)) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
-        const decodedTypeFirstOperand: OperandTypes = binaryEncodedTypeFirstOperand as OperandTypes;
+        let decodedFirstOperandType: EncodedOperandTypes = encodedFirstOperandType as EncodedOperandTypes;
    
         // Decode type of second operand.
 
-        if (!(binaryEncodedTypeSecondOperand in OperandTypes)) {
+        if (!(encodedSecondOperandType in EncodedOperandTypes)) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
-        const decodedTypeSecondOperand: OperandTypes = binaryEncodedTypeSecondOperand as OperandTypes;
+        let decodedSecondOperandType: EncodedOperandTypes = encodedSecondOperandType as EncodedOperandTypes;
    
-        let decodedFirstOperand: InstructionOperand | null = null;
-        let decodedSecondOperand: InstructionOperand | null = null;
+        let decodedFirstOperand: InstructionOperand | null;
+        let decodedSecondOperand: InstructionOperand | null;
 
-        if (decodedTypeFirstOperand !== OperandTypes.NO) {
-            /**
-             * Read second operands value from main memory.
-             * It is located at addresses with an offset of 4 from the first 
-             * address of the instruction.
-             */
-            const encodedValueFirstOperand: DoubleWord = this.mmu.readDoublewordFrom(DoubleWord.fromNumber(this.eip.content + 4), true);
-
-
-            // Decode addressing mode of first operand.
-
-            if (!(binaryEncodedAddressingModeFirstOperand in AddressingModes)) {
-                throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
-            }
-
-            const decodedAddressingModeFirstOperand: AddressingModes = binaryEncodedAddressingModeFirstOperand as AddressingModes;
-
-
-            /**
-             * Create instance of an InstructionOperand for the first operand.
-             */
-            decodedFirstOperand = new InstructionOperand(
-                decodedAddressingModeFirstOperand,
-                decodedTypeFirstOperand,
-                encodedValueFirstOperand
-            );
+        switch (decodedFirstOperandType) {
+            case EncodedOperandTypes.NO:
+                decodedFirstOperand = null;
+                break;
+            case EncodedOperandTypes.EMBEDDED_IMMEDIATE:
+            case EncodedOperandTypes.EMBEDDED_MEMORY_ADDRESS:
+                decodedFirstOperandType ^= 0b1000; 
+            case EncodedOperandTypes.REGISTER_DIRECT:
+            case EncodedOperandTypes.REGISTER_INDIRECT:
+                decodedFirstOperand = new InstructionOperand(
+                    decodedFirstOperandType as DecodedOperandTypes,
+                    DoubleWord.fromNumber(DoubleWord.getThirdByte(this.eir.content))
+                );
+                break;
+            case EncodedOperandTypes.MEMORY_ADDRESS:
+            case EncodedOperandTypes.IMMEDIATE:
+                decodedFirstOperand = new InstructionOperand(
+                    decodedFirstOperandType,
+                    this.mmu.readDoublewordFrom(this.eip.content, true)
+                );
+                this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
+                break;
+            default:
+                decodedFirstOperand = null;
+                break;
         }
 
-        // Decode second operands value if present.
-        if (decodedTypeSecondOperand !== OperandTypes.NO) {            
-            /**
-             * Read second operands value from main memory.
-             * It is located at addresses with an offset of 8 from the first 
-             * address of the instruction.
-             */
-            const encodedValueSecondOperand: DoubleWord = this.mmu.readDoublewordFrom(DoubleWord.fromNumber(this.eip.content + 8), true);
-
-
-            // Decode addressing mode of second operand.
-
-            if (!(binaryEncodedAddressingModeSecondOperand in AddressingModes)) {
-                throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
-            }
-
-            const decodedAddressingModeSecondOperand: AddressingModes = binaryEncodedAddressingModeSecondOperand as AddressingModes;
-
-            /**
-             * Create instance of an InstructionOperand for the second operand.
-             */
-            decodedSecondOperand = new InstructionOperand(
-                decodedAddressingModeSecondOperand,
-                decodedTypeSecondOperand,
-                encodedValueSecondOperand
-            );
-
+        switch (decodedSecondOperandType) {
+            case EncodedOperandTypes.NO:
+                decodedSecondOperand = null;
+                break;
+            case EncodedOperandTypes.EMBEDDED_IMMEDIATE:
+            case EncodedOperandTypes.EMBEDDED_MEMORY_ADDRESS:
+                decodedSecondOperandType ^= 0b1000; 
+            case EncodedOperandTypes.REGISTER_DIRECT:
+            case EncodedOperandTypes.REGISTER_INDIRECT:
+                decodedSecondOperand = new InstructionOperand(
+                    decodedSecondOperandType as DecodedOperandTypes,
+                    DoubleWord.fromNumber(DoubleWord.getFourthByte(this.eir.content))
+                );
+                break;
+            case EncodedOperandTypes.MEMORY_ADDRESS:
+            case EncodedOperandTypes.IMMEDIATE:
+                decodedSecondOperand = new InstructionOperand(
+                    decodedSecondOperandType,
+                    this.mmu.readDoublewordFrom(this.eip.content, true)
+                );
+                this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
+                break;
+            default:
+                decodedSecondOperand = null;
+                break;
         }
 
         // Set decoded operand values on decoded instruction.
-        this._decodedInstruction.type = decodedInstructionType
-        this._decodedInstruction.instruction = decodedOperation;
+        this._decodedInstruction.instruction = decodedOpCode;
         this._decodedInstruction.operand1 = decodedFirstOperand;
         this._decodedInstruction.operand2 = decodedSecondOperand;
     }
@@ -448,24 +435,24 @@ export class CPUCore {
      * This method executes the instruction found in the EIR register.
      */
     private execute(): void {
-        const operation: InstructionSet = this._decodedInstruction.instruction;
+        const operation: OpCode = this._decodedInstruction.instruction;
 
         let logText = "";
 
         if (DebugLogger.isLoggingEnabled() || this.flags.isInUserMode())
         {
-            const currentOperation:string = InstructionSet[operation];
+            const currentOperation:string = OpCode[operation];
             logText = this.getLogText(currentOperation)
         }
 
         if (DebugLogger.isLoggingEnabled()) {
 
-            if (InstructionSet.CALL === operation || InstructionSet.INT === operation)
+            if (OpCode.CALL === operation || OpCode.INT === operation)
             {
                 DebugLogger.log("");
             }
 
-            if (InstructionSet.RET === operation || InstructionSet.IRET === operation)
+            if (OpCode.RET === operation || OpCode.IRET === operation)
             {
                 DebugLogger.removeIndentation()
             }
@@ -483,223 +470,216 @@ export class CPUCore {
 
         let jumpPerformed = false;
         switch (operation) {
-            case InstructionSet.NOT:
+            case OpCode.NOT:
                 this.not(
                     this._decodedInstruction.operand1!
                 );
                 break;
-            case InstructionSet.AND:
+            case OpCode.AND:
                 this.and(
                     this._decodedInstruction.operand1!, 
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.OR:
+            case OpCode.OR:
                 this.or(
                     this._decodedInstruction.operand1!, 
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.XOR:
+            case OpCode.XOR:
                 this.xor(
                     this._decodedInstruction.operand1!, 
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.NEG:
+            case OpCode.NEG:
                 this.neg(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.ADD:
+            case OpCode.ADD:
                 this.add(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.ADC:
+            case OpCode.ADC:
                 this.adc(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.SUB:
+            case OpCode.SUB:
                 this.sub(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.SBB:
+            case OpCode.SBB:
                 this.sbb(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.MUL:
+            case OpCode.MUL:
                 this.mul(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.DIV:
+            case OpCode.DIV:
                 this.div(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.TEST:
+            case OpCode.TEST:
                 this.test(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 )
                 break;
-            case InstructionSet.CMP:
+            case OpCode.CMP:
                 this.cmp(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.STI:
+            case OpCode.STI:
                 this.sti();
                 break;
-            case InstructionSet.CLI:
+            case OpCode.CLI:
                 this.cli();
                 break;
-            case InstructionSet.CLC:
+            case OpCode.CLC:
                 this.clc();
                 break;
-            case InstructionSet.CMC:
+            case OpCode.CMC:
                 this.cmc();
                 break;
-            case InstructionSet.STC:
+            case OpCode.STC:
                 this.stc();
                 break;
-            case InstructionSet.POPF:
+            case OpCode.POPF:
                 this.popf();
                 break;
-            case InstructionSet.PUSHF:
+            case OpCode.PUSHF:
                 this.pushf();
                 break;
-            case InstructionSet.POP:
+            case OpCode.POP:
                 this.pop(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.PUSH:
+            case OpCode.PUSH:
                 this.push(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JMP:
+            case OpCode.JMP:
                 this.jmp(this._decodedInstruction.operand1!);
                 jumpPerformed = true;
                 break;
-            case InstructionSet.JE:
+            case OpCode.JE:
                 jumpPerformed = this.je(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JA:
+            case OpCode.JA:
                 jumpPerformed = this.ja(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JAE:
+            case OpCode.JAE:
                 jumpPerformed = this.jae(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JB:
+            case OpCode.JB:
                 jumpPerformed = this.jb(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JBE:
+            case OpCode.JBE:
                 jumpPerformed = this.jle(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JG:
+            case OpCode.JG:
                 jumpPerformed = this.jg(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JL:
+            case OpCode.JL:
                 jumpPerformed = this.jl(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JGE:
+            case OpCode.JGE:
                 jumpPerformed = this.jge(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JLE:
+            case OpCode.JLE:
                 jumpPerformed = this.jle(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JNE:
+            case OpCode.JNE:
                 jumpPerformed = this.jne(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JNZ:
+            case OpCode.JNZ:
                 jumpPerformed = this.jnz(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.JZ:
+            case OpCode.JZ:
                 jumpPerformed = this.jz(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.LEA:
+            case OpCode.LEA:
                 this.lea(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.NOP:
+            case OpCode.NOP:
                 this.nop();
                 break;
-            case InstructionSet.CALL:
+            case OpCode.CALL:
                 jumpPerformed = this.call(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.RET:
+            case OpCode.RET:
                 jumpPerformed = this.ret();
                 break;
-            case InstructionSet.MOV:
+            case OpCode.MOV:
                 this.mov(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.INT:
+            case OpCode.INT:
                 jumpPerformed = this.int(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.IRET:
+            case OpCode.IRET:
                 this.iret();
                 jumpPerformed = true;
                 break;
-            case InstructionSet.SYSENTER:
+            case OpCode.SYSENTER:
                 this.sysenter(this._decodedInstruction.operand1!);
                 break;
-            case InstructionSet.SYSEXIT:
+            case OpCode.SYSEXIT:
                 this.sysexit();
                 break;
-            case InstructionSet.DEV:
+            case OpCode.DEV:
                 this.dev(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.SHL: // SHL = SAL
+            case OpCode.SHL: // SHL = SAL
                 this.shl(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.SHR:
+            case OpCode.SHR:
                 this.shr(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.SAR:
+            case OpCode.SAR:
                 this.sar(
                     this._decodedInstruction.operand1!,
                     this._decodedInstruction.operand2!
                 );
                 break;
-            case InstructionSet.INVTLB:
+            case OpCode.INVTLB:
                 this.invtlb();
                 break;
             default:
                 // Call interrupt handler for Invalid Opcode.
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
-        if (!jumpPerformed) {
-            /**
-             * Increment EIP by 3 x 4 bytes/addresses (<-> 12 Bytes) after execution 
-             * of the current instruction.
-             */
-            this.eip.content = DoubleWord.fromNumber(this.eip.content + (this._decodedInstruction.operandCount + 1) * 4);
-        }
 
         if (DebugLogger.isLoggingEnabled()) {
 
-            if (InstructionSet.CALL === operation || InstructionSet.INT === operation)
+            if (OpCode.CALL === operation || OpCode.INT === operation)
             {
                 DebugLogger.addIndentation()
             }
@@ -718,7 +698,7 @@ export class CPUCore {
                 DebugLogger.log("Stack value: Not Mapped");
             }
             
-            if (InstructionSet.RET === operation || InstructionSet.IRET === operation)
+            if (OpCode.RET === operation || OpCode.IRET === operation)
             {
                 DebugLogger.log("");
                 DebugLogger.removeIndentation()
@@ -729,28 +709,27 @@ export class CPUCore {
     private getLogText(currentOperation: string): string {
         let text = currentOperation;
 
-        if (this._decodedInstruction !== null && this._decodedInstruction?.operandCount !== 0) {
+        if (this._decodedInstruction.operandCount !== 0) {
             if (this._decodedInstruction.operandCount === 1) {
-                if (this._decodedInstruction.operand1!.type === OperandTypes.IMMEDIATE) {
+                if (this._decodedInstruction.operand1!.type === EncodedOperandTypes.IMMEDIATE) {
                     text += " 0x" + this._decodedInstruction.operand1!.value.toString(16);
-                } else if (this._decodedInstruction.operand1!.type === OperandTypes.MEMORY_ADDRESS) {
-                    text += " 0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operand1!.value, true).toString(16);
+                } else if (this._decodedInstruction.operand1!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+                    text += " @0x" + this._decodedInstruction.operand1!.value.toString(16) + " ($0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operand1!.value, true).toString(16) + ")";
                 } else {
-                    const register = this.decodeReadableRegister(this._decodedInstruction.operand1!);
+                    const register = this.decodeReadableRegister(this._decodedInstruction.operand1!.value);
 
-                    if (this._decodedInstruction.operand1!.addressingMode === AddressingModes.INDIRECT) {
+                    if (this._decodedInstruction.operand1!.type === EncodedOperandTypes.REGISTER_INDIRECT) {
                         text += " *%" + register.name + " (*0x" + register.content.toString(16) + ")" + " (0x" + this.mmu.readDoublewordFrom(register.content, false).toString(16) + ")";
                     } else {
                         text += " %" + register.name + " (0x" + register.content.toString(16) + ")";
                     }
                 }
-            }
-            else if (this._decodedInstruction.operandCount === 2) {
+            } else if (this._decodedInstruction.operandCount === 2) {
                 let operand: DoubleWord;
 
-                if (this._decodedInstruction.operand1!.type === OperandTypes.IMMEDIATE) {
+                if (this._decodedInstruction.operand1!.type === EncodedOperandTypes.IMMEDIATE) {
                     operand = this._decodedInstruction.operand1!.value;
-                } else if (this._decodedInstruction.operand1!.type === OperandTypes.MEMORY_ADDRESS) {
+                } else if (this._decodedInstruction.operand1!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
                     operand = this.mmu.readDoublewordFrom(this._decodedInstruction.operand1!.value, true);
                 } else {
                     operand = this.readRegister(this._decodedInstruction.operand1!);
@@ -758,14 +737,14 @@ export class CPUCore {
                 const hexOperand = operand.toString(16);
                 text += " 0x" + hexOperand;
 
-                if (this._decodedInstruction.operand2!.type === OperandTypes.IMMEDIATE) {
+                if (this._decodedInstruction.operand2!.type === EncodedOperandTypes.IMMEDIATE) {
                     text += ", 0x" + this._decodedInstruction.operand2!.value.toString(16);
-                } else if (this._decodedInstruction.operand2!.type === OperandTypes.MEMORY_ADDRESS) {
-                    text += ", 0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operand2!.value, true).toString(16);
+                } else if (this._decodedInstruction.operand2!.type === EncodedOperandTypes.MEMORY_ADDRESS) {
+                    text += ", @0x" + this._decodedInstruction.operand1!.value.toString(16) + " ($0x" + this.mmu.readDoublewordFrom(this._decodedInstruction.operand1!.value, true).toString(16) + ")";
                 } else {
-                    const register = this.decodeReadableRegister(this._decodedInstruction.operand2!);
+                    const register = this.decodeReadableRegister(this._decodedInstruction.operand2!.value);
 
-                    if (this._decodedInstruction.operand2!.addressingMode === AddressingModes.INDIRECT) {
+                    if (this._decodedInstruction.operand2!.type === EncodedOperandTypes.REGISTER_INDIRECT) {
                         text += ", *%" + register.name + " (*0x" + register.content.toString(16) + ")" + " (0x" + this.mmu.readDoublewordFrom(register.content, false).toString(16) + ")";
                     } else {
                         text += ", %" + register.name + " (0x" + register.content.toString(16) + ")";
@@ -824,19 +803,20 @@ export class CPUCore {
         }
 
         // Check if exactly two operands are present.
-        if (command.type === OperandTypes.NO || data.type === OperandTypes.NO) {
+        if (command.type === EncodedOperandTypes.NO || data.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
         let op1: number = 0;
         switch (command.type) {
-            case OperandTypes.IMMEDIATE:
+            case EncodedOperandTypes.IMMEDIATE:
                 op1 = command.value;
                 break;
-            case OperandTypes.REGISTER:
+            case EncodedOperandTypes.REGISTER_DIRECT:
+            case EncodedOperandTypes.REGISTER_INDIRECT:                
                 op1 = this.readRegister(command);
                 break;
-            case OperandTypes.MEMORY_ADDRESS:
+            case EncodedOperandTypes.MEMORY_ADDRESS:
                 op1 = this.mmu.readDoublewordFrom(command.value, false);
                 break;
             default:
@@ -845,13 +825,14 @@ export class CPUCore {
 
         let op2: number = 0;
         switch (data.type) {
-            case OperandTypes.IMMEDIATE:
+            case EncodedOperandTypes.IMMEDIATE:
                 op2 = data.value;
                 break;
-            case OperandTypes.REGISTER:
+            case EncodedOperandTypes.REGISTER_DIRECT:
+            case EncodedOperandTypes.REGISTER_INDIRECT:
                 op2 = this.readRegister(data);
                 break;
-            case OperandTypes.MEMORY_ADDRESS:
+            case EncodedOperandTypes.MEMORY_ADDRESS:
                 op2 = this.mmu.readDoublewordFrom(data.value, false);
                 break;
             default:
@@ -1010,26 +991,26 @@ export class CPUCore {
      */
     private add(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
             firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1037,7 +1018,7 @@ export class CPUCore {
         // Perform the ADD operation.
         const result: DoubleWord = this.alu.add(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1055,26 +1036,26 @@ export class CPUCore {
      */
     private adc(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.        
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
             firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1082,7 +1063,7 @@ export class CPUCore {
         // Perform the ADC operation.
         const result: DoubleWord = this.alu.adc(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1100,11 +1081,11 @@ export class CPUCore {
      */
     private sub(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
 
         }
@@ -1112,15 +1093,15 @@ export class CPUCore {
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
             firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1128,7 +1109,7 @@ export class CPUCore {
         // Perform the SUB operation.
         const result: DoubleWord = this.alu.sub(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1146,26 +1127,26 @@ export class CPUCore {
      */
     private sbb(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
             firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1173,7 +1154,7 @@ export class CPUCore {
         // Perform the SBB operation.
         const result: DoubleWord = this.alu.sbb(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1191,12 +1172,12 @@ export class CPUCore {
      */
     private shl(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
 
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
 
         }
@@ -1204,15 +1185,15 @@ export class CPUCore {
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
             firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1220,7 +1201,7 @@ export class CPUCore {
         // Perform the ADD operation.
         const result: DoubleWord = this.alu.shl(secondOperandsValue, firstOperandsValue as DoubleWord.BitCount);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1238,12 +1219,12 @@ export class CPUCore {
      */
     private shr(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
 
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
 
         }
@@ -1251,15 +1232,15 @@ export class CPUCore {
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1267,7 +1248,7 @@ export class CPUCore {
         // Perform the ADD operation.
         const result: DoubleWord = this.alu.shr(secondOperandsValue, firstOperandsValue as DoubleWord.BitCount);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1285,26 +1266,26 @@ export class CPUCore {
      */
     private sar(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1312,7 +1293,7 @@ export class CPUCore {
         // Perform the ADD operation.
         const result: DoubleWord = this.alu.sar(secondOperandsValue, firstOperandsValue as DoubleWord.BitCount);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1330,26 +1311,26 @@ export class CPUCore {
      */
     private mul(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1357,7 +1338,7 @@ export class CPUCore {
         // Perform the MUL operation
         const result: DoubleWord = this.alu.imul(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1375,12 +1356,12 @@ export class CPUCore {
      */
     private div(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
@@ -1388,15 +1369,15 @@ export class CPUCore {
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1406,7 +1387,7 @@ export class CPUCore {
         result = this.alu.idiv(secondOperandsValue, firstOperandsValue);
  
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1427,18 +1408,18 @@ export class CPUCore {
      */
     private neg(target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
 
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variable to write the operands value to.
         let value: DoubleWord;
         // Read the binary value from the location defined by the operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             value = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             value = this.readRegister(target);
@@ -1446,7 +1427,7 @@ export class CPUCore {
         // Perform the NEG operation
         const result: DoubleWord = this.alu.neg(value);
         // Write the result to the location defined by the operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1464,26 +1445,26 @@ export class CPUCore {
      */
     private and(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1491,7 +1472,7 @@ export class CPUCore {
         // Perform the AND operation.
         const result: DoubleWord = this.alu.and(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1509,26 +1490,26 @@ export class CPUCore {
      */
     private or(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1536,7 +1517,7 @@ export class CPUCore {
         // Perform the OR operation.
         const result: DoubleWord = this.alu.or(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1554,26 +1535,26 @@ export class CPUCore {
      */
     private xor(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1581,7 +1562,7 @@ export class CPUCore {
         // Perform the XOR operation.
         const result: DoubleWord = this.alu.xor(secondOperandsValue, firstOperandsValue);
         // Write the result to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1598,17 +1579,17 @@ export class CPUCore {
      */
     private not(target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         } 
         // Define variable to write the operands value to.
         let operandsValue: DoubleWord;
         // Read the binary value from the location defined by the operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             operandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             operandsValue = this.readRegister(target);
@@ -1616,7 +1597,7 @@ export class CPUCore {
         // Perform the NOT operation
         const result: DoubleWord = this.alu.not(operandsValue);
         // Write the result to the location defined by the operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, result, false);
         } else {
             this.writeRegister(result, target);
@@ -1634,26 +1615,26 @@ export class CPUCore {
      */
     private cmp(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1674,26 +1655,26 @@ export class CPUCore {
      */
     private test(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variables to write the operands values to.
         let firstOperandsValue: DoubleWord;
         let secondOperandsValue: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
              firstOperandsValue = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             firstOperandsValue = this.mmu.readDoublewordFrom(source.value, true);
         } else {
             firstOperandsValue = this.readRegister(source);
         }
         // Read the binary value from the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             secondOperandsValue = this.mmu.readDoublewordFrom(target.value, true);
         } else {
             secondOperandsValue = this.readRegister(target);
@@ -1717,11 +1698,11 @@ export class CPUCore {
      */
     private jmp(target: InstructionOperand): void {
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Load the given virtual address into the instruction pointer in order to perform the jump.
@@ -1744,11 +1725,11 @@ export class CPUCore {
     private jz(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the zero flag is set to (1)_2.
@@ -1790,11 +1771,11 @@ export class CPUCore {
     private jnz(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the zero flag is cleared to (0)_2.
@@ -1835,11 +1816,11 @@ export class CPUCore {
     private ja(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -1868,11 +1849,11 @@ export class CPUCore {
     private jae(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -1900,11 +1881,11 @@ export class CPUCore {
     private jb(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -1932,11 +1913,11 @@ export class CPUCore {
     private jbe(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -1966,11 +1947,11 @@ export class CPUCore {
     private jg(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -2000,11 +1981,11 @@ export class CPUCore {
     private jge(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the values of the overflow and sign flags are identical.
@@ -2030,11 +2011,11 @@ export class CPUCore {
     private jl(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the values of the overflow and sign flags are not identical.
@@ -2060,11 +2041,11 @@ export class CPUCore {
     private jle(target: InstructionOperand): boolean {
         let jumpPerformed = false;
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -2093,29 +2074,29 @@ export class CPUCore {
      */
     private mov(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the source and target operands are both of type memory address.
-        if (source.type === OperandTypes.MEMORY_ADDRESS && target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (source.type === EncodedOperandTypes.MEMORY_ADDRESS && target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variable to write the operands value to.
         let valueToMove: DoubleWord;
         // Read the binary value from the location defined by the first operand.
-        if (source.type === OperandTypes.IMMEDIATE) {
+        if (source.type === EncodedOperandTypes.IMMEDIATE) {
             valueToMove = source.value;
-        } else if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        } else if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             valueToMove = this.mmu.readDoublewordFrom(source.value, false);
         } else {
             valueToMove = this.readRegister(source);
         }
         // Write the value to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, valueToMove, false);
         } else {
             this.writeRegister(valueToMove, target);
@@ -2132,31 +2113,31 @@ export class CPUCore {
      */
     private lea(source: InstructionOperand, target: InstructionOperand): void {
         // Check if the source and target operands are both of type memory address.
-        if (source.type === OperandTypes.MEMORY_ADDRESS && target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (source.type === EncodedOperandTypes.MEMORY_ADDRESS && target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the source or target operand are of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE || source.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE || source.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if the source operand is of type REGISTER and the addressing mode is DIRECT.
-        if (source.type === OperandTypes.REGISTER && source.addressingMode === AddressingModes.DIRECT) {
+        if (source.type === EncodedOperandTypes.REGISTER_DIRECT || source.type === EncodedOperandTypes.REGISTER_INDIRECT) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly two operands are present.
-        if (source.type === OperandTypes.NO || target.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO || target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Define variable to write the (virtual) memory address to.
         let address: DoubleWord = DoubleWord.ZERO;
         // Read the (virtual) memory address from the location defined by the first operand.
-        if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             address = source.value;
         } else {
             address = this.readRegister(source);
         }
         // Write the (virtual) memory address to the location defined by the second operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.mmu.writeDoublewordTo(target.value, address, false);
         } else {
             this.writeRegister(address, target);
@@ -2298,17 +2279,17 @@ export class CPUCore {
         //     throw new StackUnderflowError("Could not perform POP operation. STACK pointer reached bottom of the STACK.");
         // }
         // Check if the target operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Read the binary value from the STACK.
         const value: DoubleWord = this.mmu.readDoublewordFrom(this.esp.content, false);
         // Write the value to the location defined by the operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             const address: DoubleWord = target.value;
             this.mmu.writeDoublewordTo(address, value, false);
         } else {
@@ -2316,7 +2297,6 @@ export class CPUCore {
         }
         // Deallocate one doubleword from STACK by incrementing the value in ESP.
         this.mmu.writeDoublewordTo(this.esp.content, DoubleWord.ZERO, false);
-        // TODO: Call interrupt handler for deallocation of page frame in page table.
         this.esp.content = DoubleWord.fromNumber(this.esp.content + 4);
         return;
     }
@@ -2334,7 +2314,7 @@ export class CPUCore {
         //     throw new StackOverflowError("Could not perform PUSH operation. STACK pointer reached top of the STACK.");
         // }
         // Check if exactly one operand is present.
-        if (source.type === OperandTypes.NO) {
+        if (source.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Allocate one doubleword (4 byte) on STACK by decrementing ESP.
@@ -2342,10 +2322,10 @@ export class CPUCore {
         // Create a variable to store the value to write on STACK.
         let value: DoubleWord;
         // Depending on the operand type, the value is read from the main memory or a register.
-        if (source.type === OperandTypes.MEMORY_ADDRESS) {
+        if (source.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             // Read the binary value from the (virtual) memory address defined by the given operand.
             value = this.mmu.readDoublewordFrom(source.value, false);            
-        } else if (source.type === OperandTypes.REGISTER) {
+        } else if (source.type === EncodedOperandTypes.REGISTER_DIRECT || source.type === EncodedOperandTypes.REGISTER_INDIRECT) {
             // Read the binary value from the register defined by the given operand.
             value = this.readRegister(source);
         } else {
@@ -2372,11 +2352,11 @@ export class CPUCore {
      */
     private call(target: InstructionOperand): boolean {
         // Check if the source operand is of type IMMEDIATE.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         /*
@@ -2391,12 +2371,12 @@ export class CPUCore {
          * The instruction following the CALL instruction is located at EIP (currently pointing at
          * the CALL instruction) plus (12)_10 ((3)_10 * (4)_10 byte per instruction).
          */
-        const returnAddress: DoubleWord = DoubleWord.fromNumber(this.eip.content + 8);
+        const returnAddress: DoubleWord = DoubleWord.fromNumber(this.eip.content);
 
         // Write the return address to the STACK.
         this.mmu.writeDoublewordTo(this.esp.content, returnAddress, false);
         // Transfer control to the subroutine by loading the subroutines base address into EIP register.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             this.eip.content = target.value;
         } else {
             this.eip.content = this.readRegister(target);
@@ -2438,21 +2418,13 @@ export class CPUCore {
      * @throws {ExceptionError} If an exception was generated
      */
     public int(target: InstructionOperand): boolean {
-        // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
-            throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
-        }
-        // Check if the target operand is of type MEMORY_ADDRESS.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
-            throw new ExceptionError(InterruptNumbers.INVALID_OPCODE); 
-        }
-        // Check if the target operand is of type REGISTER.
-        if (target.type === OperandTypes.REGISTER) {
+        // Check if exactly one operand is present and it is Immediate.
+        if (target.type !== EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
         // Only allow INT for interrupt index 0 to 255
-        if (0 > target.type || 255 < target.value) {
+        if (0 > target.value || 255 < target.value) {
             throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
 
@@ -2495,7 +2467,7 @@ export class CPUCore {
          * The instruction following the CALL instruction is located at EIP (currently pointing at
          * the CALL instruction) plus (12)_10 ((3)_10 * (4)_10 byte per instruction).
          */
-        const returnAddress: DoubleWord = DoubleWord.fromNumber(this.eip.content + 8);
+        const returnAddress: DoubleWord = DoubleWord.fromNumber(this.eip.content);
         // Write the return address to the STACK.
         this.mmu.writeDoublewordTo(this.esp.content, returnAddress, false);
         // Jump into subroutine at the interrupt handlers address.
@@ -2549,17 +2521,17 @@ export class CPUCore {
      */
     private sysenter(target: InstructionOperand): void {
         // Check if exactly one operand is present.
-        if (target.type === OperandTypes.NO) {
+        if (target.type === EncodedOperandTypes.NO) {
             throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT);
         }
         // Check if the target operand is of type MEMORY_ADDRESS.
-        if (target.type === OperandTypes.IMMEDIATE) {
+        if (target.type === EncodedOperandTypes.IMMEDIATE) {
             throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT); 
         }
         // Create a variable to store the (virtual) address of the systems subroutine.
         let systemSubroutineAddress: DoubleWord;
         // Read the physical address of the systems subroutine from the operand.
-        if (target.type === OperandTypes.MEMORY_ADDRESS) {
+        if (target.type === EncodedOperandTypes.MEMORY_ADDRESS) {
             systemSubroutineAddress = target.value;
         } else {
             systemSubroutineAddress = this.readRegister(target);
@@ -2573,8 +2545,7 @@ export class CPUCore {
         // Call the systems subroutine.
         this.call(
             new InstructionOperand(
-                AddressingModes.DIRECT, 
-                OperandTypes.MEMORY_ADDRESS, 
+                EncodedOperandTypes.MEMORY_ADDRESS, 
                 systemSubroutineAddress)
         );
         return;
@@ -2637,11 +2608,13 @@ export class CPUCore {
      * @returns The red binary value.
      */
     private writeRegister(value: DoubleWord, operand: InstructionOperand): void {
-        // Depending on the addressing mode, the value is written to the register directly or to the referenced (virtual) memory address.
-        if (operand.addressingMode === AddressingModes.INDIRECT) {
-            this.writeRegisterIndirect(value, operand);
+        if (operand.type === EncodedOperandTypes.REGISTER_INDIRECT) {
+            const register: Register<DoubleWord> = this.decodeWritableRegister(operand.value);
+            this.mmu.writeDoublewordTo(register.content, value, false);       
+        } else if (operand.type === EncodedOperandTypes.REGISTER_DIRECT) {
+            this.writeRegisterDirect(value, operand.value);
         } else {
-            this.writeRegisterDirect(value, operand);
+            throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
         return;
     }
@@ -2652,9 +2625,9 @@ export class CPUCore {
      * @param operand The register to write the value to.
      * @throws {ExceptionError} If an exception was generated
      */
-    private writeRegisterDirect(value: DoubleWord, operand: InstructionOperand): void {
+    private writeRegisterDirect(value: DoubleWord, registerNumber: number): void {
         // Decode the register defined by the operand.
-        const register: Register<DoubleWord> = this.decodeWritableRegister(operand);
+        const register: Register<DoubleWord> = this.decodeWritableRegister(registerNumber);
         // Check if the decoded register is writable in user mode.
         if (register === this.eir && !this.flags.isInKernelMode()) {
             // Writing to the EIP register is only allowed in kernel mode.
@@ -2675,20 +2648,6 @@ export class CPUCore {
     }
 
     /**
-     * This method writes a given doubleword sized binary value to a (virtual) memory address.
-     * The (virtual memory address) is referenced by the register defined by the given operand.
-     * @param value The binary value to write to the memory address referenced by the given register.
-     * @param operand The register which references a memory address to write to.
-     * @throws {ExceptionError} If an exception was generated
-     */
-    private writeRegisterIndirect(value: DoubleWord, operand: InstructionOperand): void {
-        // Decode the register defined by the operand.
-        const register: Register<DoubleWord> = this.decodeWritableRegister(operand);
-        // Write the doubleword to the referenced (virtual) memory address.
-        this.mmu.writeDoublewordTo(register.content, value, false);
-    }
-
-    /**
      * This method reads a given doubleword sized binary value from a register defined by the given operand. 
      * Depending on the addressing mode, the value is read directly from the register or from the main memory. 
      * In the latter case, the value contained in the register is interpreted as the memory address.
@@ -2698,27 +2657,16 @@ export class CPUCore {
      */
     private readRegister(operand: InstructionOperand): DoubleWord {
         let doubleword: DoubleWord;
-        // Depending on the addressing mode, the value is read from the register directly or from the referenced (virtual) memory address.
-        if (operand.addressingMode === AddressingModes.INDIRECT) {
-            doubleword = this.readRegisterIndirect(operand);
+        if (operand.type === EncodedOperandTypes.REGISTER_INDIRECT) {
+            const address: DoubleWord = this.decodeReadableRegister(operand.value).content;
+            doubleword = this.mmu.readDoublewordFrom(address, false);        
+        } else if (operand.type === EncodedOperandTypes.REGISTER_DIRECT) {
+            doubleword = this.readRegisterDirect(operand.value);
         } else {
-            doubleword = this.readRegisterDirect(operand);
+            throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
         }
-        return doubleword;
-    }
 
-    /**
-     * This method reads a given doubleword sized binary value from a (virtual) memory address.
-     * The (virtual) memory address is referenced by the register defined in the given operand.
-     * @param operand The operand to extract the register from.
-     * @throws {ExceptionError} If an exception was generated
-     * @returns The binary value red from the referenced (virtual) memory address.
-     */
-    private readRegisterIndirect(operand: InstructionOperand): DoubleWord {
-        // Decode the register defined by the operand and read its value.
-        const address: DoubleWord = this.decodeReadableRegister(operand).content;
-        // Read the doubleword from the referenced (virtual) memory address.
-        return this.mmu.readDoublewordFrom(address, false);
+        return doubleword;
     }
 
     /**
@@ -2727,9 +2675,9 @@ export class CPUCore {
      * @throws {ExceptionError} If an exception was generated
      * @returns The binary value red from the register.
      */
-    private readRegisterDirect(operand: InstructionOperand): DoubleWord {
+    private readRegisterDirect(registerNumber: number): DoubleWord {
         // Decode the register defined by the operand and return its value.
-        return this.decodeReadableRegister(operand).content;
+        return this.decodeReadableRegister(registerNumber).content;
     }
 
     /**
@@ -2739,9 +2687,9 @@ export class CPUCore {
      * @throws {ExceptionError} If an exception was generated
      * @returns The decoded register.
      */
-    private decodeReadableRegister(operand: InstructionOperand): Register<DoubleWord> {
+    private decodeReadableRegister(registerNumber: number): Register<DoubleWord> {
         let register: Register<DoubleWord> = this.eax;
-        switch (operand.value) {
+        switch (registerNumber) {
             case RegisterNumbers.EAX:
                 register = this.eax;
                 break;
@@ -2777,7 +2725,6 @@ export class CPUCore {
                 break;
             default:
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
-                break;
         }
         return register;
     }
@@ -2789,9 +2736,9 @@ export class CPUCore {
      * @throws {ExceptionError} If an exception was generated
      * @returns The decoded register.
      */
-    private decodeWritableRegister(operand: InstructionOperand): Register<DoubleWord> {
+    private decodeWritableRegister(registerNumber: number): Register<DoubleWord> {
         let register: Register<DoubleWord> = this.eax;
-        switch (operand.value) {
+        switch (registerNumber) {
             case RegisterNumbers.EAX:
                 register = this.eax;
                 break;
@@ -2824,7 +2771,6 @@ export class CPUCore {
                 break;
             default:
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
-                break;
         }
         return register;
     }
@@ -2863,7 +2809,7 @@ export class CPUCore {
      */
     private internal_pop(): DoubleWord {
         const oldEAX = this.eax.content;
-        this.pop(new InstructionOperand(AddressingModes.DIRECT, OperandTypes.REGISTER, DoubleWord.ZERO)) // 0 for EAX
+        this.pop(new InstructionOperand(EncodedOperandTypes.REGISTER_DIRECT, DoubleWord.ZERO)) // 0 for EAX
         const poppedValue = this.eax.content;
         this.eax.content = oldEAX;
         return poppedValue;
