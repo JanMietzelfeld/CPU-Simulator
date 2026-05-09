@@ -83,12 +83,12 @@
         },
         {
             "name" : "REGISTER_DIRECT",
-            "code" : "1011",
+            "code" : "0011",
             "regex" : "%[a-zA-Z]{3,}"
         },
         {
             "name" : "REGISTER_INDIRECT",
-            "code" : "1100",
+            "code" : "0100",
             "regex" : "\\*%[a-zA-Z]{3,}"
         },
         {
