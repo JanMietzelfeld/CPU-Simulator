@@ -370,6 +370,10 @@ export class CPUCore {
         let decodedSecondOperand: InstructionOperand | null;
 
         switch (decodedFirstOperandType) {
+            case EncodedOperandTypes.PADDING:
+                decodedFirstOperandType ^= 0b1000; 
+                this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
+                // fallthrough
             case EncodedOperandTypes.NO:
                 decodedFirstOperand = null;
                 break;
@@ -392,12 +396,25 @@ export class CPUCore {
                 );
                 this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
                 break;
+            case EncodedOperandTypes.EXTERNAL_REGISTER_DIRECT:
+            case EncodedOperandTypes.EXTERNAL_REGISTER_INDIRECT:
+                decodedFirstOperandType ^= 0b1000; 
+                decodedFirstOperand = new InstructionOperand(
+                    decodedFirstOperandType as DecodedOperandTypes,
+                    this.mmu.readDoublewordFrom(this.eip.content, true)
+                );
+                this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
+                break;
             default:
                 decodedFirstOperand = null;
                 break;
         }
 
         switch (decodedSecondOperandType) {
+            case EncodedOperandTypes.PADDING:
+                decodedSecondOperandType ^= 0b1000; 
+                this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
+                // fallthrough
             case EncodedOperandTypes.NO:
                 decodedSecondOperand = null;
                 break;
@@ -416,6 +433,15 @@ export class CPUCore {
             case EncodedOperandTypes.IMMEDIATE:
                 decodedSecondOperand = new InstructionOperand(
                     decodedSecondOperandType,
+                    this.mmu.readDoublewordFrom(this.eip.content, true)
+                );
+                this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
+                break;
+            case EncodedOperandTypes.EXTERNAL_REGISTER_DIRECT:
+            case EncodedOperandTypes.EXTERNAL_REGISTER_INDIRECT:
+                decodedSecondOperandType ^= 0b1000; 
+                decodedSecondOperand = new InstructionOperand(
+                    decodedSecondOperandType as DecodedOperandTypes,
                     this.mmu.readDoublewordFrom(this.eip.content, true)
                 );
                 this.eip.content = DoubleWord.fromNumber(this.eip.content + 4);
