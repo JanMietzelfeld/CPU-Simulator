@@ -2,6 +2,8 @@ import { accessSync, chmodSync, constants, existsSync, lstatSync, openSync, read
 import { FilesystemError } from '../../../types/errors/FilesystemError';
 import { createInterface, Interface } from 'node:readline';
 import { DoubleWord } from '../../../types/binary/DoubleWord';
+import { getMainWindow } from '../..';
+
 
 class VirtualFileDescriptor {
     public filename: string;
@@ -211,7 +213,7 @@ export class PassthroughFilesystem {
     }
 
     public console_print_number(num: number) {
-        console.log(num);
+        getMainWindow()?.webContents.send('update_console', num.toString(10));
     }
 
     public console_read_number(): [number, number] {

@@ -175,6 +175,23 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 											}
 										}
 									]
+								},
+								{
+									label: "Console",
+									submenu : [
+										{
+											label: "Disable Console",
+											click() {
+												win.webContents.send("hide_console");
+											}
+										},
+										{
+											label: "Enable Console",
+											click() {
+												win.webContents.send("show_console");
+											}
+										}
+									]
 								}
 							]
 						}

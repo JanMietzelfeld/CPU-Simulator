@@ -28,6 +28,7 @@ window.onload = async () => {
 	renderer.registerRAMSearchListener();
 	renderer.createPhysicalRAMView();
 	renderer.createVirtualRAMView();
+	renderer.registerConsoleListener();
 
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);
@@ -121,3 +122,15 @@ window.windowUpdate.onHideLog(() => {
 window.windowUpdate.onShowLog(() => {
 	renderer.showLog();
 });
+
+window.windowUpdate.onHideConsole(() => {
+	renderer.hideConsole();
+});
+
+window.windowUpdate.onShowConsole(() => {
+	renderer.showConsole();
+});
+
+window.windowUpdate.onUpdateConsole((value: string) => {
+	renderer.updateConsole(value);
+})
