@@ -13,3 +13,4 @@
 
     .INCLUDE "os/src/interrupts/hardware/timer/timer"             ; 0x20
     .INCLUDE "os/src/interrupts/syscalls/syscalls"                ; 0x80
+    .INCLUDE "os/src/interrupts/hardware/io/hid/keyboard/keyboard"         ; 0x81

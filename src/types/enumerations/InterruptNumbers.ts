@@ -5,4 +5,5 @@ export enum InterruptNumbers {
 	PAGE_FAULT = 0xE,
 	TIMER = 0x20,
 	SYSTEM_CALL = 0x80,
+	KEYBOARD = 0x81,
 }

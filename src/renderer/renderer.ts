@@ -969,11 +969,26 @@ export class Renderer {
         const target: HTMLElement = event.target as HTMLElement;
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
-            if (target.getAttribute("id") === "console-input-field") return;
-            const consoleInputField: HTMLInputElement = this._document.getElementById("test") as HTMLInputElement;
+            if (target.getAttribute("id") === "console-input") return;
+            const consoleInputField: HTMLInputElement = this._document.getElementById("console-input") as HTMLInputElement;
             consoleInputField.focus();
         }
         return;
+    }
+
+    /**
+     *  This callback is used as listener logic for the input field of the console GUI element. If "Enter" is pressed
+     *  a keyboard interrupt is fired and the console input gets disabled.
+     * @param event An object, which represents the event fired, whenever a key is pressed while focused on the console input field.
+     */
+    private readonly onKeyUpConsole: EventListenerOrEventListenerObject = async (event: Event): Promise<void> => {
+        const target: HTMLInputElement = event.target as HTMLInputElement;
+        const keyboardEvent: KeyboardEvent = event as KeyboardEvent;
+        const consoleContent: string = target.value;
+        if (keyboardEvent.key === 'Enter' && consoleContent.trim().length !== 0) {
+            target.disabled = true;
+            this._window.simulator.keyboardInterrupt();
+        }
     }
 
     /**
@@ -1057,6 +1072,7 @@ export class Renderer {
         const console = this._document.getElementById("console-input-container");
         if (console !== null) {
             console.addEventListener("click", this.onClickListenerConsole);
+            console.addEventListener("keyup", this.onKeyUpConsole);
         }
     }
 
@@ -1847,20 +1863,21 @@ export class Renderer {
 
     public async showConsole(): Promise<void> {
         const consoleSection: HTMLElement | null = document.getElementById("console-section");
-        const log: HTMLElement | null = document.getElementById("console");
-        if (consoleSection && log !== null) {
+        const console: HTMLElement | null = document.getElementById("console");
+        if (consoleSection && console !== null) {
             consoleSection.style.display = "block";
-            log.children.namedItem("console-input-container")!.scrollTop = log.children.namedItem("console-input-container")!.scrollHeight;
+            console.children.namedItem("console-input-container")!.scrollTop = console.children.namedItem("console-input-container")!.scrollHeight;
         }
         return;
     }
 
     public async updateConsole(message: string): Promise<void> {
         const consoleOutput: HTMLElement | null = document.getElementById("console-output");
-        if (consoleOutput !== null) {
+        const consoleInputContainer: HTMLElement | null = document.getElementById("console-input-container");
+        if (consoleOutput && consoleInputContainer !== null) {
             consoleOutput.insertAdjacentElement("beforeend", document.createElement("br"));
             consoleOutput.insertAdjacentText("beforeend", message);
-            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            consoleInputContainer.scrollTop = consoleInputContainer.scrollHeight;
         }
         return;
     }

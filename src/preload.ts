@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld("simulator", {
 		ipcRenderer.on("enable_auto_scroll_virtual_ram", () => callback()),
 	onEnableAutoScrollForPageTable: (callback: () => void) => 
 		ipcRenderer.on("enable_auto_scroll_page_table", () => callback()),
+	keyboardInterrupt: (consoleInput: string) =>
+		ipcRenderer.send("keyboard_interrupt", consoleInput),
 });
 
 contextBridge.exposeInMainWorld("windowUpdate", {

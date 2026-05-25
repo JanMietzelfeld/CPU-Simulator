@@ -23,10 +23,11 @@
 ;
 ; 0xFFFFF000 - 0xFFFFFFFF - interrupt stack     (4096 Bytes)                                        - 1 Page Frame
 ; 0xE0101000 - 0xFFFFFFFF - unused space
-; 0xE0100A03 - 0xE0100FFF - Padding             (4096 Entries - 1024*2 - 512 - 2 = 1535 Bytes)   \
-; 0xE0100A00 - 0xE0100A00 - Running process *PCB(4 Byte)                                          |
+; 0xE0100B04 - 0xE0100FFF - Padding             (4096 Entries - 1024*2 - 256*3 - 4 = 1276 Bytes)   \
+; 0xE0100A04 - 0xE0100B03 - Blocked Queue for IO(256 Entries * 1 Byte (pid size) = 256 Bytes)     |
+; 0xE0100A00 - 0xE0100A03 - Running process *PCB(4 Byte)                                          |
 ; 0xE0100900 - 0xE01009FF - Blocked Queue       (256 Entries * 1 Byte (pid size) = 256 Bytes)     | - 1     Page Frame
-; 0xE0100800 - 0xE01008FF - Wating Queue        (256 Entries * 1 Byte (pid size) = 256 Bytes)     | 
+; 0xE0100800 - 0xE01008FF - Waiting Queue       (256 Entries * 1 Byte (pid size) = 256 Bytes)     | 
 ; 0xE0100400 - 0xE01007FF - Interrupt Table     (256 Entries * 4 Bytes = 1 KiB)                   |
 ; 0xE0100000 - 0xE01003FF - PCB Table Mapping   (256 Entries * 4 Bytes = 1 KiB)                  /
 ; 0xE00C0000 - 0xE00FFFFF - PCB List            (256 Entries * 1 KiB = 256 KiB)                     - 64    Page Frames
@@ -123,7 +124,8 @@
 ; | 0x20 - 0x20 Timer           - Hardware interupts |
 ; | 0x21 - 0x7F Unused          - Hardware interupts |
 ; | 0x80 - 0x80 System Calls    - Software interupt  | External interrupts (224)
-; | 0x81 - 0xFF Unused          - Hardware interupts |
+; | 0x81 - 0x81 Keyboard        - Hardware interrupt |
+; | 0x82 - 0xFF Unused          - Hardware interupts |
 ; |--------------------------------------------------|
 ;
 ;

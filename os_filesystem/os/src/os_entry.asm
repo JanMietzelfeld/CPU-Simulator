@@ -47,7 +47,8 @@ JMP _OS_ENTRY ; start of the os
     ; ---------------------------------------
     ; 0x20 - 0x7F Unused                    |
     ; 0x80 - 0x80 System Calls              | External interrupts (224)
-    ; 0x81 - 0xFF Unused                    |
+    ; 0x81 - 0x81 Keyboard                  |
+    ; 0x82 - 0xFF Unused                    |
 
     
     ; --- Set up the CPU exceptions---
@@ -85,6 +86,11 @@ JMP _OS_ENTRY ; start of the os
     MOV %itp, %eax
     ADD $0x200, %eax ; Interrupt Nummber 0x80 * 4 Bytes = 0x200
     MOV INTERRUPTS_SYSCALLS, *%eax
+
+    ; Set up the ISR for 0x81 Keyboard interrupt
+    MOV %itp, %eax
+    ADD $0x204, %eax ; Interrupt number 0x81 * 4 Bytes = 204
+    MOV INTERRUPTS_KEYBOARD, *%eax
 
     ; --- Finished with the External interrupts---
 
