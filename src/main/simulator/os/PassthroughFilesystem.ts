@@ -252,9 +252,17 @@ export class PassthroughFilesystem {
         return [num, 0];
     }
 
+    /**
+     * This method converts a string into a Uint8Array and adds it to the internal io buffer.
+     * If the io buffer gets bigger than 20 entries, then the oldest entry gets removed.
+     * @param line String from the console that gets added to the internal io buffer.
+     */
     public pushStdinBuffer(line: string): void {
         const utf8Encoder = new TextEncoder();
         const encodedString: Uint8Array = utf8Encoder.encode(line);
+        if (this.stdin_console_buffer.length > 20) {
+            this.stdin_console_buffer.shift();
+        }
         this.stdin_console_buffer.push(encodedString);
     }
 }

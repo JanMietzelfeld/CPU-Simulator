@@ -986,8 +986,8 @@ export class Renderer {
         const keyboardEvent: KeyboardEvent = event as KeyboardEvent;
         const consoleContent: string = target.value;
         if (keyboardEvent.key === 'Enter' && consoleContent.trim().length !== 0) {
-            target.disabled = true;
-            this._window.simulator.keyboardInterrupt();
+            this._window.simulator.keyboardInterrupt(target.value);
+            target.value= "";
         }
     }
 
