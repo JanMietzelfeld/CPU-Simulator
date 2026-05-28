@@ -1,7 +1,7 @@
 /**
  * An enum representing all the registers and their binary codes.
  */
-export const enum RegisterNumbers {
+export enum RegisterNumbers {
 	EAX =   0b00000000,
 	EBX =   0b00000001,
 	ECX =   0b00000010,

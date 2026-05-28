@@ -31,6 +31,6 @@ export class Instruction {
 	}
 
 	public get operandCount(): number {
-		return this.operand1 == null ? 0 : this.operand2 == null ? 1 : 2;
+		return this.operand1 === null ? 0 : this.operand2 === null ? 1 : 2;
 	}
 }
