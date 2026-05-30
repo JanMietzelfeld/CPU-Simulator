@@ -46,10 +46,14 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
         let decodedFirstOperand: InstructionOperand | null;
         let decodedSecondOperand: InstructionOperand | null;
 
+        let addPaddingForFirstOperand = false;
+        let addPaddingForSecondOperand = false
+
         switch (decodedFirstOperandType) {
             case EncodedOperandTypes.PADDING:
                 decodedFirstOperandType ^= 0b1000; 
                 i++;
+                addPaddingForFirstOperand = true;
                 // fallthrough
             case EncodedOperandTypes.NO:
                 decodedFirstOperand = null;
@@ -72,6 +76,9 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
                     program[i+1]
                 );
                 i++;
+                if (decodedFirstOperand.value < 256) {
+                    addPaddingForFirstOperand = true;
+                }
                 break;
             case EncodedOperandTypes.EXTERNAL_REGISTER_DIRECT:
             case EncodedOperandTypes.EXTERNAL_REGISTER_INDIRECT:
@@ -81,6 +88,9 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
                     program[i+1]
                 );
                 i++;
+                if (decodedFirstOperand.value < 256) {
+                    addPaddingForFirstOperand = true;
+                }
                 break;
             default:
                 decodedFirstOperand = null;
@@ -91,6 +101,7 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
             case EncodedOperandTypes.PADDING:
                 decodedSecondOperandType ^= 0b1000; 
                 i++
+                addPaddingForSecondOperand = true;
                 // fallthrough
             case EncodedOperandTypes.NO:
                 decodedSecondOperand = null;
@@ -113,6 +124,9 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
                     program[i+1]
                 );
                 i++;
+                if (decodedSecondOperand.value < 256) {
+                    addPaddingForSecondOperand = true;
+                }
                 break;
             case EncodedOperandTypes.EXTERNAL_REGISTER_DIRECT:
             case EncodedOperandTypes.EXTERNAL_REGISTER_INDIRECT:
@@ -122,6 +136,9 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
                     program[i+1]
                 );
                 i++;
+                if (decodedSecondOperand.value < 256) {
+                    addPaddingForSecondOperand = true;
+                }
                 break;
             default:
                 decodedSecondOperand = null;
@@ -160,6 +177,16 @@ export function disassemble(program: DoubleWord[], startAddress: number = 0): st
         }
             
         disassembledCode += "\n";
+
+        if (addPaddingForFirstOperand)
+        {
+            disassembledCode += "NOP\n";
+        }
+
+        if (addPaddingForSecondOperand)
+        {
+            disassembledCode += "NOP\n";
+        }
     }
 
     return disassembledCode;

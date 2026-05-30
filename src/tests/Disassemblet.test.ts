@@ -48,6 +48,7 @@ describe('Disassemble program', () => {
 SUB $0x1, %EAX
 CMP $0x0, %EAX
 JG @0x4
+NOP
 MOV $0x12345678, %EDX
 MOV $0x11, %EAX
 INT $0x80
