@@ -215,7 +215,8 @@ export class PassthroughFilesystem {
     }
 
     public console_print_number(num: number) {
-        getMainWindow()?.webContents.send('update_console', num.toString(10));
+        const signedNumber: number = num | 0;
+        getMainWindow()?.webContents.send('update_console', signedNumber.toString(10));
     }
 
     public console_read_number(): [number, number] {
