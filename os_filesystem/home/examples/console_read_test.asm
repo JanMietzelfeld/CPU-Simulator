@@ -42,13 +42,6 @@ MOV $CONST_SYSCALL_FILE_WRITE, %eax
 INT $0x80
 
 
-
-
-
-
-
-
-
 ; exit the process
 MOV $CONST_SYSCALL_PROCESS_EXIT, %eax
 INT $0x80

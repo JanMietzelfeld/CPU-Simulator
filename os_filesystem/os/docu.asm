@@ -159,7 +159,7 @@
 ; file_create = 6
 ; file_delete = 7
 ; console_print_number = 8
-; console_print_number = 9
+; console_read_number = 9
 ;
 ; 10-15 unused
 ;
