@@ -680,7 +680,7 @@ export class Assembler {
 			// Register used with direct addressing mode
 			operand32BitEncoded = this.encodeRegister(operand.replace("%", ""), line);
 		} else {
-			throw Error(`In line ${line + 1}: Unrecognized operand type and value.`);
+			throw Error(`In line ${line + 1}: Unrecognized operand type and value. Caused by: ` + operand);
 		}
 		return operand32BitEncoded;
 	}

@@ -97,6 +97,7 @@
 ; Runnung    has the id 1
 ; Waiting    has the id 2
 ; Blocked    has the id 3
+; IO Blocked has the id 4
 ;
 ;
 ; Process ID (pid) definition

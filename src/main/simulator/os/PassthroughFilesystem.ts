@@ -38,7 +38,6 @@ export class PassthroughFilesystem {
         }
         accessSync(path, constants.R_OK | constants.W_OK);
         this.path = path;
-
     }
 
     public io_seek(fd: number, offset: number, mode: number): number {
