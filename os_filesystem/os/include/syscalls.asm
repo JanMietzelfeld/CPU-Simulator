@@ -61,7 +61,14 @@
     ;   (ebx)     Pointer to a ASCII filename
     ; Return value (immediate value):
     ;   eax     success status (0 = success, -1 = file did not exist)
-    .CONST CONST_SYSCALL_FILE_DELETE 7    
+    .CONST CONST_SYSCALL_FILE_DELETE 7
+
+    ; SYSCALLS_CONSOLE_PRINT_NUMBER
+    ; Parameters (ebx is used as immediate value):
+    ;   ebx     Number
+    ; Return value:
+    ;   none
+    .CONST CONST_SYSCALL_CONSOLE_PRINT_NUMBER 8
 
     ; SYSCALLS_PROCESS_CREATE
     ; Parameters (ebx is a pointer to the start of an ASCII filename):

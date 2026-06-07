@@ -102,6 +102,12 @@
     JMP _INTERRUPTS_SYSCALLS_END_SYSCALL
     ._INTERRUPTS_SYSCALLS_SKIP_SYSCALL_TIMER_START:
 
+    CMP $CONST_SYSCALL_CONSOLE_PRINT_NUMBER, %eax
+    JNE _INTERRUPTS_SYSCALLS_SKIP_SYSCALL_CONSOLE_PRINT_NUMBER
+    CALL SYSCALLS_CONSOLE_PRINT_NUMBER_WITH_ASSERTS
+    JMP _INTERRUPTS_SYSCALLS_END_SYSCALL
+    ._INTERRUPTS_SYSCALLS_SKIP_SYSCALL_CONSOLE_PRINT_NUMBER:
+
     ; invalid syscall
     ; terminat the process
     CALL SYSCALLS_PROCESS_EXIT
@@ -123,6 +129,7 @@
     .INCLUDE "os/src/interrupts/syscalls/file/seek"
     .INCLUDE "os/src/interrupts/syscalls/file/stat"
     .INCLUDE "os/src/interrupts/syscalls/file/write"
+    .INCLUDE "os/src/interrupts/syscalls/file/console_print_number"
     
     .INCLUDE "os/src/interrupts/syscalls/timer/start"
 

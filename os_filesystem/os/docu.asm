@@ -158,8 +158,10 @@
 ; file_seek = 5
 ; file_create = 6
 ; file_delete = 7
+; console_print_number = 8
+; console_print_number = 9
 ;
-; 8-15 unused
+; 10-15 unused
 ;
 ; process_create = 16
 ; process_exit = 17
