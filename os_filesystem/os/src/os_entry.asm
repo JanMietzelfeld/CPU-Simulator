@@ -81,6 +81,11 @@ JMP _OS_ENTRY ; start of the os
     ADD $0x80, %eax ; Interrupt Nummber 0x20 * 4 Bytes = 0x80
     MOV INTERRUPTS_TIMER, *%eax
 
+    ; Set up the ISR for 0x21 (Periodic Timer)
+    MOC %itp, %eax
+    ADD $0x84, %eax ; Interrupt Number 0x21 * 4 Bytes = 0x84
+    MOV INTERRUPTS_PERIODIC_TIMER, *%eax
+
     ; Set up the ISR for 0x80 (System Calls)
     MOV %itp, %eax
     ADD $0x200, %eax ; Interrupt Nummber 0x80 * 4 Bytes = 0x200
