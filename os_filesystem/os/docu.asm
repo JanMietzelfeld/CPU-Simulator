@@ -74,8 +74,8 @@
 ;
 ; Process Control Block layout (1KiB) 0x000 - 0x3FF
 ; 0x200 - 0x3FF kernel stack  (512 bytes)
-; 0x03F - 0x1FF unused;
-; 0x03E - 0x03E time slice counter (max 255)
+; 0x040 - 0x1FF unused;
+; 0x03E - 0x03F time slice counter
 ; 0x03A - 0x03D flags         (4 bytes) \
 ; 0x036 - 0x039 esp           (4 bytes) |
 ; 0x032 - 0x035 eip           (4 bytes) |
