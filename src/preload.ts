@@ -65,16 +65,8 @@ contextBridge.exposeInMainWorld("simulator", {
 		ipcRenderer.on("assembled_program", (_event, filePath: string[]) => callback(filePath)),
 	onError: (callback: (errorDescription: string) => void) => 
 		ipcRenderer.on("on_error", (_event, errorDescription: string) => callback(errorDescription)),
-	onDisableAutoScrollForPhysicalRAM: (callback: () => void) => 
-		ipcRenderer.on("disable_auto_scroll_physical_ram", () => callback()),
-	onDisableAutoScrollForVirtualRAM: (callback: () => void) => 
-		ipcRenderer.on("disable_auto_scroll_virtual_ram", () => callback()),
 	onDisableAutoScrollForPageTable: (callback: () => void) => 
 		ipcRenderer.on("disable_auto_scroll_page_table", () => callback()),
-	onEnableAutoScrollForPhysicalRAM: (callback: () => void) => 
-		ipcRenderer.on("enable_auto_scroll_physical_ram", () => callback()),
-	onEnableAutoScrollForVirtualRAM: (callback: () => void) => 
-		ipcRenderer.on("enable_auto_scroll_virtual_ram", () => callback()),
 	onEnableAutoScrollForPageTable: (callback: () => void) => 
 		ipcRenderer.on("enable_auto_scroll_page_table", () => callback()),
 });

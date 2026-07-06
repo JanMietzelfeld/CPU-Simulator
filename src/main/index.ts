@@ -94,48 +94,6 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 					label: "Behavior",
 					submenu: [
 						{
-							label: "Physical RAM",
-							submenu : [
-								{
-									label: "Disable Auto Scroll",
-									click() {
-										if (simulator.autoScrollForPhysicalRAMEnabled) {
-											win.webContents.send("disable_auto_scroll_physical_ram");
-										}
-									}
-								},
-								{
-									label: "Enable Auto Scroll",
-									click() {
-										if (!simulator.autoScrollForPhysicalRAMEnabled) {
-											win.webContents.send("enable_auto_scroll_physical_ram");
-										}
-									}
-								}
-							]
-						},
-						{
-							label: "Virtual RAM",
-							submenu : [
-								{
-									label: "Disable Auto Scroll",
-									click() {
-										if (simulator.autoScrollForVirtualRAMEnabled) {
-											win.webContents.send("disable_auto_scroll_virtual_ram");
-										}
-									}
-								},
-								{
-									label: "Enable Auto Scroll",
-									click() {
-										if (!simulator.autoScrollForVirtualRAMEnabled) {
-											win.webContents.send("enable_auto_scroll_virtual_ram");
-										}
-									}
-								}
-							]
-						},
-						{
 							label: "RAM",
 							submenu : [
 								{
@@ -574,30 +532,6 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 				win.webContents.send("error", error.message);
 			}
 		}
-	});
-
-	ipcMain.removeHandler("on_disable_auto_scroll_physical_ram");
-	ipcMain.handle("on_disable_auto_scroll_physical_ram", async (): Promise<void> => {
-		simulator.autoScrollForPhysicalRAMEnabled = false;
-		return;
-	});
-
-	ipcMain.removeHandler("on_ensable_auto_scroll_physical_ram");
-	ipcMain.handle("on_ensable_auto_scroll_physical_ram", async (): Promise<void> => {
-		simulator.autoScrollForPhysicalRAMEnabled = true;
-		return;
-	});
-
-	ipcMain.removeHandler("on_disable_auto_scroll_virtual_ram");
-	ipcMain.handle("on_disable_auto_scroll_virtual_ram", async (): Promise<void> => {
-		simulator.autoScrollForVirtualRAMEnabled = false;
-		return;
-	});
-
-	ipcMain.removeHandler("on_ensable_auto_scroll_virtual_ram");
-	ipcMain.handle("on_ensable_auto_scroll_virtual_ram", async (): Promise<void> => {
-		simulator.autoScrollForVirtualRAMEnabled = true;
-		return;
 	});
 
 	ipcMain.removeHandler("on_disable_auto_scroll_page_table");

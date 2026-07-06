@@ -26,8 +26,6 @@ window.onload = async () => {
 	renderer.registerChangeListener();
 	renderer.registerClickListener();
 	renderer.registerRAMSearchListener();
-	renderer.createPhysicalRAMView();
-	renderer.createVirtualRAMView();
 	renderer.registerAddressRangeBoxListener();
 	renderer.registerDetailedRamViewSelectElement();
 
@@ -47,8 +45,6 @@ window.onload = async () => {
 
 window.simulator.onLoadedAssemblyProgram(async () => {
 	renderer.programLoaded = true;
-	await renderer.reloadPhysicalRAMView();
-	await renderer.createVirtualRAMView();
 	// TODO: Fix bug!
 	// await renderer.createPageTableView();
 	await renderer.readEAX(renderer.dataRepresentationEAX);
@@ -76,29 +72,8 @@ window.simulator.onError((errorDescription: string) => {
 	alert(errorDescription);
 });
 
-window.simulator.onDisableAutoScrollForPhysicalRAM(() => {
-	renderer.autoScrollForPhysicalRAMEnabled = false;
-	return;
-});
-
-window.simulator.onDisableAutoScrollForVirtualRAM(() => {
-	renderer.autoScrollForVirtualRAMEnabled = false;
-	return;
-});
-
-
 window.simulator.onDisableAutoScrollForPageTable(() => {
 	renderer.autoScrollForPageTableEnabled = false;
-	return;
-});
-
-window.simulator.onEnableAutoScrollForPhysicalRAM(() => {
-	renderer.autoScrollForPhysicalRAMEnabled = true;
-	return;
-});
-
-window.simulator.onEnableAutoScrollForVirtualRAM(() => {
-	renderer.autoScrollForVirtualRAMEnabled = true;
 	return;
 });
 

@@ -208,18 +208,6 @@ export class Renderer {
     public dataRepresentationRAMSearch: NumberSystem;
 
     /**
-     * This field is used to observe the visibility of the GUI elements representing cells of the physical RAM.
-     * @readonly
-     */
-    private readonly _physicalRAMObserver: IntersectionObserver;
-
-    /**
-     * This field is used to observe the visibility of the GUI elements representing cells of the virtual RAM.
-     * @readonly
-     */
-    private readonly _virtualRAMObserver: IntersectionObserver;
-
-    /**
      * This field is used to observe the visibility of the GUI elements representing Page Table entries.
      */
     private readonly _pageTableObserver: IntersectionObserver;
@@ -258,126 +246,6 @@ export class Renderer {
      * This field stores the memory end address from the input box in the detailed RAM view.
      */
     public ramViewEndAddress: number;
-
-    /**
-     * This field stores a callback used to observe the HTMLElements representing the cells of the pyhsical RAM.
-     * @param entries A list of elements, which triggered the intersection observer. 
-     * @returns A callback, which is used as the logic to perform whenever elements enter or leave the observed viewspace.
-     */
-    private readonly _physicalRAMObserverCallback: IntersectionObserverCallback = async (entries: IntersectionObserverEntry[]) => {
-        const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("physical-ram-cells");
-        if (!ramCellsHTMLElement) {
-            return;
-        }
-        for (const entry of entries) {
-            if (entry.isIntersecting && entry.rootBounds !== null) {
-                // Element enters viewport. Calculate the direction from which the element is entering the viewport.
-                const fromTop: number = entry.intersectionRect.top;
-                const fromBottom: number = entry.rootBounds.height - entry.intersectionRect.bottom;
-                // Make entered element visible.
-                entry.target.classList.remove("invisible");
-                // Check if element enters from top of viewport.
-                if (entry.target.isEqualNode(ramCellsHTMLElement.firstElementChild) && fromTop < fromBottom) {
-                    // Element is scrolling in from top of viewport and is the first child node of the HTMLElement representing the RAM view.
-                    // Insert element and a preceding element at the front of the list.
-                    const physicalAddressHexString: string = entry.target.getAttribute("data-physical-address")!;
-                    const nextHigherPhysicalAddressDec: number = parseInt(physicalAddressHexString, 16) + 1;
-                    if (nextHigherPhysicalAddressDec >= Math.pow(2, 32)) {
-                        return;
-                    }
-                    const binaryContent: number = await this._window.mainMemory.readFromPhysicalMemory(nextHigherPhysicalAddressDec);
-                    const element: Element = this.createPhysicalRAMGuiElement("0x" + nextHigherPhysicalAddressDec.toString(16), binaryContent.toString(2).padStart(8, "0"));
-                    this._physicalRAMObserver.observe(element);
-                    ramCellsHTMLElement.insertBefore(element, ramCellsHTMLElement.firstElementChild);
-                    this._listOfVisiblePhysicalRAMGuiElements.unshift(element);
-                    this._physicalRAMObserver.unobserve(ramCellsHTMLElement.lastElementChild!);
-                    this._listOfVisiblePhysicalRAMGuiElements.splice(this._listOfVisiblePhysicalRAMGuiElements.indexOf(ramCellsHTMLElement.lastElementChild!), 1);
-                    ramCellsHTMLElement.removeChild(ramCellsHTMLElement.lastElementChild!);
-                }
-                // Check if element enters from bottom of viewport.
-                if (entry.target.isEqualNode(ramCellsHTMLElement.lastElementChild) && fromTop > fromBottom) {
-                    // Element is scrolling in from bottom of viewport and is the last child node of the HTMLElement representing the RAM view.
-                    // Insert element at the end of the list.
-                    const physicalAddressHexString: string = entry.target.getAttribute("data-physical-address")!;
-                    const nextLowerPhysicalAddressDec: number = parseInt(physicalAddressHexString, 16) - 1;
-                    if (nextLowerPhysicalAddressDec < 0) {
-                        return;
-                    }
-                    const binaryContent: number = await this._window.mainMemory.readFromPhysicalMemory(nextLowerPhysicalAddressDec);
-                    const element: Element = this.createPhysicalRAMGuiElement("0x" + nextLowerPhysicalAddressDec.toString(16), binaryContent.toString(2).padStart(8, "0"));
-                    this._physicalRAMObserver.observe(element);
-                    ramCellsHTMLElement.appendChild(element);
-                    this._listOfVisiblePhysicalRAMGuiElements.push(element);
-                    this._physicalRAMObserver.unobserve(ramCellsHTMLElement.firstElementChild!);
-                    this._listOfVisiblePhysicalRAMGuiElements.splice(this._listOfVisiblePhysicalRAMGuiElements.indexOf(ramCellsHTMLElement.firstElementChild!), 1);
-                    ramCellsHTMLElement.removeChild(ramCellsHTMLElement.firstElementChild!);
-                }
-            } else {
-                // Element not in the viewport.
-                entry.target.classList.add("invisible");
-            }
-        }
-    }
-
-    /**
-     * This field stores a callback used to observe the HTMLElements representing the cells of the pyhsical RAM.
-     * @param entries A list of elements, which triggered the intersection observer. 
-     * @returns A callback, which is used as the logic to perform whenever elements enter or leave the observed viewspace.
-     */
-    private readonly _virtualRAMObserverCallback: IntersectionObserverCallback = async (entries: IntersectionObserverEntry[]) => {
-        const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("virtual-ram-cells");
-        if (!ramCellsHTMLElement) {
-            return;
-        }
-        for (const entry of entries) {
-            if (entry.isIntersecting && entry.rootBounds !== null) {
-                // Element enters viewport. Calculate the direction from which the element is entering the viewport.
-                const fromTop: number = entry.intersectionRect.top;
-                const fromBottom: number = entry.rootBounds.height - entry.intersectionRect.bottom;
-                // Make entered element visible.
-                entry.target.classList.remove("invisible");
-                // Check if element enters from top of viewport.
-                if (entry.target.isEqualNode(ramCellsHTMLElement.firstElementChild) && fromTop < fromBottom) {
-                    // Element is scrolling in from top of viewport and is the first child node of the HTMLElement representing the RAM view.
-                    // Insert element and a preceding element at the front of the list.
-                    const virtualAddressHexString: string = entry.target.getAttribute("data-virtual-address")!;
-                    const nextHigherVirtualAddressDec: number = parseInt(virtualAddressHexString, 16) + 1;
-                    if (nextHigherVirtualAddressDec >= Math.pow(2, 32)) {
-                        return;
-                    }
-                    const binaryContent: number | undefined = await this._window.mainMemory.readFromVirtualMemory(nextHigherVirtualAddressDec);
-                    const element: Element = this.createVirtualRAMGuiElement("0x" + nextHigherVirtualAddressDec.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
-                    this._virtualRAMObserver.observe(element);
-                    ramCellsHTMLElement.insertBefore(element, ramCellsHTMLElement.firstElementChild);
-                    this._listOfVisibleVirtualRAMGuiElements.unshift(element);
-                    this._virtualRAMObserver.unobserve(ramCellsHTMLElement.lastElementChild!);
-                    this._listOfVisibleVirtualRAMGuiElements.splice(this._listOfVisibleVirtualRAMGuiElements.indexOf(ramCellsHTMLElement.lastElementChild!), 1);
-                    ramCellsHTMLElement.removeChild(ramCellsHTMLElement.lastElementChild!);
-                }
-                // Check if element enters from bottom of viewport.
-                if (entry.target.isEqualNode(ramCellsHTMLElement.lastElementChild) && fromTop > fromBottom) {
-                    // Element is scrolling in from bottom of viewport and is the last child node of the HTMLElement representing the RAM view.
-                    // Insert element at the end of the list.
-                    const virtualAddressHexString: string = entry.target.getAttribute("data-virtual-address")!;
-                    const nextLowerVirtualAddressDec: number = parseInt(virtualAddressHexString, 16) - 1;
-                    if (nextLowerVirtualAddressDec < 0) {
-                        return;
-                    }
-                    const binaryContent: number | undefined = await this._window.mainMemory.readFromVirtualMemory(nextLowerVirtualAddressDec);
-                    const element: Element = this.createVirtualRAMGuiElement("0x" + nextLowerVirtualAddressDec.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
-                    this._virtualRAMObserver.observe(element);
-                    ramCellsHTMLElement.appendChild(element);
-                    this._listOfVisibleVirtualRAMGuiElements.push(element);
-                    this._virtualRAMObserver.unobserve(ramCellsHTMLElement.firstElementChild!);
-                    this._listOfVisibleVirtualRAMGuiElements.splice(this._listOfVisibleVirtualRAMGuiElements.indexOf(ramCellsHTMLElement.firstElementChild!), 1);
-                    ramCellsHTMLElement.removeChild(ramCellsHTMLElement.firstElementChild!);
-                }
-            } else {
-                // Element not in the viewport.
-                entry.target.classList.add("invisible");
-            }
-        }
-    }
 
     /**
      * This field stores a callback used to observe the GUI elements representing the entries of the Page Table.
@@ -467,7 +335,6 @@ export class Renderer {
                         this._pageTableObserver.observe(element);
                         pageTableEntriesHTMLElement.appendChild(element);
                         this._listOfVisiblePageTableEntries.push(element);
-                        this._virtualRAMObserver.unobserve(pageTableEntriesHTMLElement.firstElementChild!);
                         this._listOfVisiblePageTableEntries.splice(this._listOfVisiblePageTableEntries.indexOf(pageTableEntriesHTMLElement.firstElementChild!), 1);
                         pageTableEntriesHTMLElement.removeChild(pageTableEntriesHTMLElement.firstElementChild!);
                     }
@@ -1105,16 +972,6 @@ export class Renderer {
     }
 
     /**
-     * This field represents a flag, which enables automatic scroll for the GUIs virtual RAM widget.
-     */
-    public autoScrollForVirtualRAMEnabled: boolean;
-
-    /**
-     * This field represents a flag, which enables automatic scroll for the GUIs physical RAM widget.
-     */
-    public autoScrollForPhysicalRAMEnabled: boolean;
-
-    /**
      * This field represents a flag, which enables automatic scroll for the GUIs Page Table widget.
      */
     public autoScrollForPageTableEnabled: boolean;
@@ -1158,16 +1015,6 @@ export class Renderer {
         this.dataRepresentationVMPTR = NumberSystem.BIN;
         this._ramSearch = document.getElementById("ram-search");
         this.dataRepresentationRAMSearch = NumberSystem.HEX;
-        this._physicalRAMObserver = new IntersectionObserver(this._physicalRAMObserverCallback, {
-            root: null,             // Viewport is root element.
-            rootMargin: "0px",      // Margin for root element.
-            threshold: 0            // The element will be displayed, if it enters the rootMargin.
-        });
-        this._virtualRAMObserver = new IntersectionObserver(this._virtualRAMObserverCallback, {
-            root: null,             // Viewport is root element.
-            rootMargin: "0px",      // Margin for root element.
-            threshold: 0            // The element will be displayed, if it enters the rootMargin.
-        });
         this._pageTableObserver = new IntersectionObserver(this._pageTableObserverCallback, {
             root: null,             // Viewport is root element.
             rootMargin: "0px",      // Margin for root element.
@@ -1176,8 +1023,6 @@ export class Renderer {
         this._listOfVisiblePhysicalRAMGuiElements = new Array<Element>();
         this._listOfVisibleVirtualRAMGuiElements = new Array<Element>();
         this._listOfVisiblePageTableEntries = new Array<Element>();
-        this.autoScrollForPhysicalRAMEnabled = true;
-        this.autoScrollForVirtualRAMEnabled = true;
         this.autoScrollForPageTableEnabled = true;
         this.ramViewFollowEip = true;
         this.programLoaded = true;
@@ -1325,177 +1170,6 @@ export class Renderer {
             }
         }
         return;
-    }
-
-    /**
-     * This function reloads the RAM view, by taking the visible elements into account. This is done in order to avoid
-     * weird jumps in the widget, representing the physical main memory.
-     */
-    public async reloadPhysicalRAMView(): Promise<void> {
-        const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("physical-ram-cells");
-        if (!ramCellsHTMLElement) {
-            return;
-        }
-        if (ramCellsHTMLElement.innerText !== "") {
-            ramCellsHTMLElement.innerText = "";
-            // Disconnect obersever, which results in no element beeing observed. 
-            this._physicalRAMObserver.disconnect();
-        }
-        // Read physical memory address from the last element, which should have the lowest visible memory address.
-        const firstPhysicalAddressToRead: number =
-            parseInt(this._listOfVisiblePhysicalRAMGuiElements.at(this._listOfVisiblePhysicalRAMGuiElements.length - 1)!.getAttribute("data-physical-address")!, 16);
-        // Read physical memory address from the first element, which should have the highest visible memory adress.
-        const lastPhysicalAddressToRead: number = parseInt(this._listOfVisiblePhysicalRAMGuiElements.at(0)!.getAttribute("data-physical-address")!, 16);
-        const ramCells: Map<number, number> =
-            await this._window.mainMemory.readRangeFromPhysicalMemory(firstPhysicalAddressToRead, lastPhysicalAddressToRead);
-        for (const [physicalAddress, binaryContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createPhysicalRAMGuiElement("0x" + physicalAddress.toString(16), binaryContent.toString(2).padStart(8, "0"));
-            ramCellsHTMLElement.appendChild(element);
-            this._listOfVisiblePhysicalRAMGuiElements.push(element);
-            this._physicalRAMObserver.observe(element);
-        }
-        // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-physical-address="${"0x" + firstPhysicalAddressToRead.toString(16)}"]`)!.scrollIntoView();
-        return;
-    }
-
-    /**
-     * This function reloads the RAM view, by taking the visible elements into account. This is done in order to avoid
-     * weird jumps in the widget, representing the virtual main memory.
-     */
-    public async reloadVirtualRAMView(): Promise<void> {
-        const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("virtual-ram-cells");
-        if (!ramCellsHTMLElement) {
-            return;
-        }
-        if (ramCellsHTMLElement.innerText !== "") {
-            ramCellsHTMLElement.innerText = "";
-            // Disconnect obersever, which results in no element beeing observed. 
-            this._virtualRAMObserver.disconnect();
-        }
-        // Read physical memory address from the last element, which should have the lowest visible memory address.
-        const firstVirtualAddressToRead: number =
-            parseInt(this._listOfVisibleVirtualRAMGuiElements.at(this._listOfVisibleVirtualRAMGuiElements.length - 1)!.getAttribute("data-virtual-address")!, 16);
-        // Read physical memory address from the first element, which should have the highest visible memory adress.
-        const lastVirtualAddressToRead: number = parseInt(this._listOfVisibleVirtualRAMGuiElements.at(0)!.getAttribute("data-virtual-address")!, 16);
-        const ramCells: Map<number, number | undefined> =
-            await this._window.mainMemory.readRangeFromVirtualMemory(firstVirtualAddressToRead, lastVirtualAddressToRead);
-        for (const [virtualAddress, binaryContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createVirtualRAMGuiElement("0x" + virtualAddress.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
-            ramCellsHTMLElement.appendChild(element);
-            this._listOfVisibleVirtualRAMGuiElements.push(element);
-            this._virtualRAMObserver.observe(element);
-        }
-        // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-virtual-address="${"0x" + firstVirtualAddressToRead.toString(16)}"]`)!.scrollIntoView();
-        return;
-    }
-
-    /**
-     * This method initializes the view of the physical RAM by reading the first twenty
-     * entries of the main memory and creating HTMLElements, which represents the individual 
-     * RAM cells.
-     * @param [firstPhysicalAddressToReadHex=0x0] The first physical memory address to read from main memory in hexadecimal representation.
-     * @param [lastPhysicalAddressToReadHex=0x1e] The last physical memory address to read from main memory in hexadecimal representation.
-     */
-    public async createPhysicalRAMView(firstPhysicalAddressToReadHex = 0x0, lastPhysicalAddressToReadHex = 0x1e): Promise<void> {
-        const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("physical-ram-cells");
-        if (!ramCellsHTMLElement) {
-            return;
-        }
-        if (ramCellsHTMLElement.innerText !== "") {
-            ramCellsHTMLElement.innerText = "";
-            // Disconnect obersever, which results in no element beeing observed. 
-            this._physicalRAMObserver.disconnect();
-            this._listOfVisiblePhysicalRAMGuiElements = new Array<Element>();
-        }
-        const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(firstPhysicalAddressToReadHex, lastPhysicalAddressToReadHex);
-        for (const [physicalAddress, binaryContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createPhysicalRAMGuiElement("0x" + physicalAddress.toString(16), binaryContent.toString(2).padStart(8, "0"));
-            ramCellsHTMLElement.appendChild(element);
-            this._listOfVisiblePhysicalRAMGuiElements.push(element);
-            this._physicalRAMObserver.observe(element);
-        }
-        // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-physical-address="${"0x" + firstPhysicalAddressToReadHex.toString(16)}"]`)!.scrollIntoView();
-        return;
-    }
-
-    /**
-     * This method initializes the view of the virtual RAM by reading the first twenty entries of the main memory 
-     * and creating HTMLElements, which represents the individual RAM cells.
-     * @param [firstVirtualAddressToReadHex=0x0] The first virtual memory address to read from main memory in hexadecimal representation.
-     * @param [lastVirtualAddressToReadHex=0x1e] The last virtual memory address to read from main memory in hexadecimal representation.
-     */
-    public async createVirtualRAMView(firstVirtualAddressToReadHex = 0x0, lastVirtualAddressToReadHex = 0x1e): Promise<void> {
-        const ramCellsHTMLElement: HTMLElement | null = this._document.getElementById("virtual-ram-cells");
-        if (!ramCellsHTMLElement) {
-            return;
-        }
-        if (ramCellsHTMLElement.innerText !== "") {
-            ramCellsHTMLElement.innerText = "";
-            // Disconnect obersever, which results in no element beeing observed. 
-            this._virtualRAMObserver.disconnect();
-            this._listOfVisibleVirtualRAMGuiElements = new Array<Element>();
-        }
-        const ramCells: Map<number, number | undefined> = await this._window.mainMemory.readRangeFromVirtualMemory(firstVirtualAddressToReadHex, lastVirtualAddressToReadHex);
-        for (const [virtualAddress, binaryContent] of Array.from(ramCells).reverse()) {
-            const element: HTMLElement = this.createVirtualRAMGuiElement("0x" +  virtualAddress.toString(16), binaryContent === undefined ? "Not Mapped" : binaryContent.toString(2).padStart(8, "0"));
-            ramCellsHTMLElement.appendChild(element);
-            this._listOfVisibleVirtualRAMGuiElements.push(element);
-            this._virtualRAMObserver.observe(element);
-        }
-        // Jump to lowest available address to prevent endless scrolling.
-        this._document.querySelector(`[data-virtual-address="${"0x" + firstVirtualAddressToReadHex.toString(16)}"]`)!.scrollIntoView();
-        return;
-    }
-
-    /**
-     * This method creates an HTMLElement representing a physical RAM cell. This element consist out of a label with the 
-     * pyhsical memory address and the binary content of the main memory at this address.
-     * @param physicalAddressHexString The physical memory address of the RAM cell.
-     * @param binaryStringContent The binary content of this RAM cell.
-     * @returns A HTMLElement representing a RAM cell.
-     */
-    public createPhysicalRAMGuiElement(physicalAddressHexString: string, binaryStringContent: string): HTMLElement {
-        const outerDivElement: HTMLElement = this._document.createElement("div");
-        outerDivElement.setAttribute("class", "ram-cell widget");
-        outerDivElement.setAttribute("id", `physical-ram-cell-${physicalAddressHexString}`);
-        outerDivElement.setAttribute("data-physical-address", physicalAddressHexString);
-        const labelDivElement: HTMLElement = this._document.createElement("label");
-        labelDivElement.setAttribute("class", "lg-text");
-        labelDivElement.innerHTML = physicalAddressHexString;
-        const contendivivElement: HTMLElement = this._document.createElement("div");
-        contendivivElement.setAttribute("class", "ram-cell-content");
-        contendivivElement.setAttribute("name", "ram-cell-content");
-        contendivivElement.innerText = binaryStringContent;
-        outerDivElement.appendChild(labelDivElement);
-        outerDivElement.appendChild(contendivivElement);
-        return outerDivElement;
-    }
-
-    /**
-     * This method creates an HTMLElement representing a virtual RAM cell. This element consist out of a label with the 
-     * pyhsical memory address and the binary content of the main memory at this address.
-     * @param virtualAddressHexString The virtual memory address of the RAM cell.
-     * @param binaryStringContent The binary content of this RAM cell.
-     * @returns A HTMLElement representing a RAM cell.
-     */
-    public createVirtualRAMGuiElement(virtualAddressHexString: string, binaryStringContent: string): HTMLElement {
-        const outerDivElement: HTMLElement = this._document.createElement("div");
-        outerDivElement.setAttribute("class", "ram-cell widget");
-        outerDivElement.setAttribute("id", `virtual-ram-cell-${virtualAddressHexString}`);
-        outerDivElement.setAttribute("data-virtual-address", virtualAddressHexString);
-        const labelDivElement: HTMLElement = this._document.createElement("label");
-        labelDivElement.setAttribute("class", "lg-text");
-        labelDivElement.innerHTML = virtualAddressHexString;
-        const contendivivElement: HTMLElement = this._document.createElement("div");
-        contendivivElement.setAttribute("class", "ram-cell-content");
-        contendivivElement.setAttribute("name", "ram-cell-content");
-        contendivivElement.innerText = binaryStringContent;
-        outerDivElement.appendChild(labelDivElement);
-        outerDivElement.appendChild(contendivivElement);
-        return outerDivElement;
     }
 
     /**
@@ -1821,131 +1495,15 @@ export class Renderer {
     }
 
     /**
-     * This method jumps to a virtual memory address and highlights the GUI element in the "Virtual RAM" view representing the memory address.
-     * @param ramAddress The virtual memory address to highlight and scroll to.
-     * @param dataRepresentationRegister The number system the memory address is represented in.
-     */
-    public async jumpToVirtualRamElement(ramAddress: string, dataRepresentationRegister: NumberSystem): Promise<void> {
-        let virtualAddressHexString = "";
-        if (dataRepresentationRegister === NumberSystem.HEX) {
-            virtualAddressHexString = ramAddress;
-        } else if (dataRepresentationRegister === NumberSystem.DEC) {
-            virtualAddressHexString = `0x${parseInt(ramAddress, 10).toString(16)}`;
-        } else {
-            ramAddress = ramAddress.replace(/[\s]+/g, "");
-            virtualAddressHexString = `0x${parseInt(ramAddress, 2).toString(16)}`;
-        }
-        // Remove CSS class "highlighted" from any other HTML element(s).
-        for (const element of this._document.querySelectorAll(`div[data-physical-address]`)) {
-            if (element.classList.contains("highlighted")) {
-                element.classList.remove("highlighted");
-            }
-        }
-        for (const element of this._document.querySelectorAll(`div[data-virtual-address]`)) {
-            if (element.classList.contains("highlighted")) {
-                element.classList.remove("highlighted");
-            }
-        }
-        // Find HTML element representing the loaded virtual memory address.
-        let element: Element | null = this._document.querySelector<Element>(`[data-virtual-address="${virtualAddressHexString}"]`);
-        /**
-         *  Check if automatic scroll for the virtual memory widget is enabled.
-         */
-        if (this.autoScrollForVirtualRAMEnabled && this.programLoaded) {
-            // Check if a GUI element, representing a virtual memory address, is currently present in the document
-            if (element === null) {
-                // Element is not present in document. Load it (alongside 30 addresses above and beneath) into the document.
-                let firstVirtualAddressToReadDec: number = parseInt(virtualAddressHexString, 16) - 15;
-                let lastVirtualAddressToReadDec: number = parseInt(virtualAddressHexString, 16) + 14;
-                if (firstVirtualAddressToReadDec <= 0) {
-                    firstVirtualAddressToReadDec = 0;
-                }
-                if (lastVirtualAddressToReadDec >= Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC) {
-                    lastVirtualAddressToReadDec = Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC;
-                }
-                await this.createVirtualRAMView(firstVirtualAddressToReadDec, lastVirtualAddressToReadDec);
-                element = this._document.querySelector<Element>(`[data-virtual-address="${virtualAddressHexString}"]`);
-            }
-            if (element !== null) {
-                // Scroll this element into view.
-                element.scrollIntoView();
-            }
-        }
-        if (element !== null) {
-            // Emphesize this element.
-            element.classList.add("highlighted");
-        }
-    }
-
-    /**
-     * This method jumps to a physical memory address and highlights the GUI element in the "Physical RAM" view representing the memory address.
-     * @param ramAddress The physical memory address to highlight and scroll to.
-     * @param dataRepresentationRegister The number system the memory address is represented in.
-     */
-    public async jumpToPhysicalRamElement(ramAddress: string, dataRepresentationRegister: NumberSystem): Promise<void> {
-        let physicalAddressHexString = "";
-        if (dataRepresentationRegister === NumberSystem.HEX) {
-            physicalAddressHexString = ramAddress;
-        } else if (dataRepresentationRegister === NumberSystem.DEC) {
-            physicalAddressHexString = `0x${parseInt(ramAddress, 10).toString(16)}`;
-        } else {
-            ramAddress = ramAddress.replace(/[\s]+/g, "");
-            physicalAddressHexString = `0x${parseInt(ramAddress, 2).toString(16)}`;
-        }
-        // Remove CSS class "highlighted" from any other HTML element(s).
-        for (const element of this._document.querySelectorAll(`div[data-physical-address]`)) {
-            if (element.classList.contains("highlighted")) {
-                element.classList.remove("highlighted");
-            }
-        }
-        for (const element of this._document.querySelectorAll(`div[data-virtual-address]`)) {
-            if (element.classList.contains("highlighted")) {
-                element.classList.remove("highlighted");
-            }
-        }
-        // Find HTML element representing the loaded physical memory address.
-        let element: Element | null = this._document.querySelector<Element>(`[data-physical-address="${physicalAddressHexString}"]`);
-        /**
-         *  Check if automatic scroll for the physical memory widget is enabled.
-         */
-        if (this.autoScrollForPhysicalRAMEnabled) {
-            // Check if a GUI element, representing a physical memory address, is currently present in the document
-            if (element === null) {
-                // Element is not present in document. Load it (alongside 30 addresses above and beneath) into the document.
-                let firstPhysicalAddressToReadDec: number = parseInt(physicalAddressHexString, 16) - 15;
-                let lastPhysicalAddressToReadDec: number = parseInt(physicalAddressHexString, 16) + 14;
-                if (firstPhysicalAddressToReadDec <= 0) {
-                    firstPhysicalAddressToReadDec = 0;
-                }
-                if (lastPhysicalAddressToReadDec >= Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC) {
-                    lastPhysicalAddressToReadDec = Renderer.HIGH_ADDRESS_PHYSICAL_MEMORY_DEC;
-                }
-
-                await this.createPhysicalRAMView(firstPhysicalAddressToReadDec, lastPhysicalAddressToReadDec);
-                element = this._document.querySelector<Element>(`[data-physical-address="${physicalAddressHexString}"]`);
-            }
-            if (element !== null) {
-                // Scroll this element into view.
-                element.scrollIntoView();
-            }
-        }
-        if (element !== null) {
-            // Emphesize this element.
-            element.classList.add("highlighted");
-        }
-    }
-
-    /**
      * This method reads the content of the EIP register.
      */
     public async readEIP(radix: NumberSystem): Promise<void> {
         const content: string = await this._window.simulator.readEIP(radix);
         const hexContent: string = await this._window.simulator.readEIP(NumberSystem.HEX);
-        const physicalAddress: DoubleWord = await this._window.mainMemory.translateVirtualAddress(DoubleWord.fromNumber(Number(hexContent)));
         if (this._eip !== null) {
             this._eip.children.namedItem("register-content")!.textContent = content;
             if (this.ramViewFollowEip) {
-                await this.highlightRamElement(physicalAddress);
+                await this.highlightRamElement(Number(hexContent), true);
             }
         }
         return;
@@ -1962,8 +1520,6 @@ export class Renderer {
         if (!await this._window.simulator.nextCycle()) {
             //alert("Programm finished execution.");
         }
-        await this.reloadPhysicalRAMView();
-        await this.reloadVirtualRAMView();
         // TODO: Fix bug!
         // await this.reloadPageTableView();
         await this.readEAX(this.dataRepresentationEAX);
