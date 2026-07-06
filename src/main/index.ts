@@ -136,6 +136,23 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 							]
 						},
 						{
+							label: "RAM",
+							submenu : [
+								{
+									label: "Disable EIP Follow",
+									click() {
+										win.webContents.send("disable_ram_view_follow_eip");
+									}
+								},
+								{
+									label: "Enable EIP Follow",
+									click() {
+										win.webContents.send("enable_ram_view_follow_eip");
+									}
+								}
+							]
+						},
+						{
 							label: "Page Table",
 							submenu : [
 								{

@@ -107,6 +107,16 @@ window.simulator.onEnableAutoScrollForPageTable(() => {
 	return;
 });
 
+window.windowUpdate.onEnableRamFollowEip(() => {
+	renderer.ramViewFollowEip = true;
+	return;
+})
+
+window.windowUpdate.onDisableRamFollowEip(() => {
+	renderer.ramViewFollowEip = false;
+	return;
+})
+
 window.windowUpdate.onClearLog(() => {
 	renderer.clearLog();
 });

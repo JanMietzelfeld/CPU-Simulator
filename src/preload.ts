@@ -88,4 +88,8 @@ contextBridge.exposeInMainWorld("windowUpdate", {
 		ipcRenderer.on("hide_log", () => callback()),
 	onShowLog: (callback: () => void) =>
 		ipcRenderer.on("show_log", () => callback()),
+	onEnableRamFollowEip: (callback: () => void) => 
+		ipcRenderer.on("enable_ram_view_follow_eip", () => callback()),
+	onDisableRamFollowEip: (callback: () => void) => 
+		ipcRenderer.on("disable_ram_view_follow_eip", () => callback()),
 })

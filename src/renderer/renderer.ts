@@ -1120,6 +1120,11 @@ export class Renderer {
     public autoScrollForPageTableEnabled: boolean;
 
     /**
+     * This field represents a flag, which enables the RAM Gui element to track the virtual address of the EIP.
+     */
+    public ramViewFollowEip: boolean;
+
+    /**
      * Constructs an instance with the given HTML document associated.
      * @param document A reference to an HTML document.
      * @param window A reference to the browser "window".
@@ -1174,6 +1179,7 @@ export class Renderer {
         this.autoScrollForPhysicalRAMEnabled = true;
         this.autoScrollForVirtualRAMEnabled = true;
         this.autoScrollForPageTableEnabled = true;
+        this.ramViewFollowEip = true;
         this.programLoaded = true;
         this._window = window;
         this.ramDataRepresentation = "BIN";
@@ -1808,8 +1814,6 @@ export class Renderer {
         this.ramViewEndAddress = endAddress;
         const targetAddressIndex: number = await this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress, physicalAddress);
         const rowIndex = this.ramDataRepresentation === "ASCII" ? targetAddressIndex : blocksBefore;
-        console.log(rowIndex + " index")
-        console.log(targetAddressIndex + " target address index")
         const tableRow = tableBody.rows[rowIndex];
         for (const cell of tableRow.cells) {
             cell.classList.add("highlighted");
@@ -1940,10 +1944,9 @@ export class Renderer {
         const physicalAddress: DoubleWord = await this._window.mainMemory.translateVirtualAddress(DoubleWord.fromNumber(Number(hexContent)));
         if (this._eip !== null) {
             this._eip.children.namedItem("register-content")!.textContent = content;
-            console.log(hexContent + " hex content")
-            console.log(parseInt(hexContent, 16) + " parsed hex content")
-            await this.highlightRamElement(physicalAddress);
-            
+            if (this.ramViewFollowEip) {
+                await this.highlightRamElement(physicalAddress);
+            }
         }
         return;
     }
@@ -1977,7 +1980,9 @@ export class Renderer {
         await this.readITP(this.dataRepresentationITP);
         await this.readNPTP(this.dataRepresentationNPTP);
         await this.readVMPTR(this.dataRepresentationVMPTR);
-        //await this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress);
+        if (!this.ramViewFollowEip) {
+            await this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress);
+        }
         return;
     }
 
