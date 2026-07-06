@@ -260,7 +260,7 @@ export class PassthroughFilesystem {
     public pushStdinBuffer(line: string): void {
         const utf8Encoder = new TextEncoder();
         const encodedString: Uint8Array = utf8Encoder.encode(line);
-        if (this.stdin_console_buffer.length > 20) {
+        if (this.stdin_console_buffer.length > 255) {
             this.stdin_console_buffer.shift();
         }
         this.stdin_console_buffer.push(encodedString);
