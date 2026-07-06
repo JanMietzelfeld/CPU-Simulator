@@ -309,6 +309,24 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		return byte;
 	});
 
+	ipcMain.removeHandler("readDoubleWordFromPhysicalMemory");
+	ipcMain.handle("readDoubleWordFromPhysicalMemory", async (event: Electron.IpcMainInvokeEvent, physicalAddress: DoubleWord): Promise<DoubleWord> => {
+		const doubleWord: DoubleWord = simulator.mainMemory.readDoublewordFrom(physicalAddress);
+		return doubleWord;
+	});
+
+	ipcMain.removeHandler("findVirtualAddresses");
+	ipcMain.handle("findVirtualAddresses", async (event: Electron.IpcMainInvokeEvent, physicalAddress: DoubleWord): Promise<DoubleWord[]> => {
+		const virtualAddresses: DoubleWord[] = simulator.core.mmu.findVirtualFromPhysical(physicalAddress);
+		return virtualAddresses;
+	});
+
+	ipcMain.removeHandler("translateVirtualAddress");
+	ipcMain.handle("translateVirtualAddress", async (event: Electron.IpcMainInvokeEvent, virtualAddress: DoubleWord): Promise<DoubleWord> => {
+		const physicalAddress: DoubleWord = simulator.core.mmu.translate(virtualAddress, false, false, true, true);
+		return physicalAddress;
+	});
+
 	ipcMain.removeHandler("readRangeFromVirtualMemory");
 	ipcMain.handle("readRangeFromVirtualMemory", async (event: Electron.IpcMainInvokeEvent, fromVirtualAddress: DoubleWord, toVirtualAddress: DoubleWord): Promise<Map<DoubleWord, Byte | undefined>> => {
 		const tmp: Map<DoubleWord, Byte | undefined> = new Map<DoubleWord, Byte | undefined>();

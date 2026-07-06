@@ -28,6 +28,8 @@ window.onload = async () => {
 	renderer.registerRAMSearchListener();
 	renderer.createPhysicalRAMView();
 	renderer.createVirtualRAMView();
+	renderer.registerAddressRangeBoxListener();
+	renderer.registerDetailedRamViewSelectElement();
 
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);

@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld("mainMemory", {
 		ipcRenderer.invoke("readRangeFromPhysicalMemory", fromPhysicalAddress, toPhysicalAddress),
 	readFromPhysicalMemory: (physicalAddress: DoubleWord): Promise<Byte> => 
 		ipcRenderer.invoke("readFromPhysicalMemory", physicalAddress),
+	readDoubleWordFromPhysicalMemory: (physicalAddress: DoubleWord): Promise<DoubleWord> =>
+		ipcRenderer.invoke("readDoubleWordFromPhysicalMemory", physicalAddress),
+	findVirtualAddresses: (physicalAddress: DoubleWord): Promise<DoubleWord[]> =>
+		ipcRenderer.invoke("findVirtualAddresses", physicalAddress),
+	translateVirtualAddress: (virtualAddress: DoubleWord): Promise<DoubleWord> =>
+		ipcRenderer.invoke("translateVirtualAddress", virtualAddress),
 	readRangeFromVirtualMemory: (fromVirtualAddress: DoubleWord, toVirtualAddress: DoubleWord): Promise<Map<DoubleWord, Byte | undefined>> => 
 		ipcRenderer.invoke("readRangeFromVirtualMemory", fromVirtualAddress, toVirtualAddress),
 	readFromVirtualMemory: (virtualAddress: DoubleWord): Promise<Byte | undefined> => 

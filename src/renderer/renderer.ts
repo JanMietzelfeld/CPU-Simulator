@@ -1,3 +1,13 @@
+import { DoubleWord } from "../types/binary/DoubleWord";
+import { Byte } from "../types/binary/Byte";
+import { Instructions } from "../types/enumerations/IntructionSet";
+import { InstructionTypes } from "../types/enumerations/InstructionTypes";
+import { OperandTypes } from "../types/enumerations/OperandTypes";
+import { RegisterNumbers } from "../types/enumerations/RegisterNumbers";
+import { AddressingModes } from "../types/enumerations/AdressingModes";
+import { InterruptNumbers } from "../types/enumerations/InterruptNumbers";
+import { DevOperations } from "../types/enumerations/DevOperations";
+
 /**
  * This enumeration is a duplicate of the one, that can be
  * found in src/types/types.ts. This is intended, as imports
@@ -228,6 +238,26 @@ export class Renderer {
      * This field stores a list with all visible GUI elements associated with the widget of the Page Table.
      */
     private _listOfVisiblePageTableEntries: Array<Element>;
+
+    /**
+     * This field stores the currently selected data representation for the detailed RAM view, dictating how the byte data gets interpreted.
+     */
+    public ramDataRepresentation: string;
+
+    /**
+     * This field stores the currently selected block size for the detailed RAM view, dictating how many bytes per row are shown.
+     */
+    public ramBlockSize: number;
+
+    /**
+     * This field stores the memory start address from the input box in the detailed RAM view.
+     */
+    public ramViewStartAddress: number;
+
+    /**
+     * This field stores the memory end address from the input box in the detailed RAM view.
+     */
+    public ramViewEndAddress: number;
 
     /**
      * This field stores a callback used to observe the HTMLElements representing the cells of the pyhsical RAM.
@@ -771,6 +801,59 @@ export class Renderer {
         return;
     }
 
+
+    /**
+     * This callback is used as the change listener logic for the select element that controls the byte display format for the RAM display element
+     * @param event An object, which represents the event fired, whenever a change occurs on the <select> element contained in the GUI element.
+     */
+    private readonly onChangeListenerRamByteRepresentation: EventListenerOrEventListenerObject = (event: Event): void => {
+        const target: HTMLSelectElement = event.target as HTMLSelectElement;
+        const parent: HTMLElement | null = target.parentElement;
+        const ramBlockSizeSelector: HTMLSelectElement = this._document.getElementById("ram-select-blocksize") as HTMLSelectElement;
+        if (parent !== null) {
+            const currentByteRepresentation: string = parent.getAttribute("data-representation")!;
+            const demandedByteRepresentation: string = target.value;
+            parent.setAttribute("data-representation", demandedByteRepresentation);
+            if (currentByteRepresentation === demandedByteRepresentation) {
+                return
+            }
+            this.ramDataRepresentation = demandedByteRepresentation;
+            const blockSizeDisable: boolean = (demandedByteRepresentation === "ASCII" || demandedByteRepresentation === "ASSEMBLY");
+            ramBlockSizeSelector.disabled = blockSizeDisable;
+            if (demandedByteRepresentation === "ASSEMBLY") {
+                this.ramBlockSize = 12;
+            } else {
+                const previousBlockSize: string = parent.getAttribute("block-size")!;
+                this.ramBlockSize = parseInt(previousBlockSize);
+            }
+            this.checkAddressRangeInput();
+            this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress);
+        }
+        return;
+    }
+
+    /**
+     * This callback is used as the change listener logic for the select element that controls the blocksize in the RAM display element.
+     * @param event An object, which represents the event fired, whenever a change occurs on the <select> element contained in the GUI element.
+     */
+    private readonly onChangeListenerRamBlockSize: EventListenerOrEventListenerObject = (event: Event): void => {
+        const target: HTMLSelectElement = event.target as HTMLSelectElement;
+        const parent: HTMLElement | null = target.parentElement;
+        if (parent !== null) {
+            const currentBlockSize: string = parent.getAttribute("block-size")!;
+            const demandedBlockSize: string = target.value;
+            parent.setAttribute("block-size", demandedBlockSize);
+            if (currentBlockSize === demandedBlockSize) {
+                return;
+            } else {
+                this.ramBlockSize = parseInt(demandedBlockSize);
+                this.checkAddressRangeInput();
+                this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress);
+            }
+        }
+        return;
+    }
+
     /**
      * This callback is used as the change listeners logic for the GUI element, which visualizes the RAM-Cell search module.
      * @param event An object, which represents the event fired, whenever a change occurs on the <select> element contained in the GUI element.
@@ -786,9 +869,11 @@ export class Renderer {
             if (currentLocation === demandedLocation) {
                 return;
             } else if (demandedLocation === "PHYSICAL") {
-                this.jumpToPhysicalRamElement(searchValue, this.dataRepresentationRAMSearch);
+                //this.jumpToPhysicalRamElement(searchValue, this.dataRepresentationRAMSearch);
+                this.highlightRamElement(Number(searchValue));
             } else {
-                this.jumpToVirtualRamElement(searchValue, this.dataRepresentationRAMSearch);
+                //this.jumpToVirtualRamElement(searchValue, this.dataRepresentationRAMSearch);
+                this.highlightRamElement(Number(searchValue), true);
             }
         }
         return;
@@ -817,12 +902,70 @@ export class Renderer {
             }
             const currentLocation = parent.getAttribute("search-location")!;
             if (currentLocation === "PHYSICAL") {
-                this.jumpToPhysicalRamElement(searchValue, this.dataRepresentationRAMSearch);
+                this.highlightRamElement(Number(searchValue));
             } else {
-                this.jumpToVirtualRamElement(searchValue, this.dataRepresentationRAMSearch);
+                this.highlightRamElement(Number(searchValue), true);
+                //this.jumpToVirtualRamElement(searchValue, this.dataRepresentationRAMSearch);
             }
         }
         return;
+    }
+
+
+    /**
+     * This callback is used as the keyup listener logic for the address range GUI element in the detailed ram view.
+     * @param event An object, which represents the event fired, whenever a change occurs on the <input> element contained in the GUI element.
+     */
+    private readonly onKeyUpAddressRangeBox: EventListenerOrEventListenerObject = (event: Event): void => {
+        const target: HTMLInputElement = event.target as HTMLInputElement;
+        
+        const keyboardEvent: KeyboardEvent = event as KeyboardEvent;
+        const regExAllowedChars = /^[0-9a-fA-Fx]+$/; 
+        //const memoryStartAddress: string = inputBoxStart.value;
+        //const memoryEndAddress: string = inputBoxEnd.value;
+        const isHex = regExAllowedChars.test(target.value);
+        if(!isHex) {
+            target.value = target.value.slice(0, -1);
+        }
+        if (keyboardEvent.key === 'Enter') {
+            this.checkAddressRangeInput();
+            this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress);
+        }
+    }
+
+    /**
+     * This method checks if the given values are valid for the address range input box in the detailed memory view window.
+     * If the format is valid and the end address is bigger than the start address, but the address range is not a multiple of the current block size,
+     * then the end address is rounded up to the next multiple.
+     * @param startAddress The address that will be used as the first memory address to display
+     * @param endAddress The address that will be used as the last memory address to display
+     * @returns Returns true or false depending on if the address range and format is valid
+     */
+    private checkAddressRangeInput(): void {
+        const inputBoxStart: HTMLInputElement = this._document.getElementById("ram-input-box-start") as HTMLInputElement;
+        const inputBoxEnd: HTMLInputElement = this._document.getElementById("ram-input-box-end") as HTMLInputElement;
+        const startAddress = inputBoxStart.value;
+        const endAddress = inputBoxEnd.value;
+        const regExEnter = /(0[x])?[a-fA-F0-9]+$/;
+        const inputStartValidFormat = regExEnter.test(startAddress);
+        const inputEndValidFormat = regExEnter.test(endAddress);
+        const startAddressDec = parseInt(startAddress,16);
+        const endAddressDec = parseInt(endAddress,16);
+        const addressRange = endAddressDec - startAddressDec;
+        if (inputStartValidFormat && inputEndValidFormat && startAddressDec <= endAddressDec) {
+            this.ramViewStartAddress = startAddressDec;
+            this.ramViewEndAddress = endAddressDec;
+            const addressRangeRest = (addressRange + 1) % this.ramBlockSize;
+            if (addressRangeRest !== 0) {
+                this.ramViewEndAddress = endAddressDec + (this.ramBlockSize - addressRangeRest);
+                inputBoxEnd.value = "0x" + this.ramViewEndAddress.toString(16);
+            }
+        } else {
+            inputBoxStart.value = "0x0";
+            inputBoxEnd.value = "0xb";
+            this.ramViewStartAddress = 0x0;
+            this.ramViewEndAddress = 0xb;
+        }
     }
 
     /**
@@ -834,9 +977,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readEAX(this.dataRepresentationEAX);
+            const content: string = await this._window.simulator.readEAX(NumberSystem.HEX);
             if (this._eax !== null) {
-                this.jumpToVirtualRamElement(content, this.dataRepresentationEAX);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -851,9 +994,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readEBX(this.dataRepresentationEBX);
+            const content: string = await this._window.simulator.readEBX(NumberSystem.HEX);
             if (this._ebx !== null) {
-                this.jumpToVirtualRamElement(content, this.dataRepresentationEBX);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -868,9 +1011,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readECX(this.dataRepresentationECX);
+            const content: string = await this._window.simulator.readECX(NumberSystem.HEX);
             if (this._ecx !== null) {
-                this.jumpToVirtualRamElement(content, this.dataRepresentationECX);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -885,9 +1028,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readEDX(this.dataRepresentationEDX);
+            const content: string = await this._window.simulator.readEDX(NumberSystem.HEX);
             if (this._edx !== null) {
-                this.jumpToVirtualRamElement(content, this.dataRepresentationEDX);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -902,9 +1045,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readESP(this.dataRepresentationESP);
+            const content: string = await this._window.simulator.readESP(NumberSystem.HEX);
             if (this._esp !== null) {
-                this.jumpToVirtualRamElement(content, this.dataRepresentationESP);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -919,9 +1062,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readEIP(this.dataRepresentationEIP);
+            const content: string = await this._window.simulator.readEIP(NumberSystem.HEX);
             if (this._eip !== null) {
-                this.jumpToVirtualRamElement(content, this.dataRepresentationEIP);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -936,9 +1079,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readITP(this.dataRepresentationITP);
+            const content: string = await this._window.simulator.readITP(NumberSystem.HEX);
             if (this._itp !== null) {
-                this.jumpToPhysicalRamElement(content, this.dataRepresentationITP);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -953,9 +1096,9 @@ export class Renderer {
         const parent: HTMLElement | null = target.parentElement;
         if (parent !== null) {
             if (target.getAttribute("name") === "register-select-representation") return;
-            const content: string = await this._window.simulator.readPTP(this.dataRepresentationPTP);
+            const content: string = await this._window.simulator.readPTP(NumberSystem.HEX);
             if (this._ptp !== null) {
-                this.jumpToPhysicalRamElement(content, this.dataRepresentationPTP);
+                this.highlightRamElement(Number(content));
             }
         } 
         return;
@@ -1033,6 +1176,31 @@ export class Renderer {
         this.autoScrollForPageTableEnabled = true;
         this.programLoaded = true;
         this._window = window;
+        this.ramDataRepresentation = "BIN";
+        this.ramBlockSize = 1;
+        this.ramViewStartAddress = 0x0;
+        this.ramViewEndAddress = 0xb;
+    }
+
+    /**
+     * This method registers all the listener for the address range box in the memory view window.
+     */
+    public registerAddressRangeBoxListener(): void {
+        const inputElementStart: HTMLInputElement = this._document.getElementById("ram-input-box-start") as HTMLInputElement;
+        const inputElementEnd: HTMLInputElement = this._document.getElementById("ram-input-box-end") as HTMLInputElement;
+
+        inputElementStart.addEventListener("keyup", this.onKeyUpAddressRangeBox);
+        inputElementEnd.addEventListener("keyup", this.onKeyUpAddressRangeBox);
+    }
+
+    /**
+     * This method registers all the listener for the control box that contains the settings for the RAM display element.
+     */
+    public registerDetailedRamViewSelectElement(): void {
+        const byteDataTypeSelect: HTMLSelectElement = this._document.getElementById("ram-select-byte-datatype") as HTMLSelectElement;
+        const blockSizeSelect: HTMLSelectElement = this._document.getElementById("ram-select-blocksize") as HTMLSelectElement;
+        byteDataTypeSelect.addEventListener("change", this.onChangeListenerRamByteRepresentation);
+        blockSizeSelect.addEventListener("change", this.onChangeListenerRamBlockSize);
     }
 
     /**
@@ -1611,6 +1779,44 @@ export class Renderer {
     }
 
     /**
+     * This method highlights a row in the RAM display element. If it is a virtual address it gets translated to a physical address first.
+     * @param targetAddress The target address to highlight.
+     * @param isVirtualAddress Is the target address a virtual address or a physical address.
+     */
+    public async highlightRamElement(targetAddress: number, isVirtualAddress: boolean = false): Promise<void> {
+        const inputBoxStart: HTMLInputElement = this._document.getElementById("ram-input-box-start") as HTMLInputElement;
+        const inputBoxEnd: HTMLInputElement = this._document.getElementById("ram-input-box-end") as HTMLInputElement;
+        const detailedRAMViewTable = this._document.getElementById("ram-table") as HTMLTableCellElement;
+        const tableBody = detailedRAMViewTable.getElementsByTagName('tbody')[0];
+        
+        let physicalAddress = targetAddress;
+        if (isVirtualAddress) {
+            physicalAddress = await this._window.mainMemory.translateVirtualAddress(DoubleWord.fromNumber(Number(targetAddress)));
+        }
+
+        const blocksBefore: number = this.ramDataRepresentation === "ASCII" ? 5 : Math.min(5, Math.floor(physicalAddress / this.ramBlockSize));
+        const blocksAfter: number = this.ramDataRepresentation === "ASCII" ? 12 : 6;
+
+        let startAddress = physicalAddress - (blocksBefore * this.ramBlockSize);
+        const endAddress = physicalAddress + (blocksAfter * this.ramBlockSize) - 1;
+        if (startAddress < 0) {
+            startAddress = 0;
+        }
+        inputBoxStart.value = "0x" + startAddress.toString(16);
+        inputBoxEnd.value = "0x" + endAddress.toString(16);
+        this.ramViewStartAddress = startAddress;
+        this.ramViewEndAddress = endAddress;
+        const targetAddressIndex: number = await this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress, physicalAddress);
+        const rowIndex = this.ramDataRepresentation === "ASCII" ? targetAddressIndex : blocksBefore;
+        console.log(rowIndex + " index")
+        console.log(targetAddressIndex + " target address index")
+        const tableRow = tableBody.rows[rowIndex];
+        for (const cell of tableRow.cells) {
+            cell.classList.add("highlighted");
+        }
+    }
+
+    /**
      * This method jumps to a virtual memory address and highlights the GUI element in the "Virtual RAM" view representing the memory address.
      * @param ramAddress The virtual memory address to highlight and scroll to.
      * @param dataRepresentationRegister The number system the memory address is represented in.
@@ -1730,9 +1936,14 @@ export class Renderer {
      */
     public async readEIP(radix: NumberSystem): Promise<void> {
         const content: string = await this._window.simulator.readEIP(radix);
+        const hexContent: string = await this._window.simulator.readEIP(NumberSystem.HEX);
+        const physicalAddress: DoubleWord = await this._window.mainMemory.translateVirtualAddress(DoubleWord.fromNumber(Number(hexContent)));
         if (this._eip !== null) {
             this._eip.children.namedItem("register-content")!.textContent = content;
-            this.jumpToVirtualRamElement(content, radix);
+            console.log(hexContent + " hex content")
+            console.log(parseInt(hexContent, 16) + " parsed hex content")
+            await this.highlightRamElement(physicalAddress);
+            
         }
         return;
     }
@@ -1766,12 +1977,11 @@ export class Renderer {
         await this.readITP(this.dataRepresentationITP);
         await this.readNPTP(this.dataRepresentationNPTP);
         await this.readVMPTR(this.dataRepresentationVMPTR);
+        //await this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress);
         return;
     }
 
 
-
-    
     public async clearLog(): Promise<void> {
         const log: HTMLElement | null = document.getElementById("log");
         if (log !== null) {
@@ -1811,4 +2021,313 @@ export class Renderer {
         }
         return;
     }
+
+    /**
+     * This method builds the table rows for the RAM display element, displaying the content as numerical values.
+     * @param physicalAddressStart The start address of the display range.
+     * @param physicalAddressEnd The end address of the display range.
+     * @param ramTableBody The table body element that is used to display the RAM view.
+     */
+    public async createRamViewRowsNumeric(physicalAddressStart: number, physicalAddressEnd: number, ramTableBody: HTMLTableSectionElement): Promise<void> {
+        let tableRow: HTMLTableRowElement = this._document.createElement("tr");     
+        let physicalAddressColumn = tableRow.insertCell();
+        let virtualAddressColumn = tableRow.insertCell();
+
+        const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
+
+        for (let [index,[physicalAddress, ramCellContent]] of Array.from(ramCells).entries()) {
+            //Create Byte cells in the row and fill with data.
+            const byteData = tableRow.insertCell();
+            switch (this.ramDataRepresentation) {
+                case "BIN":
+                    byteData.innerHTML = ramCellContent.toString(2).padStart(8, "0");
+                    break;
+                case "DEC":
+                    byteData.innerHTML = ramCellContent.toString(10);
+                    break;
+                case "HEX":
+                    byteData.innerHTML = `0x${ramCellContent.toString(16)}`;
+                    break;
+            }
+            
+            const virtualAddresses: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddress);
+            for (const virtualAddress of virtualAddresses) {
+                virtualAddressColumn.append(`0x${virtualAddress.toString(16)}`);
+                const rowBreak: HTMLBRElement = this._document.createElement("br");
+                virtualAddressColumn.appendChild(rowBreak);
+            }
+
+            //If one row is completed, depending on ram block size, push the row and create a new one.
+            if ((index + 1) % this.ramBlockSize === 0) {
+                const startAddressString: string = `0x${(physicalAddress - (this.ramBlockSize - 1)).toString(16)}`;
+                const endAddressString: string = `0x${physicalAddress.toString(16)}`;
+                if (this.ramBlockSize === 1) {
+                    physicalAddressColumn.innerHTML = endAddressString;
+                } else {
+                    physicalAddressColumn.innerHTML = `${startAddressString} - ${endAddressString}`;
+                }
+                ramTableBody.appendChild(tableRow);
+                tableRow = this._document.createElement("tr");
+                physicalAddressColumn = tableRow.insertCell();
+                virtualAddressColumn = tableRow.insertCell();
+            }
+        }
+    }
+
+    /**
+     * This method builds the table rows for the RAM display element, displaying the content as characters.
+     * @param physicalAddressStart The start address of the display range.
+     * @param physicalAddressEnd The end address of the display range.
+     * @param ramTableBody The table body element that is used to display the RAM view.
+     * @param targetAddress An address to find the row index for inside the table body.
+     * @returns The row index of the target address in the table body.
+     */
+    public async createRamViewRowsAscii(physicalAddressStart: number, physicalAddressEnd: number, ramTableBody: HTMLTableSectionElement, targetAddress: number = 0): Promise<number> {
+        const masks = [0b1000_0000, 0b1110_0000, 0b1111_0000, 0b1111_1000];
+        const templates = [0b0000_0000, 0b1100_0000, 0b1110_0000, 0b1111_0000];
+        const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
+        const ramContent = Uint8Array.from(ramCells.values());
+        const utf8decoder = new TextDecoder("UTF-8");
+        let targetAddressIndex:number = 0;
+        let characterCounter: number = 0;
+
+        for (let i = 0; i < ramContent.length;) {
+            const tableRow: HTMLTableRowElement = this._document.createElement("tr");
+            let characterSize = 1;
+            //Find out size of utf8 character in byte
+            for (let j = 0; j < 4; ++j) {
+                const charMasked = (ramContent[i] & masks[j]);
+                if (charMasked === templates[j]) {
+                    characterSize = (j +1);
+                    break;
+                }
+            }
+            const character = ramContent.slice(i, (i + characterSize));
+            const characterString = utf8decoder.decode(character);
+            const physicalAddressColumn = tableRow.insertCell();
+            const virtualAddressColumn = tableRow.insertCell();
+            if (characterSize === 1) {
+                if ((physicalAddressStart + i) === targetAddress) {
+                    targetAddressIndex = characterCounter;
+                }
+                ++characterCounter;
+                physicalAddressColumn.innerHTML = "0x" + (physicalAddressStart + i).toString(16);
+                const virtualAddresses: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
+                for (const virtualAddress of virtualAddresses) {
+                    virtualAddressColumn.append(`0x${virtualAddress.toString(16)}`);
+                    const rowBreak: HTMLBRElement = this._document.createElement("br");
+                    virtualAddressColumn.appendChild(rowBreak);
+                }
+            } else {
+                const address: number = (physicalAddressStart + i + (characterSize - 1));
+                const endAddress: number = address < physicalAddressEnd ? address : physicalAddressEnd;
+                const startAddress: number = physicalAddressStart + i;
+                physicalAddressColumn.innerHTML = `0x${(physicalAddressStart + i).toString(16)} - 0x${(endAddress).toString(16)}`;
+
+                const virtualAddressesStart: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
+                const VirtualAddressesEnd: DoubleWord[] = await this.reverseMemoryMapSearch(endAddress);
+                if (targetAddress >= startAddress && targetAddress <= endAddress) {
+                    targetAddressIndex = characterCounter;
+                }
+                ++characterCounter;
+                for (let i = 0; i < virtualAddressesStart.length; i++) {
+                    const virtualAddressFrom = "0x" + virtualAddressesStart[i].toString(16);
+                    const virtualAddressTo= "0x" + VirtualAddressesEnd[i].toString(16);
+                    virtualAddressColumn.append(virtualAddressFrom + " - " + virtualAddressTo);
+                    const rowBreak: HTMLBRElement = this._document.createElement("br");
+                    virtualAddressColumn.appendChild(rowBreak);
+                }
+            }            
+            const stringCell = tableRow.insertCell();
+            stringCell.innerHTML = characterString;
+            ramTableBody.appendChild(tableRow);
+            i += characterSize;
+        }
+        return targetAddressIndex;
+    }
+
+    /**
+     * This method builds the table rows for the RAM display element, displaying the content as assembly instructions
+     * @param physicalAddressStart The start address of the display range.
+     * @param physicalAddressEnd The end address of the display range.
+     * @param ramTableBody The table body element that is used to display the RAM view.
+     */
+    public async createRamViewRowsAssembly(physicalAddressStart: number, physicalAddressEnd: number, ramTableBody: HTMLTableSectionElement): Promise<void> {
+        const ramCells: Map<number, Byte> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
+        const ramContent: Array<Byte> = Array.from(ramCells.values());
+        for (let i = 0; i < ramContent.length;) {
+            const tableRow: HTMLTableRowElement = this._document.createElement("tr");
+            const binary = ramContent.slice(i, (i + this.ramBlockSize));
+            let instructionString = await this.getInstructionText(binary);
+
+            const physicalAddressColumn = tableRow.insertCell();
+            const virtualAddressColumn = tableRow.insertCell();
+            const assemblyInstruction = tableRow.insertCell();
+
+            const virtualAddressesStart: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
+            const VirtualAddressesEnd: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i + (this.ramBlockSize - 1));
+
+            for (let i = 0; i < virtualAddressesStart.length; i++) {
+                const virtualAddressFrom = "0x" + virtualAddressesStart[i].toString(16);
+                const virtualAddressTo= "0x" + VirtualAddressesEnd[i].toString(16);
+                virtualAddressColumn.append(virtualAddressFrom + " - " + virtualAddressTo);
+                const rowBreak: HTMLBRElement = this._document.createElement("br");
+                virtualAddressColumn.appendChild(rowBreak);
+            }
+
+            const addressFrom = "0x" + (physicalAddressStart + i).toString(16);
+            const addressTo = "0x" + (physicalAddressStart + i + (this.ramBlockSize - 1)).toString(16);
+            physicalAddressColumn.innerHTML = addressFrom + " - " + addressTo;
+            assemblyInstruction.innerHTML = instructionString;
+            ramTableBody.appendChild(tableRow);
+            i += this.ramBlockSize;
+        }
+    }
+
+    /**
+     * This method creates the table header for the RAM display.
+     * @param dataMode The data representation mode.
+     */
+    public createTableHeader(dataMode: string): void {
+        const detailedRAMViewTable = this._document.getElementById("ram-table") as HTMLTableCellElement;
+        const tableHead = detailedRAMViewTable.getElementsByTagName('thead')[0];
+        tableHead.innerHTML = "";
+        const tableRow = tableHead.insertRow();
+        const physicalAddressHead = tableRow.insertCell();
+        physicalAddressHead.innerHTML = "Physical Address";
+        const virtualAddressHead = tableRow.insertCell();
+        virtualAddressHead.innerHTML = "Virtual Address";
+
+        if (dataMode === "HEX" || dataMode === "BIN" || dataMode === "DEC") {
+            for (let i = 0; i < this.ramBlockSize; ++i) {
+                const byteHead = tableRow.insertCell();
+                byteHead.innerHTML = `Byte ${i}`;
+            }
+        } else if (dataMode === "ASCII") {
+            const characterHead = tableRow.insertCell();
+            characterHead.innerHTML = "Char"
+        } else if (dataMode === "ASSEMBLY") {
+            const instructionHead = tableRow.insertCell();
+            instructionHead.innerHTML = "Assembly Instruction";
+        }
+        
+    }
+
+    /**
+     * This method creates or updates the RAM view GUI element.
+     * @param physicalStartAddress The start address of the display range.
+     * @param physicalEndAddress The end address of the display range.
+     * @param targetAddress An address to find the row index for inside the table body.
+     * @returns The row index of the target address in the table body.
+     */
+    public async createUpdateDetailedRamViewTable(physicalStartAddress: number, physicalEndAddress: number, targetAddress: number = 0): Promise<number> {
+        const dataMode: string = this.ramDataRepresentation;
+        this.createTableHeader(dataMode);
+        const detailedRAMViewTable = this._document.getElementById("ram-table") as HTMLTableCellElement;
+        const tableBody = detailedRAMViewTable.getElementsByTagName('tbody')[0];
+        tableBody.innerHTML = "";
+        let targetAddressIndex: number = 0;
+
+        if (dataMode === "HEX" || dataMode === "BIN" || dataMode === "DEC") {
+            await this.createRamViewRowsNumeric(physicalStartAddress, physicalEndAddress,tableBody);
+        } else if (dataMode === "ASCII") {
+            targetAddressIndex = await this.createRamViewRowsAscii(physicalStartAddress, physicalEndAddress, tableBody, targetAddress);
+        } else if (dataMode === "ASSEMBLY") {
+            await this.createRamViewRowsAssembly(physicalStartAddress, physicalEndAddress, tableBody);
+        }
+        return targetAddressIndex;
+    }
+
+    /**
+     * This method translates assembly instructions back to the human readable format.
+     * @param instructions Assembly instructions in form of a byte array.
+     * @returns An array of human readable assembly instructions.
+     */
+    public async getInstructionText(instructions: Array<Byte>): Promise<string> {
+        const instruction = DoubleWord.fromBytes(instructions[0], instructions[1], instructions[2], instructions[3]);
+
+        const type: string = InstructionTypes[DoubleWord.getBitRange(instruction, 0, 3)];
+        const operation: string =  Instructions[DoubleWord.getBitRange(instruction, 5, 12)];
+
+        if (type === undefined || operation === undefined) {
+            return "UNKNOWN";
+        }
+        let assemblyString = operation;
+        
+        const addrModeFirstOp: number =  DoubleWord.getBitRange(instruction, 14, 16);
+        const firstOpType: number =  DoubleWord.getBitRange(instruction, 16, 23);
+
+        if (addrModeFirstOp === undefined || firstOpType === undefined) {
+            return "UNKNOWN";
+        } else if (firstOpType === OperandTypes.NO) {
+            return assemblyString;
+        }
+
+        const firstOperand = DoubleWord.fromBytes(instructions[4], instructions[5], instructions[6], instructions[7]);
+        
+        if (operation === "INT") {
+            assemblyString += " " + InterruptNumbers[firstOperand];
+        } else if (operation === "DEV") {
+            assemblyString += " " + DevOperations[firstOperand];
+        } else if (firstOpType === OperandTypes.IMMEDIATE ) {
+            assemblyString += " $0x" + firstOperand.toString(16);
+        } else if (firstOpType === OperandTypes.MEMORY_ADDRESS) {
+            assemblyString += " @0x" + firstOperand.toString(16);
+        } else {
+            const registerName: string = RegisterNumbers[firstOperand];
+            if (registerName === undefined) {
+                return "UNKNOWN"
+            }
+            if (addrModeFirstOp === AddressingModes.INDIRECT) {
+                assemblyString += " *%" + registerName;
+            } else {
+                assemblyString += " %" + registerName;
+            }
+        }
+        
+        const addrModeSecondOp: number =  DoubleWord.getBitRange(instruction, 23, 25);
+        const secondOpType: number =  DoubleWord.getBitRange(instruction, 25);
+
+        if (addrModeSecondOp === undefined || secondOpType === undefined) {
+            return "UNKNOWN";
+        } else if (secondOpType === OperandTypes.NO) {
+            return assemblyString;
+        }
+
+        const secondOperand = DoubleWord.fromBytes(instructions[8], instructions[9], instructions[10], instructions[11]);
+        
+        if (secondOpType === OperandTypes.IMMEDIATE ) {
+            assemblyString += ", $0x" + secondOperand.toString(16);
+        } else if (secondOpType === OperandTypes.MEMORY_ADDRESS) {
+            assemblyString += ", @0x" + secondOperand.toString(16);
+        } else {
+            const registerName: string = RegisterNumbers[secondOperand];
+            if (registerName === undefined) {
+                return "UNKNOWN"
+            }
+            if (addrModeSecondOp === AddressingModes.INDIRECT) {
+                assemblyString += ", *%" + registerName;
+            } else {
+                assemblyString += ", %" + registerName;
+            }
+        }
+        
+        return assemblyString;
+    }
+
+    /**
+     * This method searches through the reverse memory map inside the MMU and finds all virtual memory addresses that map to a physical memory address.
+     * @param physicalAddress The physical memory address to find all virtual memory addresses for that map to that physical memory address.
+     * @returns An array of double words representing virtual memory addresses.
+     */
+    public async reverseMemoryMapSearch(physicalAddress: number): Promise<DoubleWord[]> {
+        const kernelSpaceStart: number = 0xC0000000;
+        const kernelSpaceEnd: number = 0xFFFFFFFF;
+        const virtualAddresses: DoubleWord[] = await this._window.mainMemory.findVirtualAddresses(DoubleWord.fromNumber(physicalAddress));
+        if (physicalAddress <= kernelSpaceEnd && physicalAddress >= kernelSpaceStart) {
+            virtualAddresses.push(DoubleWord.fromNumber(physicalAddress));
+        }
+        return virtualAddresses;
+    }
+
 }

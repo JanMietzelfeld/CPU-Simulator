@@ -23,6 +23,29 @@
                             <option value="VIRTUAL">Virtual RAM</option>
                         </select>
                 </div>
+                <div class="control-module" id="ram-address-range-box">
+                    <div class="lg-text">Start Address</div>
+                    <input type="text" class="ram-searchfield" id="ram-input-box-start" value="0x0" maxlength="10">
+                    <div class="lg-text">End Address</div>
+                    <input type="text" class="ram-searchfield" id="ram-input-box-end" value="0xb" maxlength="10">
+                </div>
+                <div class="control-module" id="ram-representation-box" data-representation="BIN" block-size="1">
+                    <div class="lg-text">RAM Presentation</div>
+                    <div class="sm-text subtitle">Byte Representation</div>
+                    <select id="ram-select-byte-datatype" title="Switch for Byte Representation">
+                        <option selected value="BIN">Binary</option>
+                        <option value="HEX">Hexadecimal</option>
+                        <option value="DEC">Decimal</option>
+                        <option value="ASCII">ASCII</option>
+                        <option value="ASSEMBLY">Assembly</option>
+                    </select>
+                    <div class="sm-text subtitle">Bytes per Line</div>
+                    <select id="ram-select-blocksize" title="Switch for changing number of bytes per line">
+                        <option selected value="1">One</option>
+                        <option value="2">Two</option>
+                        <option value="4">Four</option>
+                    </select>
+                </div>
             </menu>
         </header>
         <main>
@@ -184,6 +207,17 @@
                     </div>
                 </section>
                 <section class="virtual-ram">
+                    <table id="ram-table">
+                        <thead>
+                            
+                        </thead>
+                        <tbody>
+                        
+                        </tbody>
+                    </table>
+                </section>
+                <!--
+                <section class="virtual-ram">
                     <h1 class="header sticky-top">Virtual RAM</h1>
                     <div class="ram-cells" id="virtual-ram-cells" class="flex-col">
                     </div>
@@ -193,6 +227,7 @@
                     <div class="ram-cells" id="physical-ram-cells" class="flex-col">
                     </div>
                 </section>
+                -->
             </div>
             <div class="output">
                 <section class="logging" id="log-section">
