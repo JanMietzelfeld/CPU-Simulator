@@ -535,15 +535,15 @@ export class Assembler {
 		const encodedInstructions: DoubleWord[] = [];
 		let bufferEncoded = false;
 		const bufferStartAddress: string = bufferAddress.replace(/^0b/gim, "");
-		const bufferMemSize = Math.ceil(bufferSize / 4) * 4;
-
+		const bufferDoubleWordSize = Math.ceil(bufferSize / 4);
+		const bufferMemSize = bufferDoubleWordSize * 4;
 		//The memory address after the string array with the next instruction
 		const jumpAddress:string = (parseInt(bufferStartAddress, 2) + bufferMemSize).toString(2);
 		const jumpInstruction:string = "JMP @0b" + jumpAddress;
 		const encodedInstruction: DoubleWord[] = this.encodeLine(-1, jumpInstruction, jumpLabels);
 		encodedInstructions.push(...encodedInstruction);
 		//Create empty double words to reserve space for the buffer
-		for (let i = 0; i < bufferMemSize; ++i) {
+		for (let i = 0; i < bufferDoubleWordSize; ++i) {
 			encodedInstructions.push(DoubleWord.fromNumber(0));
 		}
 

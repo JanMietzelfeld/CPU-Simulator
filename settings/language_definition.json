@@ -50,7 +50,7 @@
         },
         {
             "name" : "EIR",
-            "conde" : "0101"
+            "code" : "0101"
         },
         {
             "name" : "ESP",
