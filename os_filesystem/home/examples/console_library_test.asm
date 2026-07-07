@@ -12,6 +12,9 @@ MOV $test, %ebx
 MOV $4, %eax ; number of bytes to write 
 CALL console_write_string ; write to console
 
+CALL console_read_number; read number from console
+MOV %eax, %ebx
+CALL console_write_number
 
 ; exit the process
 MOV $CONST_SYSCALL_PROCESS_EXIT, %eax

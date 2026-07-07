@@ -1,6 +1,7 @@
 .INCLUDE "os/include/syscalls"
 
 JMP skipLibrary
+
 ;   Parameters:
 ;       eax     amount of bytes to read from the console
 ;       ebx     pointer to buffer
@@ -38,6 +39,25 @@ JMP skipLibrary
     MOV %esp, %ecx
     ADD $12, %ecx
     MOV %ecx, %esp ; Restore stack pointer
+    RET
+
+; Parameters:
+;   none
+; Return value:
+;   eax     Number
+;   ebx success status (0 = success, -1 = no input ready, -2 = could not parse number, -3 = number does not fit into 32 bit DoubleWord)
+.console_read_number:
+    MOV $CONST_SYSCALL_CONSOLE_READ_NUMBER, %eax
+    INT $0x80 ; Trigger interrupt for syscall
+    RET
+
+; Parameters (ebx is used as immediate value):
+;   ebx     Number
+; Return value:
+;   none
+.console_write_number:
+    MOV $CONST_SYSCALL_CONSOLE_PRINT_NUMBER, %eax
+    INT $0x80
     RET
 
 .skipLibrary:
