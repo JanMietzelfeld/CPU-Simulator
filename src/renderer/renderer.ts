@@ -984,9 +984,12 @@ export class Renderer {
     private readonly onKeyUpConsole: EventListenerOrEventListenerObject = async (event: Event): Promise<void> => {
         const target: HTMLInputElement = event.target as HTMLInputElement;
         const keyboardEvent: KeyboardEvent = event as KeyboardEvent;
-        const consoleContent: string = target.value;
-        if (keyboardEvent.key === 'Enter' && consoleContent.trim().length !== 0) {
-            this._window.simulator.keyboardInterrupt(target.value);
+        const consoleContent: string = target.value.trim();
+        if (keyboardEvent.key === 'Enter' && consoleContent.length !== 0) {
+            const lines = consoleContent.split(/\\n/);
+            for (const line of lines) {
+                this._window.simulator.keyboardInterrupt(line.trim());
+            }
             target.value= "";
         }
     }
