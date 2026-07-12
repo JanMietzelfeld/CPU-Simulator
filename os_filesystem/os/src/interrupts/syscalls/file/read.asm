@@ -35,6 +35,15 @@
 
     JG _SYSCALLS_FILE_READ_FILE
 
+    PUSH %ebx
+    DEV $CONST_DEV_COMMAND_CONSOLE_BUFFER_STATUS, $0
+    MOV %ebx, %eax
+    POP %ebx
+
+    CMP $0, %eax
+    JG _SYSCALLS_FILE_READ_FILE
+
+
     MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
     MOV *%eax, %eax;
 

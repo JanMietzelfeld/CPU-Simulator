@@ -265,4 +265,38 @@ export class PassthroughFilesystem {
         }
         this.stdin_console_buffer.push(encodedString);
     }
+
+    /**
+     * This method counts how many strings are currently in the input buffer.
+     * Since numbers are also counted as strings, the function just returns the size of the input buffer.
+     * @returns The number of strings that are currently in the input buffer.
+     */
+    public getStdinBufferStringCount(): number {
+        return this.stdin_console_buffer.length;
+    }
+
+    /**
+     * This method counts how many numbers are currently in the input buffer.
+     * @returns The amount of numbers in the input buffer.
+     */
+    public getStdinBufferNumberCount(): number {
+        if (this.stdin_console_buffer.length === 0) {
+            return 0;
+        }
+
+        let stdin_console_buffer_index = 0;
+        let numberCount: number = 0;
+        const utf8Decoder = new TextDecoder('UTF-8');
+
+        while (stdin_console_buffer_index < this.stdin_console_buffer.length) {
+            let num: number = NaN;
+            const line = this.stdin_console_buffer[stdin_console_buffer_index];
+            num = Number(utf8Decoder.decode(line));
+            if (!isNaN(num)) {
+                ++numberCount;
+            }
+            ++stdin_console_buffer_index;
+        }
+        return numberCount;
+    }
 }

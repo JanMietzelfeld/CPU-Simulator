@@ -959,6 +959,13 @@ export class CPUCore {
                 this.timer.addTimer(op2, timeValue);
                 break;
             }
+            case DevOperations.CONSOLE_BUFFER_STATUS:{
+                this.eax.content = DoubleWord.fromNumber(this.fs.getStdinBufferNumberCount());
+                this.ebx.content = DoubleWord.fromNumber(this.fs.getStdinBufferStringCount());
+                console.log("Numbers in stdin " + this.fs.getStdinBufferNumberCount())
+                console.log("Strings in stdin " + this.fs.getStdinBufferStringCount())
+                break;
+            }
             default:{
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
             }
