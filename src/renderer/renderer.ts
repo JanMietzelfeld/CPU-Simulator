@@ -685,7 +685,7 @@ export class Renderer {
                 return
             }
             this.ramDataRepresentation = demandedByteRepresentation;
-            const blockSizeDisable: boolean = (demandedByteRepresentation === "ASCII" || demandedByteRepresentation === "ASSEMBLY");
+            const blockSizeDisable: boolean = (demandedByteRepresentation === "UTF-8" || demandedByteRepresentation === "ASSEMBLY");
             ramBlockSizeSelector.disabled = blockSizeDisable;
             if (demandedByteRepresentation === "ASSEMBLY") {
                 this.ramBlockSize = 12;
@@ -1474,8 +1474,8 @@ export class Renderer {
             physicalAddress = await this._window.mainMemory.translateVirtualAddress(DoubleWord.fromNumber(Number(targetAddress)));
         }
 
-        const blocksBefore: number = this.ramDataRepresentation === "ASCII" ? 5 : Math.min(5, Math.floor(physicalAddress / this.ramBlockSize));
-        const blocksAfter: number = this.ramDataRepresentation === "ASCII" ? 12 : 6;
+        const blocksBefore: number = this.ramDataRepresentation === "UTF-8" ? 5 : Math.min(5, Math.floor(physicalAddress / this.ramBlockSize));
+        const blocksAfter: number = this.ramDataRepresentation === "UTF-8" ? 12 : 6;
 
         let startAddress = physicalAddress - (blocksBefore * this.ramBlockSize);
         const endAddress = physicalAddress + (blocksAfter * this.ramBlockSize) - 1;
@@ -1487,7 +1487,7 @@ export class Renderer {
         this.ramViewStartAddress = startAddress;
         this.ramViewEndAddress = endAddress;
         const targetAddressIndex: number = await this.createUpdateDetailedRamViewTable(this.ramViewStartAddress, this.ramViewEndAddress, physicalAddress);
-        const rowIndex = this.ramDataRepresentation === "ASCII" ? targetAddressIndex : blocksBefore;
+        const rowIndex = this.ramDataRepresentation === "UTF-8" ? targetAddressIndex : blocksBefore;
         const tableRow = tableBody.rows[rowIndex];
         for (const cell of tableRow.cells) {
             cell.classList.add("highlighted");
@@ -1643,7 +1643,7 @@ export class Renderer {
      * @param targetAddress An address to find the row index for inside the table body.
      * @returns The row index of the target address in the table body.
      */
-    public async createRamViewRowsAscii(physicalAddressStart: number, physicalAddressEnd: number, ramTableBody: HTMLTableSectionElement, targetAddress: number = 0): Promise<number> {
+    public async createRamViewRowsUtf8(physicalAddressStart: number, physicalAddressEnd: number, ramTableBody: HTMLTableSectionElement, targetAddress: number = 0): Promise<number> {
         const masks = [0b1000_0000, 0b1110_0000, 0b1111_0000, 0b1111_1000];
         const templates = [0b0000_0000, 0b1100_0000, 0b1110_0000, 0b1111_0000];
         const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
@@ -1764,7 +1764,7 @@ export class Renderer {
                 const byteHead = tableRow.insertCell();
                 byteHead.innerHTML = `Byte ${i}`;
             }
-        } else if (dataMode === "ASCII") {
+        } else if (dataMode === "UTF-8") {
             const characterHead = tableRow.insertCell();
             characterHead.innerHTML = "Char"
         } else if (dataMode === "ASSEMBLY") {
@@ -1791,8 +1791,8 @@ export class Renderer {
 
         if (dataMode === "HEX" || dataMode === "BIN" || dataMode === "DEC") {
             await this.createRamViewRowsNumeric(physicalStartAddress, physicalEndAddress,tableBody);
-        } else if (dataMode === "ASCII") {
-            targetAddressIndex = await this.createRamViewRowsAscii(physicalStartAddress, physicalEndAddress, tableBody, targetAddress);
+        } else if (dataMode === "UTF-8") {
+            targetAddressIndex = await this.createRamViewRowsUtf8(physicalStartAddress, physicalEndAddress, tableBody, targetAddress);
         } else if (dataMode === "ASSEMBLY") {
             await this.createRamViewRowsAssembly(physicalStartAddress, physicalEndAddress, tableBody);
         }
