@@ -1491,6 +1491,7 @@ export class Renderer {
         const tableRow = tableBody.rows[rowIndex];
         for (const cell of tableRow.cells) {
             cell.classList.add("highlighted");
+            cell.scrollIntoView();
         }
     }
 
