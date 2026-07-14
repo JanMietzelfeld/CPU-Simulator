@@ -38,16 +38,6 @@ export class SimulationController {
     private static readonly KERNEL_SPACE_START: DoubleWord = DoubleWord.fromNumber(0xC0000000);
 
     /**
-     * This field represents a flag, which enables automatic scroll for the GUIs virtual RAM widget.
-     */
-    public autoScrollForVirtualRAMEnabled: boolean;
-
-    /**
-     * This field represents a flag, which enables automatic scroll for the GUIs physical RAM widget.
-     */
-    public autoScrollForPhysicalRAMEnabled: boolean;
-
-    /**
      * This field represents a flag, which enables automatic scroll for the GUIs Page Table widget.
      */
     public autoScrollForPageTableEnabled: boolean;
@@ -71,8 +61,6 @@ export class SimulationController {
         this._assembler = new Assembler(pathToLanguageDefinition, pathToOSFilesystem);
         this._programmLoaded = true;
         this.autoScrollForPageTableEnabled = true;
-        this.autoScrollForPhysicalRAMEnabled = true;
-        this.autoScrollForVirtualRAMEnabled = true;
         this.inDevMode = devMode;
     }
 
