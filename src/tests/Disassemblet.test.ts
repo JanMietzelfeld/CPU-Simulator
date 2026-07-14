@@ -44,7 +44,9 @@ describe('Disassemble program', () => {
 
     test("Decode assembly programs", () => {        
 
-        let code = `MOV $0x64, %EAX
+
+    let input = `.CONST TEST_CONST "Test"
+MOV $0x64, %EAX
 SUB $0x1, %EAX
 CMP $0x0, %EAX
 JG @0x4
@@ -53,8 +55,19 @@ MOV $0x12345678, %EDX
 MOV $0x11, %EAX
 INT $0x80
 `;
-        const binary: DoubleWord[] = assembler.assemble(readFileSync("./os_filesystem/home/examples/loop.asm", "utf8"));
+
+
+        let output = `MOV $0x64, %EAX
+SUB $0x1, %EAX
+CMP $0x0, %EAX
+JG @0x4
+NOP
+MOV $0x12345678, %EDX
+MOV $0x11, %EAX
+INT $0x80
+`;
+        const binary: DoubleWord[] = assembler.assemble(input);
         let result = disassemble(binary);
-        expect(result).toEqual(code);
+        expect(result).toEqual(output);
     });
 });
