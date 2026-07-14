@@ -9,6 +9,7 @@ export class FilesystemError extends Error {
 	 */
     constructor(description: string) {
 		super(description);
+        this.name = "FilesystemError";
         // Set the prototype explicitly to enable typechecking.
         Object.setPrototypeOf(this, FilesystemError.prototype);
     }

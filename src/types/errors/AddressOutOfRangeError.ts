@@ -9,6 +9,7 @@ export class AddressOutOfRangeError extends Error {
 	 */
     constructor(description: string) {
         super(description);
+        this.name = "AddressOutOfRangeError";
         // Set the prototype explicitly to enable typechecking.
         Object.setPrototypeOf(this, AddressOutOfRangeError.prototype);
     }

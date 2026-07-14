@@ -81,7 +81,6 @@ export class PassthroughFilesystem {
             default:
                 // unkown mode
                 return -4;
-                break;
         }
 
         if (this.file_stat(vfd.filename) < vfd.seek_position) {
@@ -93,17 +92,17 @@ export class PassthroughFilesystem {
             return -3;
         }
         // node:fs doesnt support seek() on file descriptors, but allows it on write commands. Seek is emulated on each write command.
-        vfd.seek_position += offset;
+        vfd.seek_position += new_seek_postion;
         return 0;
     }
 
-    public io_close(fd: number) {
-        // TODO maybe add return value indicating success/error if invalid fd is given
+    public io_close(fd: number): number {
         if (!this.fd_map.has(fd)) {
             // invalid fd
-            return;
+            return -1;
         }
         this.fd_map.delete(fd);
+        return 0;
     }
 
     public io_read_buffer(fd: number, buffer: Uint8Array, size: number): number {
@@ -198,13 +197,13 @@ export class PassthroughFilesystem {
     }
 
     public file_stat(filename: string): number {
-        const path = this.path + filename
+        const path = this.path + filename;
         if (!existsSync(path)) {
             // file does not exist
             return -1;
         }
         const stat = lstatSync(path)
-        if (!stat.isFile || stat.isDirectory()) {
+        if (!stat.isFile() || stat.isDirectory()) {
             // not a file
             return -2;
         }
@@ -220,15 +219,15 @@ export class PassthroughFilesystem {
             // error -1 -> no input ready
             return [0, -1];
         }
-        const line = this.stdin_buffer[0]
+        const line = this.stdin_buffer[0];
         this.stdin_buffer.shift();
         const num = parseInt(new TextDecoder('latin1').decode(line));
         if (isNaN(num)) {
             // error -2 -> could not parse number
             return [0, -2];
         }
-        if (num > DoubleWord.MAXIMUM_NUMBER_DEC || num < DoubleWord.MINIMUM_NUMBER_DEC) {
-            // error -2 -> number does not fit into signed 32 bit DoubleWord
+        if (num > DoubleWord.MAX_POSITIVE_NUMBER || num < DoubleWord.MAX_NEGATIVE_NUMBER) {
+            // error -2 -> number does not fit into 32 bit DoubleWord
             return [0, -3]
         }
         return [num, 0];

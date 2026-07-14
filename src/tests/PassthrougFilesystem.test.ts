@@ -16,7 +16,7 @@ describe('PassthroughFilesystem', () => {
     afterEach(() => {
         try {
             rmSync(tmp, { recursive: true, force: true });
-        } catch (e) {
+        } catch {
             // Ignore cleanup errors
         }
     });

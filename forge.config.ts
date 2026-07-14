@@ -16,14 +16,14 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: "./assets/icons/app/icon",
-    extraResource: ["./assembly/", "./settings/"],
-    executableName: "ihme-core-simulator"
+    extraResource: ["./os_filesystem/", "./settings/"],
+    executableName: "ihme-core-simulator",
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
       iconUrl: "https://raw.githubusercontent.com/ProgrammIt/CPU-Simulator/refs/heads/main/assets/icons/app/icon.ico",
-      copyright: "Copyright © 2025 University of Hannover for Applied Sciences and Arts",
+      copyright: "Copyright © 2026 University of Hannover for Applied Sciences and Arts",
       noMsi: false,
       setupIcon: "./assets/icons/app/icon.ico"
     }, ["win32"]), 
