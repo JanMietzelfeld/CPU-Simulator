@@ -140,7 +140,7 @@ export class MemoryManagementUnit {
      */
     public writeDoublewordTo(virtualAddress: DoubleWord, doubleword: DoubleWord, attemptsToExecute: boolean): void {
         const physicalAddress: DoubleWord = this.translate(virtualAddress, true, attemptsToExecute);
-        this.updateReverseMemoryMap(physicalAddress, doubleword)
+        //this.updateReverseMemoryMap(physicalAddress, doubleword)
         this._cpu.mainMemory.writeDoubleWordTo(physicalAddress, doubleword);
         return;
     }
@@ -224,7 +224,7 @@ export class MemoryManagementUnit {
         }
 
         const pageNumber = PageNumber.fromVirtualAddress(virtualAddress);
-        const pageTableEntry: PageTableEntry = this._tlb.get(pageNumber) ?? this.searchPageTable(virtualAddress);
+        const pageTableEntry: PageTableEntry = this._tlb.get(pageNumber) ?? this.findPageTableEntry(virtualAddress);
         const pageTableEntryFlags: PageTableEntryFlags = PageTableEntry.getFlags(pageTableEntry);
 
         // Check if a page frame is connected to the page to which the specified virtual address refers.
@@ -253,7 +253,7 @@ export class MemoryManagementUnit {
             // Set changed flag bit.
             PageTableEntryFlags.setChangedFlagBit(pageTableEntryFlags, 1);
             // Update flag bits of page table entry in memory as well.
-            this._cpu.mainMemory.writeDoubleWordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), pageTableEntry);
+            this._cpu.mainMemory.writeDoubleWordTo(this.findPageTableEntryPhysicalAddress(virtualAddress), pageTableEntry);
         }
         // Page frame is present and operation is permitted.
         // Create a valid physical memory address from the page frame number and the offset extracted from the given virtual memory address.
@@ -304,6 +304,35 @@ export class MemoryManagementUnit {
             // Enter user mode.
             this._cpu.flags.enterUserMode();
         }
+        return pageTableEntry;
+    }
+
+    private findPageTableEntryPhysicalAddress(virtualAddress: DoubleWord): DoubleWord {
+        const pageDirectoryIndex: number = (virtualAddress >> 22) & 0x3FF;
+        const pageTableIndex: number = (virtualAddress >> 12) & 0x3FF;
+
+        const pageDirectoryEntryPhysical: DoubleWord = DoubleWord.fromNumber(this._cpu.ptp.content + pageDirectoryIndex * 4);
+        const contentOfPageDirectoryEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(pageDirectoryEntryPhysical);
+        const pageDirectoryEntry: PageTableEntry = PageTableEntry.fromDoubleWord(contentOfPageDirectoryEntry);
+
+        const pageDirectoryEntryFlags: PageTableEntryFlags = PageTableEntry.getFlags(pageDirectoryEntry);
+
+        if (!PageTableEntryFlags.isPresent(pageDirectoryEntryFlags)) {
+
+            this.pageFaultAddress = virtualAddress;
+            
+            throw new ExceptionError(InterruptNumbers.PAGE_FAULT);
+        }
+
+        //Level 2 Page Table
+        const pageTableBase = PageTableEntry.getFrameNumber(pageDirectoryEntry) << MemoryManagementUnit.NUMBER_BITS_OFFSET;
+        const pageTableEntryPhysicalAddress = DoubleWord.fromNumber(pageTableBase + (pageTableIndex * 4));
+        return pageTableEntryPhysicalAddress;
+    }
+
+    private findPageTableEntry(virtualAddress: DoubleWord): PageTableEntry {
+        const contentOfPageTableEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(this.findPageTableEntryPhysicalAddress(virtualAddress));
+        const pageTableEntry: PageTableEntry = PageTableEntry.fromDoubleWord(contentOfPageTableEntry);
         return pageTableEntry;
     }
 
