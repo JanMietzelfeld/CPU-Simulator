@@ -1,12 +1,12 @@
 import { DoubleWord } from "../types/binary/DoubleWord";
 import { Byte } from "../types/binary/Byte";
-import { Instructions } from "../types/enumerations/IntructionSet";
 import { InstructionTypes } from "../types/enumerations/InstructionTypes";
 import { OperandTypes } from "../types/enumerations/OperandTypes";
 import { RegisterNumbers } from "../types/enumerations/RegisterNumbers";
 import { AddressingModes } from "../types/enumerations/AdressingModes";
 import { InterruptNumbers } from "../types/enumerations/InterruptNumbers";
 import { DevOperations } from "../types/enumerations/DevOperations";
+import { InstructionSet } from "../types/enumerations/InstructionSet";
 
 /**
  * This enumeration is a duplicate of the one, that can be
@@ -1684,7 +1684,7 @@ export class Renderer {
 
         const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
 
-        for (let [index,[physicalAddress, ramCellContent]] of Array.from(ramCells).entries()) {
+        for (const [index,[physicalAddress, ramCellContent]] of Array.from(ramCells).entries()) {
             //Create Byte cells in the row and fill with data.
             const byteData = tableRow.insertCell();
             switch (this.ramDataRepresentation) {
@@ -1807,7 +1807,7 @@ export class Renderer {
         for (let i = 0; i < ramContent.length;) {
             const tableRow: HTMLTableRowElement = this._document.createElement("tr");
             const binary = ramContent.slice(i, (i + this.ramBlockSize));
-            let instructionString = await this.getInstructionText(binary);
+            const instructionString = await this.getInstructionText(binary);
 
             const physicalAddressColumn = tableRow.insertCell();
             const virtualAddressColumn = tableRow.insertCell();
@@ -1896,7 +1896,7 @@ export class Renderer {
         const instruction = DoubleWord.fromBytes(instructions[0], instructions[1], instructions[2], instructions[3]);
 
         const type: string = InstructionTypes[DoubleWord.getBitRange(instruction, 0, 3)];
-        const operation: string =  Instructions[DoubleWord.getBitRange(instruction, 5, 12)];
+        const operation: string =  InstructionSet[DoubleWord.getBitRange(instruction, 5, 12)];
 
         if (type === undefined || operation === undefined) {
             return "UNKNOWN";
