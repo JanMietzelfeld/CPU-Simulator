@@ -1,4 +1,4 @@
-; Interrupt ISR for the periodic timer interrupt (0x20)
+; Interrupt ISR for the periodic timer interrupt (0x21)
 
 .INTERRUPTS_PERIODIC_TIMER:
 

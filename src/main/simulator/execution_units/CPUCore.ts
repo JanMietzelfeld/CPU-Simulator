@@ -993,7 +993,7 @@ export class CPUCore {
                 this.timer.addTimer(op2, timeValue);
                 break;
             }
-            case DevOperations.PERIODIC_TIMER_SET:{ //  0001111 setupTimer(op2=time value)
+            case DevOperations.PERIODIC_TIMER_SET:{ //  0001111 setupTimer(time_value=op2)
                 const timerValue = op2;
                 this.periodicTimer.setupTimer(timerValue);
                 break;

@@ -128,8 +128,6 @@
 
     ; add current process to the waiting queue
 
-    ;CMP $1, %ebx ; init process should not be added to the waiting list
-    ;JE _UTIL_SCHEDULER_FIND_NEXT
     CMP $2, %ebx ; idle process should not be added to the waiting list
     JE _UTIL_SCHEDULER_FIND_NEXT
 

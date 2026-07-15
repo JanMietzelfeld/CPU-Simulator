@@ -59,7 +59,7 @@ JMP _OS_ENTRY ; start of the os
 
     ; Set up the ISR for 0x06 (Invalid Opcode)
     MOV %itp, %eax
-    ADD $0x24, %eax ; Interrupt Nummber 0x06 * 4 Bytes = 0x24
+    ADD $0x18, %eax ; Interrupt Nummber 0x06 * 4 Bytes = 0x18
     MOV INTERRUPTS_INVALID_OPCODE, *%eax
 
     ; Set up the ISR for 0x0D (General Protection Fault)
