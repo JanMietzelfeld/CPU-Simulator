@@ -95,43 +95,18 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 					label: "Behavior",
 					submenu: [
 						{
-							label: "Physical RAM",
+							label: "RAM",
 							submenu : [
 								{
-									label: "Disable Auto Scroll",
+									label: "Disable EIP Follow",
 									click() {
-										if (simulator.autoScrollForPhysicalRAMEnabled) {
-											win.webContents.send("disable_auto_scroll_physical_ram");
-										}
+										win.webContents.send("disable_ram_view_follow_eip");
 									}
 								},
 								{
-									label: "Enable Auto Scroll",
+									label: "Enable EIP Follow",
 									click() {
-										if (!simulator.autoScrollForPhysicalRAMEnabled) {
-											win.webContents.send("enable_auto_scroll_physical_ram");
-										}
-									}
-								}
-							]
-						},
-						{
-							label: "Virtual RAM",
-							submenu : [
-								{
-									label: "Disable Auto Scroll",
-									click() {
-										if (simulator.autoScrollForVirtualRAMEnabled) {
-											win.webContents.send("disable_auto_scroll_virtual_ram");
-										}
-									}
-								},
-								{
-									label: "Enable Auto Scroll",
-									click() {
-										if (!simulator.autoScrollForVirtualRAMEnabled) {
-											win.webContents.send("enable_auto_scroll_virtual_ram");
-										}
+										win.webContents.send("enable_ram_view_follow_eip");
 									}
 								}
 							]
@@ -308,6 +283,24 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 	ipcMain.handle("readFromPhysicalMemory", async (event: Electron.IpcMainInvokeEvent, physicalAddress: DoubleWord): Promise<Byte > => {
 		const byte: Byte = simulator.mainMemory.readByteFrom(physicalAddress);
 		return byte;
+	});
+
+	ipcMain.removeHandler("readDoubleWordFromPhysicalMemory");
+	ipcMain.handle("readDoubleWordFromPhysicalMemory", async (event: Electron.IpcMainInvokeEvent, physicalAddress: DoubleWord): Promise<DoubleWord> => {
+		const doubleWord: DoubleWord = simulator.mainMemory.readDoublewordFrom(physicalAddress);
+		return doubleWord;
+	});
+
+	ipcMain.removeHandler("findVirtualAddresses");
+	ipcMain.handle("findVirtualAddresses", async (event: Electron.IpcMainInvokeEvent, physicalAddress: DoubleWord): Promise<DoubleWord[]> => {
+		const virtualAddresses: DoubleWord[] = simulator.core.mmu.findVirtualFromPhysical(physicalAddress as PhysicalAddress) as DoubleWord[];
+		return virtualAddresses;
+	});
+
+	ipcMain.removeHandler("translateVirtualAddress");
+	ipcMain.handle("translateVirtualAddress", async (event: Electron.IpcMainInvokeEvent, virtualAddress: DoubleWord): Promise<DoubleWord> => {
+		const physicalAddress: DoubleWord = simulator.core.mmu.translate(virtualAddress, false, false, true, true);
+		return physicalAddress;
 	});
 
 	ipcMain.removeHandler("readRangeFromVirtualMemory");
@@ -535,30 +528,6 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 				win.webContents.send("error", error.message);
 			}
 		}
-	});
-
-	ipcMain.removeHandler("on_disable_auto_scroll_physical_ram");
-	ipcMain.handle("on_disable_auto_scroll_physical_ram", async (): Promise<void> => {
-		simulator.autoScrollForPhysicalRAMEnabled = false;
-		return;
-	});
-
-	ipcMain.removeHandler("on_ensable_auto_scroll_physical_ram");
-	ipcMain.handle("on_ensable_auto_scroll_physical_ram", async (): Promise<void> => {
-		simulator.autoScrollForPhysicalRAMEnabled = true;
-		return;
-	});
-
-	ipcMain.removeHandler("on_disable_auto_scroll_virtual_ram");
-	ipcMain.handle("on_disable_auto_scroll_virtual_ram", async (): Promise<void> => {
-		simulator.autoScrollForVirtualRAMEnabled = false;
-		return;
-	});
-
-	ipcMain.removeHandler("on_ensable_auto_scroll_virtual_ram");
-	ipcMain.handle("on_ensable_auto_scroll_virtual_ram", async (): Promise<void> => {
-		simulator.autoScrollForVirtualRAMEnabled = true;
-		return;
 	});
 
 	ipcMain.removeHandler("on_disable_auto_scroll_page_table");

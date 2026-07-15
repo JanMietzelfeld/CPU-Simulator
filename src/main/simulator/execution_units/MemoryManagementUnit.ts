@@ -9,7 +9,12 @@ import { PageTableEntryFlags } from "../../../types/binary/PageTableEntryFlags";
 import { VirtualAddress } from "../../../types/binary/VirtualAddress";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { PageTableEntry } from "../../../types/binary/PageTableEntry";
+import { FrameNumber } from "../../../types/binary/FrameNumber";
 
+interface memoryMapEntry {
+        pageTableId: number;
+        pageNumber: number;
+}
 /**
  * This class represents a Memory Management Unit (MMU). This specialized execution unit is responsible
  * for translating virtual memory addresses into physical memory addresses.
@@ -79,6 +84,16 @@ export class MemoryManagementUnit {
 
     public pageFaultAddress: DoubleWord | undefined = undefined;
 
+    /**
+     * This array stores a mapping between the physical frame number and virtual page numbers along with the associated pid.
+     * Each entry is an array of objects. The Entries are only populated if a vpn is mapped to that frame number.
+     * {
+     *  pageTableId: number
+     *  pageNumber: number
+     * }
+     */
+    public reverseMemoryMap: memoryMapEntry[][] = [];
+
 
     /**
      * Constructs a new instance from the given references of the RAM, Page Table Pointer (PTP) register, the ALU and the EFLAGS register.
@@ -126,6 +141,7 @@ export class MemoryManagementUnit {
      */
     public writeDoublewordTo(virtualAddress: VirtualAddress, doubleword: DoubleWord, attemptsToExecute: boolean): void {
         const physicalAddress: PhysicalAddress = this.translate(virtualAddress, true, attemptsToExecute);
+        this.updateReverseMemoryMap(physicalAddress, doubleword as PageTableEntry)
         this._cpu.mainMemory.writeDoubleWordTo(physicalAddress, doubleword);
     }
 
@@ -264,6 +280,76 @@ export class MemoryManagementUnit {
         const addressOfPageTableEntry: PhysicalAddress = this.calcPhysicalAddressOfPageTableEntry(virtualAddress);
         // Read page table entry from memory.
         return this._cpu.mainMemory.readDoublewordFrom(addressOfPageTableEntry) as PageTableEntry;
+    }
+
+    /**
+     * This method updates the reverse memory map based on the present bit of the given page table entry.
+     * The reverse memory map maps a physical frame number to an object which contains the mapped virtual page number and the page table id, which the virtual page number belongs to.
+     * Each index in the reverse memory map represents the physical frame number.
+     * If the present bit of the page table entry changes from zero to one, then a new entry is created.
+     * If the present bit of the page table entry changes from one to zero, then all entries that match the virtual page number and page table id at the entry of the physical frame number in the
+     * reverse memory map get removed.
+     * If the present bit stays at one and the physical frame number changes, then the old entry gets removed and a new entry is written.
+     * @param ptEntryAddress The memory address of the page table entry.
+     * @param ptEntry The page table entry.
+     */
+    private updateReverseMemoryMap(ptEntryAddress: PhysicalAddress, ptEntry: PageTableEntry): void {
+        const pageTablesStartAddress: number = 0xD0000000;
+        const pageTablesEndAddress: number = 0xDFFFFFFF;
+        if (ptEntryAddress < pageTablesStartAddress || ptEntryAddress > pageTablesEndAddress) {
+            return
+        }
+        const newPtEntry: PageTableEntry = ptEntry;
+        const oldPtEntry: PageTableEntry = this._cpu.mainMemory.readDoublewordFrom(ptEntryAddress) as PageTableEntry;
+
+        const newPtPresentBit: number = PageTableEntry.getFlags(newPtEntry) >> 11;
+        const oldPtPresentBit: number = PageTableEntry.getFlags(oldPtEntry) >> 11;
+        const newFrameNumber: number = PageTableEntry.getFrameNumber(newPtEntry);
+        const oldFrameNumber: number = PageTableEntry.getFrameNumber(oldPtEntry);
+
+        const ptMemoryOffset: number = ptEntryAddress - pageTablesStartAddress;
+        
+        //Divide by four
+        const globalEntryIndex: number = ptMemoryOffset >> 2;
+        //Bitwise modulo 2^20 to find the page number since a page table has 2^20 entries
+        const pageNumber: number = globalEntryIndex & 0xFFFFF;
+        const pageTableId: number = globalEntryIndex >> 20;
+
+        if (newPtPresentBit === 1 && oldPtPresentBit === 0) {
+            (this.reverseMemoryMap[newFrameNumber] ??= []).push({pageTableId: pageTableId, pageNumber: pageNumber});
+        }
+
+        if (newPtPresentBit === 0 && oldPtPresentBit === 1) {
+            if (!this.reverseMemoryMap[newFrameNumber]) {
+                return;
+            }
+            this.reverseMemoryMap[newFrameNumber] = this.reverseMemoryMap[newFrameNumber].filter(
+                (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
+            );
+        }
+
+        if (oldPtPresentBit === 1 && newPtPresentBit === 1) {
+            if (newFrameNumber === oldFrameNumber) {
+                return
+            }
+            this.reverseMemoryMap[oldFrameNumber] = this.reverseMemoryMap[oldFrameNumber].filter(
+                (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
+            );
+            (this.reverseMemoryMap[newFrameNumber] ??= []).push({pageTableId: pageTableId, pageNumber: pageNumber});
+        }
+    }
+
+    public findVirtualFromPhysical(physicalAddress: PhysicalAddress): VirtualAddress[] {
+        const frameNumber: FrameNumber = FrameNumber.fromPhysicalAddress(physicalAddress);
+        const reverseMemoryMapEntry: memoryMapEntry[] = this.reverseMemoryMap[frameNumber];
+        const virtualAddresses: VirtualAddress[] = [];
+        for (const entry of reverseMemoryMapEntry) {
+            const pNumber: number = entry.pageNumber;
+            const offset: number = physicalAddress & 0xFFF;
+            const virtualAddress: VirtualAddress = VirtualAddress.fromNumber(pNumber | offset);
+            virtualAddresses.push(virtualAddress);
+        }
+        return virtualAddresses;
     }
 
 }

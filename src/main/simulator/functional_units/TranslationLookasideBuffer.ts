@@ -21,9 +21,6 @@ export class TranslationLookasideBuffer {
     public get(pageNumber: PageNumber): PageTableEntry | undefined {
         const index = (pageNumber & (this.TLB_ENTRIES - 1)) * 2;
 
-        const test = this.tlb[index];
-        const result = test === pageNumber
-
         return this.tlb[index] === pageNumber
             ? ((this.tlb[index + 1] >>> 0) as PageTableEntry)
             : undefined;
