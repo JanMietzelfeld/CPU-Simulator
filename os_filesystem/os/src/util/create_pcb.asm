@@ -80,7 +80,7 @@
         SHL $24, %ecx ; move the id to the msb
         AND $0xFFFFFF, *%eax
         OR %ecx, *%eax ;set pid
-        SHR $24, %ecx
+        ;SHR $24, %ecx
         ADD $1, %eax
 
         AND $0xFFFFFF, *%eax
@@ -89,9 +89,47 @@
         OR %ebx, *%eax ; set status to to Waiting 
         ADD $1, %eax
 
+
+        ; find free page table
+        PUSH %eax ; save eax
+        MOV $CONST_OS_PAGE_TABLE_BITMAP_START, %eax
+
+        ._WALK_PAGE_TABLE_BITMAP_START:
+            CMP $CONST_OS_PAGE_TABLE_BITMAP_END, %eax ; end of bitmap reached?
+            JGE _UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER
+
+            MOV *%eax, %ebx ; get content
+            MOV $0, %ecx ; set bit counter to zero
+
+            ._WALK_REGISTER_START:
+                CMP $32, %ecx ; tested all 32 bits?
+                JE _NEXT_DOUBLE_WORD
+                SHL $1, %ebx
+                JNC _FOUND_FREE_PAGE_TABLE ; the bit that got pushed away was zero, free page table found
+                ADD $1, %ecx ; otherwise increase counter and try again
+                JMP _WALK_REGISTER_START
+
+        ._NEXT_DOUBLE_WORD:
+            ADD $4, %eax
+            JMP _WALK_PAGE_TABLE_BITMAP_START
+
+        ._FOUND_FREE_PAGE_TABLE:
+            SUB $CONST_OS_PAGE_TABLE_BITMAP_START, %eax
+            SHL $3, %eax ; multiply by 8
+            ADD %ecx, %eax ; eax now contains index of first zero in bitmap
+        
+        ; calculate page table base address
+        SHL $12, %eax ; multiply index by size of one page table
+        ADD $CONST_OS_PAGE_TABLE_LIST_START, %eax ; eax now holds address of first free page table
+        MOV %eax, %ecx
+        POP %eax ; restore eax
+
+
+
+
         ; allocate Page Table
-        SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %ecx
-        ADD $CONST_OS_PAGE_TABLE_LIST_START, %ecx
+        ;SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %ecx
+        ;ADD $CONST_OS_PAGE_TABLE_LIST_START, %ecx
 
 
         MOV %ecx, *%eax  ; set page table pointer
