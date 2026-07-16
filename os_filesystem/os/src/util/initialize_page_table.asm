@@ -24,40 +24,55 @@
 ;   none
 .UTIL_INITIALIZE_PAGE_TABLE:
 
+    
+    PUSH %eax
     PUSH %ebx
+    PUSH %ecx
 
-    .CONST _UTIL_INITIALIZE_PAGE_TABLE_CONST_PAGE_TABLE_FILE_PATH "os/util/page_table.bin"
+    ;.CONST _UTIL_INITIALIZE_PAGE_TABLE_CONST_PAGE_TABLE_FILE_PATH "os/util/page_table.bin"
 
-    MOV $_UTIL_INITIALIZE_PAGE_TABLE_CONST_PAGE_TABLE_FILE_PATH, %ebx
+    ;MOV $_UTIL_INITIALIZE_PAGE_TABLE_CONST_PAGE_TABLE_FILE_PATH, %ebx
 
     ; SYSCALLS_FILE_OPEN
     ; Parameters (ebx is a pointer to the start of an ASCII filename):
     ;   (ebx)     Pointer to a ASCII filename
     ; Return value (immediate value):
     ;   eax     file descriptor (-1 = error)
-    CALL SYSCALLS_FILE_OPEN
-    CMP $-1, %eax
-    JNE _UTIL_INITIALIZE_PAGE_TABLE_FILE_OPEN
+    ;CALL SYSCALLS_FILE_OPEN
+    ;CMP $-1, %eax
+    ;JNE _UTIL_INITIALIZE_PAGE_TABLE_FILE_OPEN
     ; this should not be able to happen
 
     ; panic
 
     ; TODO stop the simulator
-    ._UTIL_INITIALIZE_PAGE_TABLE_FILE_OPEN:
+    ;._UTIL_INITIALIZE_PAGE_TABLE_FILE_OPEN:
 
-    POP %ebx ; Pointer to the Page Table entry
+    ;POP %ebx ; Pointer to the Page Table entry
 
-    PUSH $CONST_OS_PAGE_TABLE_SIZE
-    PUSH %ebx
-    PUSH %eax
+    ;PUSH $CONST_OS_PAGE_TABLE_SIZE
+    ;PUSH %ebx
+    ;PUSH %eax
 
-    MOV %esp, %ebx
+    ;MOV %esp, %ebx
 
-    PUSH %eax ; file descriptor
+    ;PUSH %eax ; file descriptor
 
     DEV $CONST_DEV_COMMAND_CPU_IS_MEMORY_VIRTUALIZATION_ENABLED, $0
     PUSH %eax ; is virtualization enabled
     DEV $CONST_DEV_COMMAND_CPU_DISABLE_MEMORY_VIRTUALIZATION, $0
+
+    MOV $0, %eax
+    ._INITIALIZE_PAGE_TABLE_START:
+        CMP $CONST_OS_PAGE_TABLE_SIZE, %eax
+        JGE _PAGE_TABLE_INITIALIZATION_DONE
+        MOV $0, *%ebx
+        ADD $4, %eax
+        ADD $4, %ebx
+        JMP _INITIALIZE_PAGE_TABLE_START
+        
+
+    ._PAGE_TABLE_INITIALIZATION_DONE:
 
     ; SYSCALLS_FILE_READ
     ; Parameters (ebx is a pointer to the following struct):
@@ -66,15 +81,15 @@
     ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
     ; Return value (immediate value):
     ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
-    CALL SYSCALLS_FILE_READ
-    CMP $0, %eax
-    JG _UTIL_INITIALIZE_PAGE_TABLE_FILE_READ
+    ;CALL SYSCALLS_FILE_READ
+    ;CMP $0, %eax
+    ;JG _UTIL_INITIALIZE_PAGE_TABLE_FILE_READ
     ; this should not be able to happen
 
     ; panic
 
     ; TODO stop the simulator
-    ._UTIL_INITIALIZE_PAGE_TABLE_FILE_READ:
+    ;._UTIL_INITIALIZE_PAGE_TABLE_FILE_READ:
 
     POP %ebx ; was virtualization enabled
     CMP $0, %ebx
@@ -82,27 +97,31 @@
         DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
     ._UTIL_INITIALIZE_PAGE_TABLE_SKIP_MEMORY_VIRTIALIZATION:
 
-    POP %ebx ; file descriptor
+    ;POP %ebx ; file descriptor
 
     ; SYSCALLS_FILE_CLOSE
     ; Parameters (ebx is used as a immediate value):
     ;   ebx     file descriptor
     ; Return value:
     ;   eax     success status (0 = success, -1 = invalid file descriptor)
-    CALL SYSCALLS_FILE_CLOSE
-    CMP $-1, %eax
-    JNE _UTIL_INITIALIZE_PAGE_TABLE_FILE_CLOSED
+    ;CALL SYSCALLS_FILE_CLOSE
+    ;CMP $-1, %eax
+    ;JNE _UTIL_INITIALIZE_PAGE_TABLE_FILE_CLOSED
     ; this should not be able to happen
 
     ; panic
 
     ; TODO stop the simulator
 
-    ._UTIL_INITIALIZE_PAGE_TABLE_FILE_CLOSED:
+    ;._UTIL_INITIALIZE_PAGE_TABLE_FILE_CLOSED:
 
+    POP %ecx
     POP %ebx
-    POP %ebx
-    POP %ebx
+    POP %eax
+
+    ;POP %ebx
+    ;POP %ebx
+    ;POP %ebx
 
 ; Page Table Is Set Up
 

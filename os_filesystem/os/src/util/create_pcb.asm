@@ -96,7 +96,7 @@
 
         ._WALK_PAGE_TABLE_BITMAP_START:
             CMP $CONST_OS_PAGE_TABLE_BITMAP_END, %eax ; end of bitmap reached?
-            JGE _UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER
+            JAE _UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER
 
             MOV *%eax, %ebx ; get content
             MOV $0, %ecx ; set bit counter to zero
@@ -114,6 +114,9 @@
             JMP _WALK_PAGE_TABLE_BITMAP_START
 
         ._FOUND_FREE_PAGE_TABLE:
+            MOV $0x80000000, %ebx
+            SHR %ecx, %ebx
+            OR %ebx, *%eax ; set the bit at the index to 1, marking page table as used
             SUB $CONST_OS_PAGE_TABLE_BITMAP_START, %eax
             SHL $3, %eax ; multiply by 8
             ADD %ecx, %eax ; eax now contains index of first zero in bitmap
