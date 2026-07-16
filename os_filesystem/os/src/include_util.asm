@@ -15,6 +15,8 @@
 
 .INCLUDE "os/src/util/clear_frame"
 
+.INCLUDE "os/src/util/allocate_page_table"
+
 
 
 
