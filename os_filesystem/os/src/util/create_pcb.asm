@@ -122,7 +122,7 @@
             ADD %ecx, %eax ; eax now contains index of first zero in bitmap
         
         ; calculate page table base address
-        SHL $12, %eax ; multiply index by size of one page table
+        SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %eax ; multiply index by size of one page table
         ADD $CONST_OS_PAGE_TABLE_LIST_START, %eax ; eax now holds address of first free page table
         MOV %eax, %ecx
         POP %eax ; restore eax
