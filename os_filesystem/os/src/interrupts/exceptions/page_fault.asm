@@ -66,7 +66,7 @@
     ._INTERRUPTS_PAGE_FAULT_FIND_PAGE_TABLE_INDEX:
     ; ecx contains pointer to page directory table entry
     MOV *%ecx, %ecx
-    AND $0x000FFFFF, %ecx ; remove flags
+    AND $0xFFFFF, %ecx ; remove flags
     SHL $12, %ecx ; physical address of L2 page table
     POP %ebx
     ; ebx fault address

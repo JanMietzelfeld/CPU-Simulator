@@ -24,7 +24,7 @@ MOV $0, %ebx ; index counter
     MOV *%ecx, %ecx ; ecx contains page table entry now
     TEST $0x80000000, %ecx ; present bit set?
     JZ _UTIL_CLEAR_PAGE_TABLE_SKIP_ENTRY
-    AND $0x000FFFFF, %ecx ; strip flags
+    AND $0xFFFFF, %ecx ; strip flags
     SHL $12, %ecx ; get frame base address
 
     PUSH %eax
