@@ -32,8 +32,9 @@
         ._UTIL_ALLOCATE_FRAME_WALK_REGISTER_START:
             CMP $32, %ecx ; tested all 32 bits?
             JE _UTIL_ALLOCATE_FRAME_NEXT_DOUBLE_WORD
+            TEST $0x80000000, %ebx
+            JZ _UTIL_ALLOCATE_FRAME_FOUND_FREE_FRAME ; is the left most bit zero, frame found
             SHL $1, %ebx
-            JNC _UTIL_ALLOCATE_FRAME_FOUND_FREE_FRAME ; the bit that got pushed away was zero, free frame found
             ADD $1, %ecx ; otherwise increase counter and try again
             JMP _UTIL_ALLOCATE_FRAME_WALK_REGISTER_START
 

@@ -22,8 +22,9 @@ MOV $CONST_OS_PAGE_TABLE_BITMAP_START, %eax
     ._UTIL_ALLOCATE_PAGE_TABLE_WALK_REGISTER_START:
         CMP $32, %ecx ; tested all 32 bits?
         JE _UTIL_ALLOCATE_PAGE_TABLE_NEXT_DOUBLE_WORD
+        TEST $0x80000000, %ebx
+        JZ _UTIL_ALLOCATE_PAGE_TABLE_FOUND_FREE_PAGE_TABLE ; is left most bit zero, free page table found
         SHL $1, %ebx
-        JNC _UTIL_ALLOCATE_PAGE_TABLE_FOUND_FREE_PAGE_TABLE ; the bit that got pushed away was zero, free page table found
         ADD $1, %ecx ; otherwise increase counter and try again
         JMP _UTIL_ALLOCATE_PAGE_TABLE_WALK_REGISTER_START
 

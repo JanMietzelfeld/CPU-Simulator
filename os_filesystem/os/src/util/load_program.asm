@@ -312,7 +312,7 @@
         ADD %ecx, %eax ; eax now points to the correct entry in the page directory table
         MOV *%eax, %eax ; get page directory entry
         ; get page table address
-        AND $0x000FFFFF, %eax
+        AND $0xFFFFF, %eax
         SHL $12, %eax ; eax now contains base address of the L2 page table at the current base directory index
         ; Find entry in L2 page table
         ADD $4, %ebx

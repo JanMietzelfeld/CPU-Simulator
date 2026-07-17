@@ -31,6 +31,8 @@
         ; L2 page table was not present, allocate and map
         ; ecx pointer to page directory table
 
+        PUSH %ecx
+
         ; Searches for a free page table, marks it as used and returns the base address
         ; UTIL_ALLOCATE_PAGE_TABLE
         ; Parameters 
@@ -54,6 +56,7 @@
         ;   none
         CALL UTIL_INITIALIZE_PAGE_TABLE
 
+        POP %ecx
         ; ecx page directory table entry pointer
 
         AND $0xFFF00000, *%ecx ;delete any old mapping, keep flags
