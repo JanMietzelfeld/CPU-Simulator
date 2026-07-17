@@ -19,7 +19,7 @@
 
 ; UTIL_INITIALIZE_PAGE_TABLE
 ; Parameters (ebx is a pointer to the start of the Page Table):
-;   (ebx)     Pointer to the Page Table entry
+;   (ebx)     Pointer to the Page Table base address
 ; Return value (immediate value):
 ;   none
 .UTIL_INITIALIZE_PAGE_TABLE:
