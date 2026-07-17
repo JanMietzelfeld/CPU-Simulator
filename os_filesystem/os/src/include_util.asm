@@ -17,6 +17,8 @@
 
 .INCLUDE "os/src/util/allocate_page_table"
 
+.INCLUDE "os/src/util/clear_page_table"
+
 
 
 
