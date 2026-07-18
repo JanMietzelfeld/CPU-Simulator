@@ -9,6 +9,9 @@ PUSH %eax
 PUSH %ebx
 PUSH %ecx
 
+DEV $CONST_DEV_COMMAND_CPU_IS_MEMORY_VIRTUALIZATION_ENABLED, $0
+PUSH %eax ; is virtualization enabled
+DEV $CONST_DEV_COMMAND_CPU_DISABLE_MEMORY_VIRTUALIZATION, $0
 
 MOV %ebx, %eax
 MOV $0, %ebx ; index counter
@@ -120,6 +123,12 @@ MOV *%ecx, %ebx ; load dword from bitmap
 AND %eax, %ebx ; apply mask
 MOV %ebx, *%ecx ; write back to bitmap
 
+
+POP %ebx ; was virtualization enabled
+CMP $0, %ebx
+JE _CLEAR_PAGE_TABLE_SKIP_MEMORY_VIRTUALIZATION
+    DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
+._CLEAR_PAGE_TABLE_SKIP_MEMORY_VIRTUALIZATION:
 
 POP %ecx
 POP %ebx
