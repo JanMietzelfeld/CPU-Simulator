@@ -286,7 +286,7 @@
         POP %ebx
         POP %ebx
 
-        ; map the frame into the virtial memory space
+        ; map the frame into the virtual memory space
 
         ; *(%esp+16) = number of needed frames
         ; *(%esp+12) = number of written frames

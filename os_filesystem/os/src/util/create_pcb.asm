@@ -118,7 +118,7 @@
         MOV %ecx, %ebx ; ebx = pointer to the Page Table
 
         PUSH %eax ; save eax
-
+        PUSH %ecx ; save pointer to page table
 
         CMP $CONST_OS_PAGE_TABLE_LIST_START, %ebx
         JB _UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER
@@ -128,7 +128,7 @@
         JMP _UTIL_CREATE_PCB_VALID_PAGE_TABLE_POINTER
 
         ._UTIL_CREATE_PCB_INVALID_PAGE_TABLE_POINTER:
-
+            POP %eax ; clear pointer to page table from stack
             POP %eax ; eax
             POP %eax ; pcb
             ADD $1, *%eax ; status bit 
@@ -146,6 +146,26 @@
         ; Return value (immediate value):
         ;   none
         CALL UTIL_INITIALIZE_PAGE_TABLE
+
+        POP %ebx
+        ; UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE
+        ; Parameters (ebx is a pointer to the start of the Page Table):
+        ;   (ebx)     Pointer to the Page Table base address
+        ; Return value (immediate value):
+        ;   (eax)  0 = success, -1 = no space
+        CALL UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE
+        CMP $-1, %eax
+        JNE _UTIL_CREATE_PCB_INITIALIZE_PAGE_DIRECTORY_TABLE_NO_ERROR
+            POP %eax ; eax
+            POP %eax ; pcb
+            ADD $1, *%eax ; status bit 
+            MOV $0, *%eax ; set status to to terminated 
+            POP %eax ; pid
+            POP %eax ; pop ASCII name
+            MOV $0xFFFFFFFF, %eax
+            RET
+
+        ._UTIL_CREATE_PCB_INITIALIZE_PAGE_DIRECTORY_TABLE_NO_ERROR:
 
         POP %eax ; restore eax
 

@@ -21,6 +21,7 @@
 
 .INCLUDE "os/src/util/clear_page_directory_table"
 
+.INCLUDE "os/src/util/initialize_page_directory_table"
 
 
 
