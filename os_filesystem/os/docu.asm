@@ -30,7 +30,10 @@
 ; 0xE0100400 - 0xE01007FF - Interrupt Table     (256 Entries * 4 Bytes = 1 KiB)                   |
 ; 0xE0100000 - 0xE01003FF - PCB Table Mapping   (256 Entries * 4 Bytes = 1 KiB)                  /
 ; 0xE00C0000 - 0xE00FFFFF - PCB List            (256 Entries * 1 KiB = 256 KiB)                     - 64    Page Frames
-; 0xE0000000 - 0xE00BFFFF - Memory Map          (786432 Entries * 1 Byte = 786432 Bytes)            - 192   Page Frames   
+; 0xE0000000 - 0xE00BFFFF - Memory Map          (deprecated) (786432 Entries * 1 Byte = 786432 Bytes)            - 192   Page Frames
+; 0xE001A000 - 0xE00BFFFF - Free                (5439488)
+; 0xE0002000 - 0xE0019FFF - User Frame Bitmap   (98304 Byte * 8 = 786432 bit / entries) 786432 * 4KiB = 3 GiB
+; 0xE0000000 - 0xE0001FFF - Page Table Bitmap   (8192 Byte * 8 = 65536 bit / entries) 65536 * 4KiB = 256 MiB
 ; 0xD0000000 - 0xDFFFFFFF - Page Tables         (64 * 2²⁰ * 4 = 256 MiB)                            - 65536 Page Frames  
 ; 0xC0000000 - 0xCFFFFFFF - OS Code             (256 MiB / 4 = 67_108_864 32 bit Instructions)      - 65536 Page Frames 
 

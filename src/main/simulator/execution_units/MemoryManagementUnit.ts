@@ -308,8 +308,8 @@ export class MemoryManagementUnit {
     }
 
     private findPageTableEntryPhysicalAddress(virtualAddress: DoubleWord): DoubleWord {
-        const pageDirectoryIndex: number = (virtualAddress >> 22) & 0x3FF;
-        const pageTableIndex: number = (virtualAddress >> 12) & 0x3FF;
+        const pageDirectoryIndex: number = (virtualAddress >>> 22) & 0x3FF;
+        const pageTableIndex: number = (virtualAddress >>> 12) & 0x3FF;
 
         const pageDirectoryEntryPhysical: DoubleWord = DoubleWord.fromNumber(this._cpu.ptp.content + pageDirectoryIndex * 4);
         const contentOfPageDirectoryEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(pageDirectoryEntryPhysical);
@@ -325,7 +325,7 @@ export class MemoryManagementUnit {
         }
 
         //Level 2 Page Table
-        const pageTableBase = PageTableEntry.getFrameNumber(pageDirectoryEntry) << MemoryManagementUnit.NUMBER_BITS_OFFSET;
+        const pageTableBase = (PageTableEntry.getFrameNumber(pageDirectoryEntry) << MemoryManagementUnit.NUMBER_BITS_OFFSET) >>> 0;
         const pageTableEntryPhysicalAddress = DoubleWord.fromNumber(pageTableBase + (pageTableIndex * 4));
         return pageTableEntryPhysicalAddress;
     }

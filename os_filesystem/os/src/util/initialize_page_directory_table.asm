@@ -7,6 +7,10 @@
 PUSH %ebx
 PUSH %ecx
 
+DEV $CONST_DEV_COMMAND_CPU_IS_MEMORY_VIRTUALIZATION_ENABLED, $0
+PUSH %eax ; is virtualization enabled
+DEV $CONST_DEV_COMMAND_CPU_DISABLE_MEMORY_VIRTUALIZATION, $0
+
 PUSH %ebx ; page directory table base address
 PUSH $768 ; index in page directory table 768 = start of kernel space
 PUSH $CONST_KERNEl_MEMORY_START ; current physical memory address
@@ -100,6 +104,13 @@ MOV $0, *%esp ; reset L2 index counter
 
 ._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_DONE:
     ADD $16, %esp ; clear variables from stack
+
+    POP %ebx ; was virtualization enabled
+    CMP $0, %ebx
+    JE _INITIALIZE_PAGE_DIRECTORY_TABLE_SKIP_MEMORY_VIRTUALIZATION_NO_ERROR
+        DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
+    ._INITIALIZE_PAGE_DIRECTORY_TABLE_SKIP_MEMORY_VIRTUALIZATION_NO_ERROR:
+
     POP %ecx
     POP %ebx
     MOV $0, %eax
@@ -109,6 +120,13 @@ MOV $0, *%esp ; reset L2 index counter
 ._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_ERROR:
     ; no space left for page tables
     ADD $16, %esp ; clear variables from stack
+
+    POP %ebx ; was virtualization enabled
+    CMP $0, %ebx
+    JE _INITIALIZE_PAGE_DIRECTORY_TABLE_SKIP_MEMORY_VIRTUALIZATION_ERROR
+        DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
+    ._INITIALIZE_PAGE_DIRECTORY_TABLE_SKIP_MEMORY_VIRTUALIZATION_ERROR:
+
     POP %ecx
     POP %ebx
     MOV $-1, %eax
