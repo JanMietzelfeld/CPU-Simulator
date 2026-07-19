@@ -48,6 +48,17 @@ MOV $CONST_OS_PAGE_TABLE_BITMAP_START, %eax
 SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %eax ; multiply index by size of one page table
 ADD $CONST_OS_PAGE_TABLE_LIST_START, %eax ; eax now holds address of first free page table
 
+PUSH %eax ; save free page table base address
+MOV %eax, %ebx
+; UTIL_INITIALIZE_PAGE_TABLE
+; Parameters (ebx is a pointer to the start of the Page Table):
+;   (ebx)     Pointer to the Page Table base address
+; Return value (immediate value):
+;   none
+CALL UTIL_INITIALIZE_PAGE_TABLE
+POP %eax ; restore free page table base address
+
+
 
 POP %ebx ; was virtualization enabled
 CMP $0, %ebx

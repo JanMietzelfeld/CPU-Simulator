@@ -139,13 +139,6 @@
             RET
         ._UTIL_CREATE_PCB_VALID_PAGE_TABLE_POINTER:
 
-        ; UTIL_INITIALIZE_PAGE_TABLE
-        ; Parameters 
-        ; Parameters (ebx is a pointer to the start of the Page Table):
-        ;   (ebx)     Pointer to the Page Table
-        ; Return value (immediate value):
-        ;   none
-        CALL UTIL_INITIALIZE_PAGE_TABLE
 
         POP %ebx
         ; UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE

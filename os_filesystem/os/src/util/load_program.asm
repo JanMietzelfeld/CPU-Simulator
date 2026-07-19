@@ -128,14 +128,6 @@
 
         ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLE_NO_ERROR:
             MOV %eax, %ebx
-            PUSH %ecx
-            ; UTIL_INITIALIZE_PAGE_TABLE
-            ; Parameters (ebx is a pointer to the start of the Page Table):
-            ;   (ebx)     Pointer to the Page Table base address
-            ; Return value (immediate value):
-            ;   none
-            CALL UTIL_INITIALIZE_PAGE_TABLE
-            POP %ecx
             ; ecx current page directory address
             ; ebx initialized page table base address
             AND $0xFFFFF000, %ebx ; calculate the address part of the page table entry

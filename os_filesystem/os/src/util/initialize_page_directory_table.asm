@@ -4,7 +4,6 @@
 ; Return value (immediate value):
 ;   (eax)  0 = success, -1 = no space
 .UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE:
-
 PUSH %ebx
 PUSH %ecx
 
@@ -37,14 +36,6 @@ CALL UTIL_ALLOCATE_PAGE_TABLE
 CMP $0xFFFFFFFF, %eax
 JE _UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_ERROR
 
-PUSH %eax
-; UTIL_INITIALIZE_PAGE_TABLE
-; Parameters (ebx is a pointer to the start of the Page Table):
-;   (ebx)     Pointer to the Page Table base address
-; Return value (immediate value):
-;   none
-CALL UTIL_INITIALIZE_PAGE_TABLE
-POP %eax
 MOV %eax, %ebx
 
 ; format page directory entry
@@ -68,13 +59,12 @@ MOV %ecx, *%eax ; write to page directory
 MOV $0, *%esp ; reset L2 index counter
 
 ._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_L2_START:
-    MOV *%esp, %eax
-    CMP $1024, %eax
+    CMP $1024, *%esp ;%eax
     JGE _UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_L2_DONE
 
     ; calculate L2 entry address
     ; ebx has L2 base address
-    MOV %eax, %ecx ; L2 index
+    MOV *%esp, %ecx ; L2 index
     SHL $2, %ecx ; byte offset in L2
     ADD %ebx, %ecx ; pointer to L2 entry
 
