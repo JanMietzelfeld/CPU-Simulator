@@ -66,7 +66,7 @@
     ._INITIALIZE_PAGE_TABLE_START:
         CMP $CONST_OS_PAGE_TABLE_SIZE, %eax
         JGE _PAGE_TABLE_INITIALIZATION_DONE
-        MOV $0, *%ebx
+        MOV $0x40000000, *%ebx
         ADD $4, %eax
         ADD $4, %ebx
         JMP _INITIALIZE_PAGE_TABLE_START

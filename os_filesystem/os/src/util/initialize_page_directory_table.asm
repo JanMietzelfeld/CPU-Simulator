@@ -45,7 +45,20 @@ MOV %eax, %ebx
 ; format page directory entry
 AND $0xFFFFF000, %eax ; calculate the address part of the page table entry
 SHR $12, %eax ; make space for the flags (12)
-OR $0xA0000000, %eax ; A = Present and Executable bit
+MOV %esp, %edx
+ADD $8, %edx
+CMP $832, *%edx
+JGE _UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_KERNEL_BLOCK_FLAGS_L1
+OR $0xB0000000, %eax ; B = Present, Executable, Mode bits set
+JMP _UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_L1_FLAGS_DONE
+
+._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_KERNEL_BLOCK_FLAGS_L1:
+OR $0x90000000, %eax ; 9 = Present and Mode bits set
+
+
+._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_L1_FLAGS_DONE:
+
+
 
 ; write entry to page directory entry
 MOV %esp, %ecx
@@ -78,7 +91,23 @@ MOV $0, *%esp ; reset L2 index counter
     MOV *%eax, %eax ; current physical memory address to map
     AND $0xFFFFF000, %eax ; calculate the address part of the page table entry
     SHR $12, %eax ; make space for the flags (12)
-    OR $0xA0000000, %eax ; A = Present and Executable bit
+
+
+    MOV %esp, %edx
+    ADD $8, %edx
+    CMP $832, *%edx
+    JGE _UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_KERNEL_BLOCK_FLAGS_L2
+    OR $0xB0000000, %eax ; B = Present, Executable, Mode bits set
+    JMP _UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_L2_FLAGS_DONE
+
+    ._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_KERNEL_BLOCK_FLAGS_L2:
+    OR $0x90000000, %eax ; 9 = Present and Mode bits set
+
+
+._UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE_L2_FLAGS_DONE:
+
+
+
     MOV %eax, *%ecx ; map L2 to page directory entry
     
     ; add frame size to current physical address
