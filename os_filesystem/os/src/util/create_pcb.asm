@@ -145,20 +145,8 @@
         ; Parameters (ebx is a pointer to the start of the Page Table):
         ;   (ebx)     Pointer to the Page Table base address
         ; Return value (immediate value):
-        ;   (eax)  0 = success, -1 = no space
+        ;   none
         CALL UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE
-        CMP $-1, %eax
-        JNE _UTIL_CREATE_PCB_INITIALIZE_PAGE_DIRECTORY_TABLE_NO_ERROR
-            POP %eax ; eax
-            POP %eax ; pcb
-            ADD $1, *%eax ; status bit 
-            MOV $0, *%eax ; set status to to terminated 
-            POP %eax ; pid
-            POP %eax ; pop ASCII name
-            MOV $0xFFFFFFFF, %eax
-            RET
-
-        ._UTIL_CREATE_PCB_INITIALIZE_PAGE_DIRECTORY_TABLE_NO_ERROR:
 
         POP %eax ; restore eax
 
