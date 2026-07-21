@@ -181,6 +181,35 @@
 
         ._UTIL_LOAD_PROGRAM_ALLOCATE_FRAME_NO_ERROR:
 
+        
+
+        ; ebx = pcb pointer
+        ; eax = frame address
+
+        ; inform simulator that frame has been allocated
+        ; FRAME_MAPPED_SIGNAL
+        ; (esp+8) virtual address
+        ; (esp+4) frame address
+        ; (esp)   process id
+        ; values get popped from stack
+
+        MOV *%esp, %ecx
+        SHL $10, %ecx ; Page directory index with space for L2 index
+        PUSH %ecx
+        MOV %esp, %ecx ;
+        ADD $8, %ecx
+        OR *%ecx, *%esp ; Created vpn
+        POP %ecx ; vpn now in ecx
+        SHL $12, %ecx
+        PUSH %ecx ; put virtual address onto stack
+        PUSH %eax ; put frame address onto stack
+        MOV *%ebx, %ecx ; pcb content
+        AND $0xFF000000, %ecx
+        SHR $24, %ecx ; PID is first byte of pcb
+        PUSH %ecx
+        DEV $CONST_DEV_COMMAND_FRAME_MAPPED_SIGNAL, $0
+
+
         PUSH %eax ; Push the frame start address onto the stack
 
         ; struct for syscall Read

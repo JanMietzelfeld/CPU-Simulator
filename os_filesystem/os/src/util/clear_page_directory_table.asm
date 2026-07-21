@@ -31,13 +31,13 @@ MOV $0, %ebx ; index counter
     SHL $12, %ecx ; get L2 page table base address
 
     PUSH %eax
-    PUSH %ebx
-    PUSH %ecx
-    MOV %ecx, %ebx
+    PUSH %ebx ; page directory index counter
+    PUSH %ecx ; L2 page table base address
 
     ; UTIL_CLEAR_PAGE_TABLE
     ; Parameters:
-    ;   (ebx)     Pointer to the L2 page table base address
+    ;   (ebx)       Page directory index
+    ;   (ecx)       L2 page table base address
     ; Return value (immediate value):
     ;   none
     CALL UTIL_CLEAR_PAGE_TABLE

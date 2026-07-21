@@ -959,6 +959,20 @@ export class CPUCore {
                 this.timer.addTimer(op2, timeValue);
                 break;
             }
+            case DevOperations.FRAME_MAP_SIGNAL:{
+                const processId: DoubleWord = this.internal_pop();
+                const framePhysicalAddress: DoubleWord = this.internal_pop();
+                const virtualAddress: DoubleWord = this.internal_pop();
+                this.mmu.insertReverseMemoryMapping(framePhysicalAddress, virtualAddress, processId);
+                break;
+            }
+            case DevOperations.FRAME_UNMAP_SIGNAL:{
+                const processId: DoubleWord = this.internal_pop();
+                const framePhysicalAddress: DoubleWord = this.internal_pop();
+                const virtualAddress: DoubleWord = this.internal_pop();
+                this.mmu.insertReverseMemoryMapping(framePhysicalAddress, virtualAddress, processId);
+                break;
+            }
             default:{
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
             }

@@ -148,7 +148,7 @@ export class MemoryManagementUnit {
      */
     public writeDoublewordTo(virtualAddress: DoubleWord, doubleword: DoubleWord, attemptsToExecute: boolean): void {
         const physicalAddress: DoubleWord = this.translate(virtualAddress, true, attemptsToExecute);
-        this.catchPageTableWrite(physicalAddress, doubleword);
+        //this.catchPageTableWrite(physicalAddress, doubleword);
         this._cpu.mainMemory.writeDoubleWordTo(physicalAddress, doubleword);
         return;
     }
@@ -344,6 +344,40 @@ export class MemoryManagementUnit {
         return pageTableEntry;
     }
 
+
+    public insertReverseMemoryMapping(physicalAddress: DoubleWord, virtualAddress: DoubleWord, processId: DoubleWord): void {
+        const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
+        const virtualPageNumber: PageNumber = PageNumber.fromVirtualAddress(virtualAddress);
+        const id: number = processId;
+
+        // Check if entry exists in case of silent remapping virtual address to new frame without unmap
+        // If mapping for vpn exists, delete it
+        for (const frameNumber in this.reverseMemoryMap) {
+            const mappings = this.reverseMemoryMap[frameNumber];
+            if (mappings) {
+                const existingIndex = mappings.findIndex(
+                    (entry) => entry.pageTableId === id && entry.pageNumber === virtualPageNumber
+                );
+                if (existingIndex !== -1) {
+                    mappings.splice(existingIndex, 1);
+                    break;
+                }
+            }
+        }
+        (this.reverseMemoryMap[frameNumber] ??= []).push({pageTableId: id, pageNumber: virtualPageNumber});
+            
+    }
+
+    public removeReverseMemoryMapping(physicalAddress: DoubleWord, virtualAddress: DoubleWord, processId: DoubleWord): void {
+        const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
+        const virtualPageNumber: PageNumber = PageNumber.fromVirtualAddress(virtualAddress);
+        const id: number = processId;
+        if (this.reverseMemoryMap[frameNumber]) {
+                this.reverseMemoryMap[frameNumber] = this.reverseMemoryMap[frameNumber].filter(
+                    (entry) => !(entry.pageTableId === id && entry.pageNumber === virtualPageNumber)
+            );
+        }
+    }
     /**
      * This method updates the reverse memory map based on the present bit of the given page table entry.
      * The reverse memory map maps a physical frame number to an object which contains the mapped virtual page number and the page table id, which the virtual page number belongs to.

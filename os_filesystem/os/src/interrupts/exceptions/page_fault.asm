@@ -61,7 +61,9 @@
     MOV *%ecx, %ecx
     AND $0xFFFFF, %ecx ; remove flags
     SHL $12, %ecx ; physical address of L2 page table
-    POP %ebx
+
+    MOV *%esp, %ebx
+
     ; ebx fault address
     ; ecx physical address of L2 page table
     ; extract page table index
@@ -83,6 +85,22 @@
         ; TODO implement swapping
         CALL SYSCALLS_PROCESS_EXIT
     ._INTERRUPTS_PAGE_FAULT_NO_ALLOCATE_FRAME_FAULT:
+
+    ; inform simulator that frame has been allocated
+    ; FRAME_MAPPED_SIGNAL
+    ; (esp+8) fault address
+    ; (esp+4) frame address
+    ; (esp)   process id
+    ; values get popped from stack
+    PUSH %eax
+    MOV $CONST_OS_CURRENT_PCB_POINTER, %ecx
+    MOV *%ecx, %ecx ; PCB pointer
+    MOV *%ecx, %ecx ; PCB content
+    AND $0xFF000000, %ecx ; first byte is PID
+    SHR $24, %ecx
+    PUSH %ecx
+    DEV $CONST_DEV_COMMAND_FRAME_MAPPED_SIGNAL, $0
+
 
     ; eax frame address
     ; ebx page table entry pointer

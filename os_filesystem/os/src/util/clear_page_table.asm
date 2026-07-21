@@ -1,6 +1,7 @@
 ; UTIL_CLEAR_PAGE_TABLE
 ; Parameters:
-;   (ebx)     Pointer to the L2 page table base address
+;   (ebx)     Page directory index
+;   (ecx)     L2 page table base address
 ; Return value (immediate value):
 ;   none
 .UTIL_CLEAR_PAGE_TABLE:
@@ -13,7 +14,9 @@ DEV $CONST_DEV_COMMAND_CPU_IS_MEMORY_VIRTUALIZATION_ENABLED, $0
 PUSH %eax ; is virtualization enabled
 DEV $CONST_DEV_COMMAND_CPU_DISABLE_MEMORY_VIRTUALIZATION, $0
 
-MOV %ebx, %eax
+PUSH %ebx ; page directory index
+
+MOV %ecx, %eax
 MOV $0, %ebx ; index counter
 
 ._UTIL_CLEAR_PAGE_TABLE_WALK_START:
@@ -41,6 +44,38 @@ MOV $0, %ebx ; index counter
     ; Return value (immediate value):
     ;   none
     CALL UTIL_CLEAR_FRAME
+
+
+    ; inform simulator that frame has been freed
+    ; FRAME_UNMAPPED_SIGNAL
+    ; (esp+8) virtual address
+    ; (esp+4) frame address
+    ; (esp)   process id
+    ; values get popped from stack
+
+    MOV %esp, %eax
+    ADD $12, %eax
+    MOV *%eax, %eax ; eax page directory index
+    SHL $10, %eax ; make space for L2 index
+    PUSH %eax
+    MOV %esp, %eax
+    ADD $8, %eax
+    OR *%eax, *%esp ; create vpn
+    SHL $12, *%esp ; virtual address
+    MOV %esp, %eax
+    ADD $4, %eax
+    MOV *%eax, %eax
+    PUSH %eax ; push physical address
+
+    MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
+    MOV *%eax, %eax ; PCB pointer
+    MOV *%eax, %eax ; PCB content
+    AND $0xFF000000, %eax ; first byte is PID
+    SHR $24, %eax
+    PUSH %eax ; put pid on stack
+    DEV $CONST_DEV_COMMAND_FRAME_UNMAPPED_SIGNAL, $0
+
+
 
     ; clear bit in memory bitmap
     POP %eax
@@ -86,7 +121,7 @@ MOV $0, %ebx ; index counter
      
 
 ._UTIL_CLEAR_PAGE_TABLE_WALK_DONE:
-
+POP %ebx ; clear page directory index from stack
 
 ; clear page table bitmap 
 
@@ -130,8 +165,7 @@ JE _CLEAR_PAGE_TABLE_SKIP_MEMORY_VIRTUALIZATION
     DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
 ._CLEAR_PAGE_TABLE_SKIP_MEMORY_VIRTUALIZATION:
 
-POP %ecx
-POP %ebx
+MOV *%esp, %ebx
 ; free page table itself
 ; UTIL_CLEAR_FRAME
 ; Parameters:
@@ -139,5 +173,8 @@ POP %ebx
 ; Return value (immediate value):
 ;   none
 CALL UTIL_CLEAR_FRAME
+
+POP %ecx
+POP %ebx
 POP %eax
 RET
