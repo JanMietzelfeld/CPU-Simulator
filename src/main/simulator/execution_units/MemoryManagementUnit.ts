@@ -14,6 +14,12 @@ interface memoryMapEntry {
         pageTableId: number;
         pageNumber: number;
 }
+
+interface pageTableRegistryEntry {
+    pageTableId: number;
+    directoryIndex: number;
+}
+
 /**
  * This class represents a Memory Management Unit (MMU). This specialized execution unit is responsible
  * for translating virtual memory addresses into physical memory addresses.
@@ -93,6 +99,8 @@ export class MemoryManagementUnit {
      */
     public reverseMemoryMap: memoryMapEntry[][] = [];
 
+    public pageTableRegistry: pageTableRegistryEntry[][] = [];
+
 
     /**
      * Constructs a new instance from the given references of the RAM, Page Table Pointer (PTP) register, the ALU and the EFLAGS register.
@@ -140,7 +148,7 @@ export class MemoryManagementUnit {
      */
     public writeDoublewordTo(virtualAddress: DoubleWord, doubleword: DoubleWord, attemptsToExecute: boolean): void {
         const physicalAddress: DoubleWord = this.translate(virtualAddress, true, attemptsToExecute);
-        //this.updateReverseMemoryMap(physicalAddress, doubleword)
+        this.catchPageTableWrite(physicalAddress, doubleword);
         this._cpu.mainMemory.writeDoubleWordTo(physicalAddress, doubleword);
         return;
     }
@@ -347,12 +355,7 @@ export class MemoryManagementUnit {
      * @param ptEntryAddress The memory address of the page table entry.
      * @param ptEntry The page table entry.
      */
-    private updateReverseMemoryMap(ptEntryAddress: DoubleWord, ptEntry: DoubleWord): void {
-        const pageTablesStartAddress: number = 0xD0000000;
-        const pageTablesEndAddress: number = 0xDFFFFFFF;
-        if (ptEntryAddress < pageTablesStartAddress || ptEntryAddress > pageTablesEndAddress) {
-            return
-        }
+    private updateReverseMemoryMap(ptEntryAddress: DoubleWord, ptEntry: DoubleWord, pageTableId: number, pageNumber: number): void {
         const newPtEntry: PageTableEntry = PageTableEntry.fromDoubleWord(ptEntry);
         const oldPtEntry: PageTableEntry = PageTableEntry.fromDoubleWord(this._cpu.mainMemory.readDoublewordFrom(ptEntryAddress));
 
@@ -361,23 +364,15 @@ export class MemoryManagementUnit {
         const newFrameNumber: number = PageTableEntry.getFrameNumber(newPtEntry);
         const oldFrameNumber: number = PageTableEntry.getFrameNumber(oldPtEntry);
 
-        const ptMemoryOffset: number = ptEntryAddress - pageTablesStartAddress;
-        
-        //Divide by four
-        const globalEntryIndex: number = ptMemoryOffset >> 2;
-        //Bitwise modulo 2^20 to find the page number since a page table has 2^20 entries
-        const pageNumber: number = globalEntryIndex & 0xFFFFF;
-        const pageTableId: number = globalEntryIndex >> 20;
-
         if (newPtPresentBit === 1 && oldPtPresentBit === 0) {
             (this.reverseMemoryMap[newFrameNumber] ??= []).push({pageTableId: pageTableId, pageNumber: pageNumber});
         }
 
         if (newPtPresentBit === 0 && oldPtPresentBit === 1) {
-            if (!this.reverseMemoryMap[newFrameNumber]) {
+            if (!this.reverseMemoryMap[oldFrameNumber]) {
                 return;
             }
-            this.reverseMemoryMap[newFrameNumber] = this.reverseMemoryMap[newFrameNumber].filter(
+            this.reverseMemoryMap[oldFrameNumber] = this.reverseMemoryMap[oldFrameNumber].filter(
                 (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
             );
         }
@@ -386,24 +381,104 @@ export class MemoryManagementUnit {
             if (newFrameNumber === oldFrameNumber) {
                 return
             }
-            this.reverseMemoryMap[oldFrameNumber] = this.reverseMemoryMap[oldFrameNumber].filter(
-                (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
-            );
+            if (this.reverseMemoryMap[oldFrameNumber]) {
+                this.reverseMemoryMap[oldFrameNumber] = this.reverseMemoryMap[oldFrameNumber].filter(
+                    (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
+                );
+            }
             (this.reverseMemoryMap[newFrameNumber] ??= []).push({pageTableId: pageTableId, pageNumber: pageNumber});
         }
     }
 
     public findVirtualFromPhysical(physicalAddress: DoubleWord): DoubleWord[] {
         const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
-        const reverseMemoryMapEntry: memoryMapEntry[] = this.reverseMemoryMap[frameNumber];
+        const reverseMemoryMapEntry: memoryMapEntry[] = this.reverseMemoryMap[frameNumber] ?? [];
         const virtualAddresses: DoubleWord[] = [];
         for (const entry of reverseMemoryMapEntry) {
-            const pNumber: number = entry.pageNumber;
+            const pNumber: number = entry.pageNumber << 12;
             const offset: number = physicalAddress & 0xFFF;
             const virtualAddress: DoubleWord = DoubleWord.fromNumber(pNumber | offset);
             virtualAddresses.push(virtualAddress);
         }
         return virtualAddresses;
+    }
+
+
+    private catchPageTableWrite(physicalAddress: DoubleWord, newEntry: DoubleWord): void {
+        const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
+        const offset: number = physicalAddress & 0xFFF;
+        const entryIndex = offset >>> 2; // Each entry is 4 bytes, divide by 4 gives index
+        // Is write to page directory?
+        if (this.isPageDirectory(physicalAddress)) {
+            this.pageDirectoryWrite(physicalAddress, newEntry, entryIndex);
+            return;
+        }
+
+        // Is it a write to a known L2 page table?
+        const pageTableRegistryEntries = this.pageTableRegistry[frameNumber];
+        if (pageTableRegistryEntries !== undefined) {
+            for (const entry of pageTableRegistryEntries) {
+                const targetVpn = (entry.directoryIndex << 10) | entryIndex;
+                this.updateReverseMemoryMap(physicalAddress, newEntry, entry.pageTableId, targetVpn);
+            }
+        }
+
+
+    }
+
+    private isPageDirectory(physicalAddress: DoubleWord): boolean {
+        const pageDirectoryBaseAddress: DoubleWord = this._cpu.ptp.content;
+        const pageDirectoryFrameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(pageDirectoryBaseAddress);
+        const physicalAddressFrameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
+        const isInRange: boolean = pageDirectoryFrameNumber === physicalAddressFrameNumber; // Page tables are 4kib aligned 
+        return isInRange;
+    }
+
+    private pageDirectoryWrite(pdEntryAddress: DoubleWord, pdEntry: DoubleWord, directoryIndex: number): void {
+        const oldPdEntry: PageTableEntry = PageTableEntry.fromDoubleWord(this._cpu.mainMemory.readDoublewordFrom(pdEntryAddress));
+        const newPdEntry: PageTableEntry = PageTableEntry.fromDoubleWord(pdEntry);
+
+        const newPdPresentBit: number = PageTableEntry.getFlags(newPdEntry) >> 11;
+        const oldPdPresentBit: number = PageTableEntry.getFlags(oldPdEntry) >> 11;
+
+        const newL2FrameNumber: number = PageTableEntry.getFrameNumber(newPdEntry);
+        const oldL2FrameNumber: number = PageTableEntry.getFrameNumber(oldPdEntry);
+
+        const pageTableId = this.getCurrentPageTableId(); // use pid as id
+
+        // New L2 page table got mapped
+        if (newPdPresentBit === 1 && oldPdPresentBit === 0) {
+            (this.pageTableRegistry[newL2FrameNumber] ??= []).push({pageTableId: pageTableId, directoryIndex: directoryIndex});
+        }
+
+        // L2 page got unmapped
+        if (newPdPresentBit === 0 && oldPdPresentBit === 1) {
+            if (!this.pageTableRegistry[oldL2FrameNumber]) {
+                return;
+            }
+            this.pageTableRegistry[oldL2FrameNumber] = this.pageTableRegistry[oldL2FrameNumber].filter(
+                (entry) => !(entry.pageTableId === pageTableId && entry.directoryIndex === directoryIndex)
+            );
+        }
+
+        // L2 page table got swapped
+        if (oldPdPresentBit === 1 && newPdPresentBit === 1) {
+            if (newL2FrameNumber === oldL2FrameNumber) {
+                return
+            }
+            if (this.pageTableRegistry[oldL2FrameNumber]) {
+                this.pageTableRegistry[oldL2FrameNumber] = this.pageTableRegistry[oldL2FrameNumber].filter(
+                    (entry) => !(entry.pageTableId === pageTableId && entry.directoryIndex === directoryIndex)
+                );
+            }
+            (this.pageTableRegistry[newL2FrameNumber] ??= []).push({pageTableId: pageTableId, directoryIndex: directoryIndex});
+        }
+    }
+
+    private getCurrentPageTableId(): number {
+        const currentPcbPointer = this._cpu.mainMemory.readDoublewordFrom(DoubleWord.fromNumber(0xE0100A00)); // Mem address of current active pcb
+        const pid = (this._cpu.mainMemory.readDoublewordFrom(currentPcbPointer) >>> 24) & 0xFF; // first byte of PCB = pid
+        return pid;
     }
 
 }
