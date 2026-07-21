@@ -23,5 +23,5 @@
 
 .INCLUDE "os/src/util/initialize_page_directory_table"
 
-
+.INCLUDE "os/src/util/setup_kernel_L2_mapping"
 

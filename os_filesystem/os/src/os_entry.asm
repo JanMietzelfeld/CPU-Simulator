@@ -91,6 +91,16 @@ JMP _OS_ENTRY ; start of the os
 
 ; Interrupt Table Is Set Up
 
+; UTIL_SETUP_KERNEL_L2_MAPPING
+; Parameters:
+;   none
+; Return value (immediate value):
+;   none
+CALL UTIL_SETUP_KERNEL_L2_MAPPING
+
+; L2 page tables that map the kernel space have been created
+; These L2 maps later get linked into the page directory of new processes
+
 ; Create the init process
     
     ; the code for init Program should be located in the file os/user/init (as bynary file)
