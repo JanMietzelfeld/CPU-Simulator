@@ -73,7 +73,7 @@ MOV $0, %ebx ; index counter
     AND $0xFF000000, %eax ; first byte is PID
     SHR $24, %eax
     PUSH %eax ; put pid on stack
-    DEV $CONST_DEV_COMMAND_FRAME_UNMAPPED_SIGNAL, $0
+    DEV $CONST_DEV_COMMAND_FRAME_UNMAPPED_SIGNAL, $0 ; DEV command pops 3 entries from stack
 
 
 
@@ -129,6 +129,7 @@ MOV $CONST_OS_PAGE_TABLE_LIST_START, %ebx
 MOV $CONST_OS_PAGE_TABLE_BITMAP_START, %ecx
 
 ; eax page table base address
+PUSH %eax
 ; ebx page table list start address
 ; ecx page table bitmap start address
 
@@ -158,6 +159,18 @@ MOV *%ecx, %ebx ; load dword from bitmap
 AND %eax, %ebx ; apply mask
 MOV %ebx, *%ecx ; write back to bitmap
 
+POP %eax ; page table base address
+MOV $0, %ebx ; index counter
+
+._UTIL_CLEAR_PAGE_TABLE_CLEAR_TABLE_START:
+CMP $1024, %ebx
+JGE _UTIL_CLEAR_PAGE_TABLE_CLEAR_TABLE_END
+MOV $0, *%eax
+ADD $1, %ebx
+ADD $4, %eax
+JMP _UTIL_CLEAR_PAGE_TABLE_CLEAR_TABLE_START
+
+._UTIL_CLEAR_PAGE_TABLE_CLEAR_TABLE_END:
 
 POP %ebx ; was virtualization enabled
 CMP $0, %ebx
@@ -165,14 +178,6 @@ JE _CLEAR_PAGE_TABLE_SKIP_MEMORY_VIRTUALIZATION
     DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
 ._CLEAR_PAGE_TABLE_SKIP_MEMORY_VIRTUALIZATION:
 
-MOV *%esp, %ebx
-; free page table itself
-; UTIL_CLEAR_FRAME
-; Parameters:
-;   (ebx)     Pointer to the frame base address
-; Return value (immediate value):
-;   none
-CALL UTIL_CLEAR_FRAME
 
 POP %ecx
 POP %ebx

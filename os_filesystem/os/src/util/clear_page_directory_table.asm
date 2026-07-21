@@ -17,7 +17,7 @@ MOV %ebx, %eax
 MOV $0, %ebx ; index counter
 
 ._UTIL_CLEAR_PAGE_DIRECTORY_TABLE_WALK_START:
-    CMP $1024, %ebx
+    CMP $768, %ebx ; only free user space frames, otherwise complete kernel gets deleted
     JGE _UTIL_CLEAR_PAGE_DIRECTORY_TABLE_WALK_DONE
     ; calculate entry address
     MOV %ebx, %ecx
@@ -60,6 +60,7 @@ MOV $CONST_OS_PAGE_TABLE_LIST_START, %ebx
 MOV $CONST_OS_PAGE_TABLE_BITMAP_START, %ecx
 
 ; eax page table base address
+PUSH %eax
 ; ebx page table list start address
 ; ecx page table bitmap start address
 
@@ -89,6 +90,20 @@ MOV *%ecx, %ebx ; load dword from bitmap
 AND %eax, %ebx ; apply mask
 MOV %ebx, *%ecx ; write back to bitmap
 
+POP %eax ; page directory base address
+MOV $0, %ebx ; index counter
+
+
+._UTIL_CLEAR_PAGE_DIRECTORY_TABLE_CLEAR_TABLE_START:
+CMP $768, %ebx ; do not empty full page directory, the kernel mapping is still needed
+JGE _UTIL_CLEAR_PAGE_DIRECTORY_TABLE_CLEAR_TABLE_END
+MOV $0, *%eax
+ADD $1, %ebx
+ADD $4, %eax
+;JMP _UTIL_CLEAR_PAGE_DIRECTORY_TABLE_CLEAR_TABLE_START
+
+._UTIL_CLEAR_PAGE_DIRECTORY_TABLE_CLEAR_TABLE_END:
+
 POP %ebx ; was virtualization enabled
 CMP $0, %ebx
 JE _CLEAR_PAGE_DIRECTORY_TABLE_SKIP_MEMORY_VIRTUALIZATION
@@ -98,12 +113,5 @@ JE _CLEAR_PAGE_DIRECTORY_TABLE_SKIP_MEMORY_VIRTUALIZATION
 
 POP %ecx
 POP %ebx
-; free page directory table itself
-; UTIL_CLEAR_FRAME
-; Parameters:
-;   (ebx)     Pointer to the frame base address
-; Return value (immediate value):
-;   none
-CALL UTIL_CLEAR_FRAME
 POP %eax
 RET
