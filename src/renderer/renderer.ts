@@ -1,12 +1,14 @@
 import { DoubleWord } from "../types/binary/DoubleWord";
 import { Byte } from "../types/binary/Byte";
-import { Instructions } from "../types/enumerations/IntructionSet";
 import { InstructionTypes } from "../types/enumerations/InstructionTypes";
 import { OperandTypes } from "../types/enumerations/OperandTypes";
 import { RegisterNumbers } from "../types/enumerations/RegisterNumbers";
 import { AddressingModes } from "../types/enumerations/AdressingModes";
 import { InterruptNumbers } from "../types/enumerations/InterruptNumbers";
 import { DevOperations } from "../types/enumerations/DevOperations";
+import { InstructionSet } from "../types/enumerations/InstructionSet";
+import { PhysicalAddress } from "../types/binary/PhysicalAddress";
+import { VirtualAddress } from "../types/binary/VirtualAddress";
 
 /**
  * This enumeration is a duplicate of the one, that can be
@@ -1597,7 +1599,7 @@ export class Renderer {
 
         const ramCells: Map<number, number> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
 
-        for (let [index,[physicalAddress, ramCellContent]] of Array.from(ramCells).entries()) {
+        for (const [index,[physicalAddress, ramCellContent]] of Array.from(ramCells).entries()) {
             //Create Byte cells in the row and fill with data.
             const byteData = tableRow.insertCell();
             switch (this.ramDataRepresentation) {
@@ -1612,7 +1614,7 @@ export class Renderer {
                     break;
             }
             
-            const virtualAddresses: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddress);
+            const virtualAddresses: VirtualAddress[] = await this.reverseMemoryMapSearch(physicalAddress);
             for (const virtualAddress of virtualAddresses) {
                 virtualAddressColumn.append(`0x${virtualAddress.toString(16)}`);
                 const rowBreak: HTMLBRElement = this._document.createElement("br");
@@ -1674,7 +1676,7 @@ export class Renderer {
                 }
                 ++characterCounter;
                 physicalAddressColumn.innerHTML = "0x" + (physicalAddressStart + i).toString(16);
-                const virtualAddresses: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
+                const virtualAddresses: VirtualAddress[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
                 for (const virtualAddress of virtualAddresses) {
                     virtualAddressColumn.append(`0x${virtualAddress.toString(16)}`);
                     const rowBreak: HTMLBRElement = this._document.createElement("br");
@@ -1686,8 +1688,8 @@ export class Renderer {
                 const startAddress: number = physicalAddressStart + i;
                 physicalAddressColumn.innerHTML = `0x${(physicalAddressStart + i).toString(16)} - 0x${(endAddress).toString(16)}`;
 
-                const virtualAddressesStart: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
-                const VirtualAddressesEnd: DoubleWord[] = await this.reverseMemoryMapSearch(endAddress);
+                const virtualAddressesStart: VirtualAddress[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
+                const VirtualAddressesEnd: VirtualAddress[] = await this.reverseMemoryMapSearch(endAddress);
                 if (targetAddress >= startAddress && targetAddress <= endAddress) {
                     targetAddressIndex = characterCounter;
                 }
@@ -1720,14 +1722,14 @@ export class Renderer {
         for (let i = 0; i < ramContent.length;) {
             const tableRow: HTMLTableRowElement = this._document.createElement("tr");
             const binary = ramContent.slice(i, (i + this.ramBlockSize));
-            let instructionString = await this.getInstructionText(binary);
+            const instructionString = await this.getInstructionText(binary);
 
             const physicalAddressColumn = tableRow.insertCell();
             const virtualAddressColumn = tableRow.insertCell();
             const assemblyInstruction = tableRow.insertCell();
 
-            const virtualAddressesStart: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
-            const VirtualAddressesEnd: DoubleWord[] = await this.reverseMemoryMapSearch(physicalAddressStart + i + (this.ramBlockSize - 1));
+            const virtualAddressesStart: VirtualAddress[] = await this.reverseMemoryMapSearch(physicalAddressStart + i);
+            const VirtualAddressesEnd: VirtualAddress[] = await this.reverseMemoryMapSearch(physicalAddressStart + i + (this.ramBlockSize - 1));
 
             for (let i = 0; i < virtualAddressesStart.length; i++) {
                 const virtualAddressFrom = "0x" + virtualAddressesStart[i].toString(16);
@@ -1809,7 +1811,7 @@ export class Renderer {
         const instruction = DoubleWord.fromBytes(instructions[0], instructions[1], instructions[2], instructions[3]);
 
         const type: string = InstructionTypes[DoubleWord.getBitRange(instruction, 0, 3)];
-        const operation: string =  Instructions[DoubleWord.getBitRange(instruction, 5, 12)];
+        const operation: string =  InstructionSet[DoubleWord.getBitRange(instruction, 5, 12)];
 
         if (type === undefined || operation === undefined) {
             return "UNKNOWN";
@@ -1882,12 +1884,12 @@ export class Renderer {
      * @param physicalAddress The physical memory address to find all virtual memory addresses for that map to that physical memory address.
      * @returns An array of double words representing virtual memory addresses.
      */
-    public async reverseMemoryMapSearch(physicalAddress: number): Promise<DoubleWord[]> {
+    public async reverseMemoryMapSearch(physicalAddress: number): Promise<VirtualAddress[]> {
         const kernelSpaceStart: number = 0xC0000000;
         const kernelSpaceEnd: number = 0xFFFFFFFF;
-        const virtualAddresses: DoubleWord[] = await this._window.mainMemory.findVirtualAddresses(DoubleWord.fromNumber(physicalAddress));
+        const virtualAddresses: VirtualAddress[] = await this._window.mainMemory.findVirtualAddresses(PhysicalAddress.fromNumber(physicalAddress));
         if (physicalAddress <= kernelSpaceEnd && physicalAddress >= kernelSpaceStart) {
-            virtualAddresses.push(DoubleWord.fromNumber(physicalAddress));
+            virtualAddresses.push(VirtualAddress.fromNumber(physicalAddress));
         }
         return virtualAddresses;
     }

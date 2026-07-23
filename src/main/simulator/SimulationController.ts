@@ -7,6 +7,8 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
+import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
+import { FrameOffset } from "../../types/binary/FrameOffset";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -99,7 +101,6 @@ export class SimulationController {
         //Assemble the init program (needed by the os)
         this.assembleOSCode(this.pathToOSFilesystem + "/os/user/init.asm");
     
-
         //Assemble the init program (needed by the os)
         this.assembleOSCode(this.pathToOSFilesystem + "/os/user/idle.asm");
     }
@@ -124,13 +125,8 @@ export class SimulationController {
         const lenght =  buffer.length - (buffer.length % 4);
 
         for (let i = 0; i < lenght; i+=4) {
-            const value: DoubleWord = DoubleWord.fromBytes(
-                Byte.fromNumber(buffer[i]), 
-                Byte.fromNumber(buffer[i+1]), 
-                Byte.fromNumber(buffer[i+2]), 
-                Byte.fromNumber(buffer[i+3]));
-
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
+            const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i));
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
         }
 
         if (buffer.length % 4 !== 0)
@@ -141,7 +137,7 @@ export class SimulationController {
                 Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
                 Byte.ZERO);
 
-            this.mainMemory.writeDoubleWordTo(DoubleWord.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
         }
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
@@ -202,15 +198,7 @@ export class SimulationController {
             relativePathToCode = relativePathToCode.concat("\0");
         }
 
-        const buffer: number[] = [];
-
-        for (let i = 0; i < relativePathToCode.length; i++) {
-
-            buffer.push(relativePathToCode.charCodeAt(i));
-        }
-
-
-        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from(buffer));
+        writeFileSync(this.pathToOSFilesystem + "/os/util/new_process_name.bin", Buffer.from(relativePathToCode, "utf8"));
         
         return;
     }
@@ -226,16 +214,11 @@ export class SimulationController {
         // Compile the program code.
         const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents);
 
-        const buffer = Buffer.alloc(compiledProgram.length * 4);
+        const buffer = Buffer.allocUnsafe(compiledProgram.length * 4);
 
-        compiledProgram.forEach((doubleWord, i) => {
-            const offset = i * 4;
-
-            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
-            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
-            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
-            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
-        });
+        for (let index = 0; index < compiledProgram.length; index++) {
+            buffer.writeUInt32BE(compiledProgram[index], index * 4);
+        }
 
         pathToProgramCode = this.pathToOSFilesystem + "/bin" + pathToProgramCode.substring(pathToProgramCode.lastIndexOf("/"));
         pathToProgramCode = pathToProgramCode.replace(".asm", ".bin");;
@@ -256,16 +239,11 @@ export class SimulationController {
         // Compile the program code.
         const compiledProgram: Array<DoubleWord> = this._assembler.assemble(fileContents, baseOffeset);
 
-        const buffer = Buffer.alloc(compiledProgram.length * 4);
+        const buffer = Buffer.allocUnsafe(compiledProgram.length * 4);
 
-        compiledProgram.forEach((doubleWord, i) => {
-            const offset = i * 4;
-
-            buffer[offset]     = DoubleWord.getFirstByte(doubleWord);
-            buffer[offset + 1] = DoubleWord.getSecondByte(doubleWord);
-            buffer[offset + 2] = DoubleWord.getThirdByte(doubleWord);
-            buffer[offset + 3] = DoubleWord.getFourthByte(doubleWord);
-        });
+        for (let index = 0; index < compiledProgram.length; index++) {
+            buffer.writeUInt32BE(compiledProgram[index], index * 4);
+        }
 
         pathToProgramCode = pathToProgramCode.replace(".asm", "");
 
@@ -296,7 +274,7 @@ export class SimulationController {
 
         if (!existsSync(zeroFramePath))
         {
-            const buffer = Buffer.alloc(4096 * 4);
+            const buffer = Buffer.alloc((2**FrameOffset.NUMBER_OF_BITS) * 4);
 
             writeFileSync(zeroFramePath, buffer);
         }
