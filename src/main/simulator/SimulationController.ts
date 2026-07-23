@@ -301,38 +301,6 @@ export class SimulationController {
             writeFileSync(zeroFramePath, buffer);
         }
 
-        const pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
-
-        if (!existsSync(pageTablePath))
-        {
-            const buffer = Buffer.alloc((786432 + 262144) * 4);
-
-            for (let i = 0; i < 786432*4; i+=4) { //0x40000000
-                buffer[i] = 0x40;
-            }
-
-            for (let i = 0; i < 262144; i++) {
-                const index = 786432*4 + i*4;
-                if (i < 65536) //0xB0...
-                {
-                    const value = DoubleWord.fromNumber(0xB0000000 + i + 786432);
-                    buffer[index] = DoubleWord.getFirstByte(value);
-                    buffer[index+1] = DoubleWord.getSecondByte(value);
-                    buffer[index+2] = DoubleWord.getThirdByte(value);
-                    buffer[index+3] = DoubleWord.getFourthByte(value);
-                }
-                else //0x90...
-                {
-                    const value = DoubleWord.fromNumber(0x90000000 + i + 786432);
-                    buffer[index] = DoubleWord.getFirstByte(value);
-                    buffer[index+1] = DoubleWord.getSecondByte(value);
-                    buffer[index+2] = DoubleWord.getThirdByte(value);
-                    buffer[index+3] = DoubleWord.getFourthByte(value);
-                }
-            }
-
-            writeFileSync(pageTablePath, buffer);
-        }
     }
 
     /**

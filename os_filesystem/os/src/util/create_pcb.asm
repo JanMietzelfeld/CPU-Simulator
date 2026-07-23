@@ -104,14 +104,6 @@
         MOV %eax, %ecx
         POP %eax ; restore eax
 
-
-
-
-        ; allocate Page Table
-        ;SHL $CONST_OS_PAGE_TABLE_BIT_SIZE, %ecx
-        ;ADD $CONST_OS_PAGE_TABLE_LIST_START, %ecx
-
-
         MOV %ecx, *%eax  ; set page table pointer
         ADD $4, %eax
 

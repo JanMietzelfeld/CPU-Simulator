@@ -1,5 +1,3 @@
-
-
 ; The Loader is responsible for loading the code of a program into memory
 
 ; assume %ebx is the pointer to the filename of the to be loaded program
@@ -11,7 +9,6 @@
 ; Return value (immediate value):
 ;   eax     success status (0 = success, -1 = file does not exists, -2 = not a file, -3 = out of memory, -4 = unknown)
 .UTIL_LOAD_PROGRAM:
-
     PUSH %ebx ; save ebx
 
     MOV *%ebx, %ebx
@@ -29,79 +26,69 @@
     RET
 
     ._UTIL_LOAD_PROGRAM_FILE_STAT:
+        PUSH %eax ; Push the file length onto the stack
 
-
-    PUSH %eax ; Push the file length onto the stack
-
-    ; SYSCALLS_FILE_OPEN
-    ; Parameters (ebx is a pointer to the start of an ASCII filename):
-    ;   (ebx)     Pointer to a ASCII filename
-    ; Return value (immediate value):
-    ;   eax     file descriptor (-1 = error)
-    CALL SYSCALLS_FILE_OPEN
-    CMP $0, %eax
-    JGE _UTIL_LOAD_PROGRAM_FILE_OPEN
-    POP %ebx
-    POP %ebx
-    MOV $-4, %eax
-    RET
+        ; SYSCALLS_FILE_OPEN
+        ; Parameters (ebx is a pointer to the start of an ASCII filename):
+        ;   (ebx)     Pointer to a ASCII filename
+        ; Return value (immediate value):
+        ;   eax     file descriptor (-1 = error)
+        CALL SYSCALLS_FILE_OPEN
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_FILE_OPEN
+        POP %ebx
+        POP %ebx
+        MOV $-4, %eax
+        RET
     
     ._UTIL_LOAD_PROGRAM_FILE_OPEN:
+        PUSH %eax ; Push the file descriptor onto the stack
 
-    PUSH %eax ; Push the file descriptor onto the stack
+        ; *(%esp+4) = file lenght
+        ; *(%esp) = file descriptor
 
-    ; *(%esp+4) = file lenght
-    ; *(%esp) = file descriptor
+        ; calculate number of needed frames
 
-    ; calculate number of needed frames
+        MOV %esp, %eax
+        ADD $4, %eax
+        MOV *%eax, %eax ; get file lenght
 
-    MOV %esp, %eax
-    ADD $4, %eax
-    MOV *%eax, %eax ; get file lenght
+        MOV %eax, %ebx ; copy
 
-    MOV %eax, %ebx ; copy
+        SHR $CONST_OS_FRAME_BIT_SIZE, %eax ; divide by frame size (2¹²) = 12 bit shifts to the right
 
-    SHR $CONST_OS_FRAME_BIT_SIZE, %eax ; divide by frame size (2¹²) = 12 bit shifts to the right
-
-    ; check if there is a remainder
-    MOV $CONST_CPU_BIT_WIDTH, %ecx 
-    SUB $CONST_OS_FRAME_BIT_SIZE, %ecx
-    SAL %ecx, %ebx
-    CMP $0, %ebx
-    JE UTIL_LOAD_PROGRAM_NO_REMAINDER
+        ; check if there is a remainder
+        MOV $CONST_CPU_BIT_WIDTH, %ecx 
+        SUB $CONST_OS_FRAME_BIT_SIZE, %ecx
+        SAL %ecx, %ebx
+        CMP $0, %ebx
+        JE UTIL_LOAD_PROGRAM_NO_REMAINDER
         ADD $1, %eax ; if there is a remainder we need to allocate one more frame for it
+
     .UTIL_LOAD_PROGRAM_NO_REMAINDER:
+        PUSH %eax ; Push the number of needed frames onto the stack
+        ; calculate number of required L2 page tables and write them to the page directory
+        ; use ceiling function to floor function for optimization
+        ADD $1023, %eax
+        SHR $10, %eax ; divide by the amount of entries a page table can hold 2¹⁰ = 1024
+        
+        ; %eax now holds amount of needed L2 page tables
+        ; initialize and map L2 page tables to base directory
 
-    PUSH %eax ; Push the number of needed frames onto the stack
+        ; get PCB pointer from stack
+        MOV %esp, %ebx
+        ADD $12, %ebx
+        MOV *%ebx, %ebx
+        ADD $4, %ebx
+        MOV *%ebx, %ebx ; ebx = pcb pointer
+        ADD $2, %ebx ; move to page directory base address in pcb
+        MOV *%ebx, %ebx ; page directory base address now in ebx
+        MOV %ebx, %ecx
 
-
-
-
-
-    ; calculate number of required L2 page tables and write them to the page directory
-    ; use ceiling function to floor function for optimization
-    ADD $1023, %eax
-    SHR $10, %eax ; divide by the amount of entries a page table can hold 2¹⁰ = 1024
-    
-    ; %eax now holds amount of needed L2 page tables
-    ; initialize and map L2 page tables to base directory
-
-    ; get PCB pointer from stack
-    MOV %esp, %ebx
-    ADD $12, %ebx
-    MOV *%ebx, %ebx
-    ADD $4, %ebx
-    MOV *%ebx, %ebx ; ebx = pcb pointer
-    ADD $2, %ebx ; move to page directory base address in pcb
-    MOV *%ebx, %ebx ; page directory base address now in ebx
-    MOV %ebx, %ecx
-
-
-
-    MOV $0, %ebx ; counter for base directory index
-    ; eax needed amount of L2 page tables
-    ; ebx page directory index counter
-    ; ecx page directory base address
+        MOV $0, %ebx ; counter for base directory index
+        ; eax needed amount of L2 page tables
+        ; ebx page directory index counter
+        ; ecx page directory base address
     
     ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES:
         CMP %eax, %ebx ; all L2 page tab mapped?
@@ -126,32 +113,28 @@
             MOV $-4, %eax
             RET
 
-        ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLE_NO_ERROR:
-            MOV %eax, %ebx
-            ; ecx current page directory address
-            ; ebx initialized page table base address
-            AND $0xFFFFF000, %ebx ; calculate the address part of the page table entry
-            SHR $12, %ebx ; make space for the flags (12)
-            OR $0xA0000000, %ebx ; A = Present and Executable bit
-            MOV %ebx, *%ecx ; write the base directory entry
+    ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLE_NO_ERROR:
+        MOV %eax, %ebx
+        ; ecx current page directory address
+        ; ebx initialized page table base address
+        AND $0xFFFFF000, %ebx ; calculate the address part of the page table entry
+        SHR $12, %ebx ; make space for the flags (12)
+        OR $0xA0000000, %ebx ; A = Present and Executable bit
+        MOV %ebx, *%ecx ; write the base directory entry
 
-            POP %ebx ; page directory index counter
-            POP %eax ; needed amount of L2 page tables
-            ADD $1, %ebx
-            ADD $4, %ecx ; next base directory index
+        POP %ebx ; page directory index counter
+        POP %eax ; needed amount of L2 page tables
+        ADD $1, %ebx
+        ADD $4, %ecx ; next base directory index
 
-            JMP _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES
+        JMP _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES
     
     ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES_DONE:
-
-
-
-    PUSH $1 ; Push the number of written frames onto the stack
-    PUSH $0 ; push page table index onto stack
-    PUSH $0 ; push page directory index onto stack
+        PUSH $1 ; Push the number of written frames onto the stack
+        PUSH $0 ; push page table index onto stack
+        PUSH $0 ; push page directory index onto stack
 
     ._UTIL_LOAD_PROGRAM_ALLOCATE_FRAMES:
-
         ; set up parameter
         MOV %esp, %ebx
         ADD $24, %ebx
@@ -179,10 +162,7 @@
         MOV $-3, %eax
         RET
 
-        ._UTIL_LOAD_PROGRAM_ALLOCATE_FRAME_NO_ERROR:
-
-        
-
+    ._UTIL_LOAD_PROGRAM_ALLOCATE_FRAME_NO_ERROR:
         ; ebx = pcb pointer
         ; eax = frame address
 
@@ -208,7 +188,6 @@
         SHR $24, %ecx ; PID is first byte of pcb
         PUSH %ecx
         DEV $CONST_DEV_COMMAND_FRAME_MAPPED_SIGNAL, $0
-
 
         PUSH %eax ; Push the frame start address onto the stack
 
@@ -253,15 +232,13 @@
         MOV $-4, %eax
         RET
 
-        ._UTIL_LOAD_PROGRAM_FILE_READ_NO_ERROR:
-
-
+    ._UTIL_LOAD_PROGRAM_FILE_READ_NO_ERROR:
         POP %ebx ; was virtualization enabled
         CMP $0, %ebx
         JE _UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTUALIZATION
-            DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
-        ._UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTUALIZATION:
+        DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
 
+    ._UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTUALIZATION:
         POP %ebx
         POP %ebx
         POP %ebx
@@ -354,11 +331,11 @@
         ADD $1, *%eax
         CMP $1024, *%eax ; has the L2 page table been filled?
         JNE _UTIL_LOAD_PROGRAM_L2_NOT_FULL
-            MOV $0, *%eax ; reset L2 index
-            SUB $4, %eax ; page directory index
-            ADD $1, *%eax ; increase page directory index
-        ._UTIL_LOAD_PROGRAM_L2_NOT_FULL:
+        MOV $0, *%eax ; reset L2 index
+        SUB $4, %eax ; page directory index
+        ADD $1, *%eax ; increase page directory index
 
+    ._UTIL_LOAD_PROGRAM_L2_NOT_FULL:
         MOV %esp, %eax
         ADD $12, %eax ; number of needed frames pointer
 
@@ -370,7 +347,6 @@
         JE _UTIL_LOAD_PROGRAM_FIND_FRAMES_END
             ADD $1, *%ebx
         JMP _UTIL_LOAD_PROGRAM_ALLOCATE_FRAMES
-
 
     ._UTIL_LOAD_PROGRAM_FIND_FRAMES_END:
         POP %ebx ; POP the page directory index from the stack
@@ -392,12 +368,11 @@
             ; panic
 
             ; TODO stop the simulator
-        ._UTIL_LOAD_PROGRAM_FILE_CLOSED:
 
+    ._UTIL_LOAD_PROGRAM_FILE_CLOSED:
         POP %eax ; POP the file lenght from the stack
         POP %ebx ; POP the ebx input
 
-        
 
 MOV $0, %eax
 RET

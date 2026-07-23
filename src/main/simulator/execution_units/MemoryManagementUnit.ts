@@ -15,11 +15,6 @@ interface memoryMapEntry {
         pageNumber: number;
 }
 
-interface pageTableRegistryEntry {
-    pageTableId: number;
-    directoryIndex: number;
-}
-
 /**
  * This class represents a Memory Management Unit (MMU). This specialized execution unit is responsible
  * for translating virtual memory addresses into physical memory addresses.
@@ -99,9 +94,6 @@ export class MemoryManagementUnit {
      */
     public reverseMemoryMap: memoryMapEntry[][] = [];
 
-    public pageTableRegistry: pageTableRegistryEntry[][] = [];
-
-
     /**
      * Constructs a new instance from the given references of the RAM, Page Table Pointer (PTP) register, the ALU and the EFLAGS register.
      * @param cpu A reference to the cpu.
@@ -148,7 +140,6 @@ export class MemoryManagementUnit {
      */
     public writeDoublewordTo(virtualAddress: DoubleWord, doubleword: DoubleWord, attemptsToExecute: boolean): void {
         const physicalAddress: DoubleWord = this.translate(virtualAddress, true, attemptsToExecute);
-        //this.catchPageTableWrite(physicalAddress, doubleword);
         this._cpu.mainMemory.writeDoubleWordTo(physicalAddress, doubleword);
         return;
     }
@@ -275,46 +266,13 @@ export class MemoryManagementUnit {
     }
 
     /**
-     * This method computes the physical address of the page table entry, which is associated with the given virtual address.
-     * The page table entry is located at a specific physical address, which is calculated by adding the page number to the page tables base address.
-     * @param virtualAddress The virtual address to compute the physical address of the page table entry for.
-     * @returns The physical address of the page table entry.
+     * This method takes a virtual address and finds the physical address of the matching L2 page table entry.
+     * To find the matching L2 page table the method looks up the L2 page table by using the page directory index of the virtual memory address.
+     * If the page directory entry is empty, meaning the L2 page table, which contains the wanted entry, is not mapped, then a page fault is thrown.
+     * Once the L2 page table is located the physical address of the entry in the L2 page table is calculated and returned.
+     * @param virtualAddress The virtual address of the wanted page table entry physical address.
+     * @returns The physical address of the wanted L2 page table entry.
      */
-    private calcPhysicalAddressOfPageTableEntry(virtualAddress: DoubleWord): DoubleWord {
-        /* 
-         * Add the page number * 4 to the physical page table base address to get the address of the page table entry.
-         * Because every page table entry is 4 bytes long, the page number needs to be multiplied by 4 before 
-         * adding it to the page tables base address.
-         */
-        return DoubleWord.fromNumber(this._cpu.ptp.content + PageNumber.fromVirtualAddress(virtualAddress) * 4);
-    }
-
-    /**
-     * This method searches the page table for a specific entry. To do this, the page number and an offset are 
-     * extracted from the given virtual address. The page number is filled with zero bits on the right. The offset 
-     * is discarded as part of this method. The padded page number is added to the physical base address of the 
-     * page table. The entry you are looking for is located at the resulting physical address. This entry corresponds 
-     * to the page to which the given virtual memory address is assigned. The page table entry includes some status 
-     * bits and possibly the physical base address of a page frame.
-     * @param virtualAddress The virtual memory address to look up in the page table.
-     */
-    private searchPageTable(virtualAddress: DoubleWord): PageTableEntry {
-        const wasInKernelMode: boolean = this._cpu.flags.isInKernelMode();
-        // Enter kernel mode in order to be able to search the page table.
-        this._cpu.flags.enterKernelMode();
-        // Compute the physical address, where the page table resides in the page table.
-        const addressOfPageTableEntry: DoubleWord = this.calcPhysicalAddressOfPageTableEntry(virtualAddress);
-        // Read page table entry from memory.
-        const contentOfPageTableEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(addressOfPageTableEntry);
-        // Create object from this content.
-        const pageTableEntry: PageTableEntry = PageTableEntry.fromDoubleWord(contentOfPageTableEntry);
-        if (!wasInKernelMode) {
-            // Enter user mode.
-            this._cpu.flags.enterUserMode();
-        }
-        return pageTableEntry;
-    }
-
     private findPageTableEntryPhysicalAddress(virtualAddress: DoubleWord): DoubleWord {
         const pageDirectoryIndex: number = (virtualAddress >>> 22) & 0x3FF;
         const pageTableIndex: number = (virtualAddress >>> 12) & 0x3FF;
@@ -338,13 +296,26 @@ export class MemoryManagementUnit {
         return pageTableEntryPhysicalAddress;
     }
 
+    /**
+     * This method takes a virtual address and returns the L2 page table entry, which maps the virtual address to a physical frame.
+     * @param virtualAddress The virtual address to find the L2 page table entry for.
+     * @returns The page table entry that was searched for.
+     */
     private findPageTableEntry(virtualAddress: DoubleWord): PageTableEntry {
         const contentOfPageTableEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(this.findPageTableEntryPhysicalAddress(virtualAddress));
         const pageTableEntry: PageTableEntry = PageTableEntry.fromDoubleWord(contentOfPageTableEntry);
         return pageTableEntry;
     }
 
-
+    /**
+     * This method extracts the frame number and the virtual page number from the physical and virtual address passed to the function.
+     * The frame number is used as index in the reverse memory map and the virtual page number and process id are used to create an object as entry.
+     * This method also checks if a virtual page number for the same id is already mapped to a different frame number and deletes the existing entry.
+     * It prevents silent remaps of a virtual page number to a different frame number without explicitly calling the frame unmap first.
+     * @param physicalAddress The physical address of a page frame.
+     * @param virtualAddress The virtual address the page frame gets mapped to.
+     * @param processId The process id of the process that caused a new frame to get mapped.
+     */
     public insertReverseMemoryMapping(physicalAddress: DoubleWord, virtualAddress: DoubleWord, processId: DoubleWord): void {
         const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
         const virtualPageNumber: PageNumber = PageNumber.fromVirtualAddress(virtualAddress);
@@ -368,6 +339,14 @@ export class MemoryManagementUnit {
             
     }
 
+    /**
+     * This method extracts the frame number and the virtual page number from the physical and virtual address passed to the function.
+     * The frame number is used as index in the reverse memory map and the virtual page number and process id are used to identify an entry.
+     * If the entry for the frame number exists, then all entries matching the virtual page number and process id get deleted.
+     * @param physicalAddress The physical address of a page frame.
+     * @param virtualAddress The virtual address the page frame gets mapped to.
+     * @param processId The process id of the process that caused a new frame to get unmapped.
+     */
     public removeReverseMemoryMapping(physicalAddress: DoubleWord, virtualAddress: DoubleWord, processId: DoubleWord): void {
         const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
         const virtualPageNumber: PageNumber = PageNumber.fromVirtualAddress(virtualAddress);
@@ -378,52 +357,12 @@ export class MemoryManagementUnit {
             );
         }
     }
+
     /**
-     * This method updates the reverse memory map based on the present bit of the given page table entry.
-     * The reverse memory map maps a physical frame number to an object which contains the mapped virtual page number and the page table id, which the virtual page number belongs to.
-     * Each index in the reverse memory map represents the physical frame number.
-     * If the present bit of the page table entry changes from zero to one, then a new entry is created.
-     * If the present bit of the page table entry changes from one to zero, then all entries that match the virtual page number and page table id at the entry of the physical frame number in the
-     * reverse memory map get removed.
-     * If the present bit stays at one and the physical frame number changes, then the old entry gets removed and a new entry is written.
-     * @param ptEntryAddress The memory address of the page table entry.
-     * @param ptEntry The page table entry.
+     * This method takes a physical address and finds all virtual addresses that are mapped to the physical address.
+     * @param physicalAddress Physical address to find all virtual addresses for.
+     * @returns Array of virtual addresses that are mapped to the searched physical address.
      */
-    private updateReverseMemoryMap(ptEntryAddress: DoubleWord, ptEntry: DoubleWord, pageTableId: number, pageNumber: number): void {
-        const newPtEntry: PageTableEntry = PageTableEntry.fromDoubleWord(ptEntry);
-        const oldPtEntry: PageTableEntry = PageTableEntry.fromDoubleWord(this._cpu.mainMemory.readDoublewordFrom(ptEntryAddress));
-
-        const newPtPresentBit: number = PageTableEntry.getFlags(newPtEntry) >> 11;
-        const oldPtPresentBit: number = PageTableEntry.getFlags(oldPtEntry) >> 11;
-        const newFrameNumber: number = PageTableEntry.getFrameNumber(newPtEntry);
-        const oldFrameNumber: number = PageTableEntry.getFrameNumber(oldPtEntry);
-
-        if (newPtPresentBit === 1 && oldPtPresentBit === 0) {
-            (this.reverseMemoryMap[newFrameNumber] ??= []).push({pageTableId: pageTableId, pageNumber: pageNumber});
-        }
-
-        if (newPtPresentBit === 0 && oldPtPresentBit === 1) {
-            if (!this.reverseMemoryMap[oldFrameNumber]) {
-                return;
-            }
-            this.reverseMemoryMap[oldFrameNumber] = this.reverseMemoryMap[oldFrameNumber].filter(
-                (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
-            );
-        }
-
-        if (oldPtPresentBit === 1 && newPtPresentBit === 1) {
-            if (newFrameNumber === oldFrameNumber) {
-                return
-            }
-            if (this.reverseMemoryMap[oldFrameNumber]) {
-                this.reverseMemoryMap[oldFrameNumber] = this.reverseMemoryMap[oldFrameNumber].filter(
-                    (entry) => !(entry.pageTableId === pageTableId && entry.pageNumber === pageNumber)
-                );
-            }
-            (this.reverseMemoryMap[newFrameNumber] ??= []).push({pageTableId: pageTableId, pageNumber: pageNumber});
-        }
-    }
-
     public findVirtualFromPhysical(physicalAddress: DoubleWord): DoubleWord[] {
         const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
         const reverseMemoryMapEntry: memoryMapEntry[] = this.reverseMemoryMap[frameNumber] ?? [];
@@ -435,84 +374,6 @@ export class MemoryManagementUnit {
             virtualAddresses.push(virtualAddress);
         }
         return virtualAddresses;
-    }
-
-
-    private catchPageTableWrite(physicalAddress: DoubleWord, newEntry: DoubleWord): void {
-        const frameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
-        const offset: number = physicalAddress & 0xFFF;
-        const entryIndex = offset >>> 2; // Each entry is 4 bytes, divide by 4 gives index
-        // Is write to page directory?
-        if (this.isPageDirectory(physicalAddress)) {
-            this.pageDirectoryWrite(physicalAddress, newEntry, entryIndex);
-            return;
-        }
-
-        // Is it a write to a known L2 page table?
-        const pageTableRegistryEntries = this.pageTableRegistry[frameNumber];
-        if (pageTableRegistryEntries !== undefined) {
-            for (const entry of pageTableRegistryEntries) {
-                const targetVpn = (entry.directoryIndex << 10) | entryIndex;
-                this.updateReverseMemoryMap(physicalAddress, newEntry, entry.pageTableId, targetVpn);
-            }
-        }
-
-
-    }
-
-    private isPageDirectory(physicalAddress: DoubleWord): boolean {
-        const pageDirectoryBaseAddress: DoubleWord = this._cpu.ptp.content;
-        const pageDirectoryFrameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(pageDirectoryBaseAddress);
-        const physicalAddressFrameNumber: FrameNumber = FrameNumber.fromPyhsicalAddress(physicalAddress);
-        const isInRange: boolean = pageDirectoryFrameNumber === physicalAddressFrameNumber; // Page tables are 4kib aligned 
-        return isInRange;
-    }
-
-    private pageDirectoryWrite(pdEntryAddress: DoubleWord, pdEntry: DoubleWord, directoryIndex: number): void {
-        const oldPdEntry: PageTableEntry = PageTableEntry.fromDoubleWord(this._cpu.mainMemory.readDoublewordFrom(pdEntryAddress));
-        const newPdEntry: PageTableEntry = PageTableEntry.fromDoubleWord(pdEntry);
-
-        const newPdPresentBit: number = PageTableEntry.getFlags(newPdEntry) >> 11;
-        const oldPdPresentBit: number = PageTableEntry.getFlags(oldPdEntry) >> 11;
-
-        const newL2FrameNumber: number = PageTableEntry.getFrameNumber(newPdEntry);
-        const oldL2FrameNumber: number = PageTableEntry.getFrameNumber(oldPdEntry);
-
-        const pageTableId = this.getCurrentPageTableId(); // use pid as id
-
-        // New L2 page table got mapped
-        if (newPdPresentBit === 1 && oldPdPresentBit === 0) {
-            (this.pageTableRegistry[newL2FrameNumber] ??= []).push({pageTableId: pageTableId, directoryIndex: directoryIndex});
-        }
-
-        // L2 page got unmapped
-        if (newPdPresentBit === 0 && oldPdPresentBit === 1) {
-            if (!this.pageTableRegistry[oldL2FrameNumber]) {
-                return;
-            }
-            this.pageTableRegistry[oldL2FrameNumber] = this.pageTableRegistry[oldL2FrameNumber].filter(
-                (entry) => !(entry.pageTableId === pageTableId && entry.directoryIndex === directoryIndex)
-            );
-        }
-
-        // L2 page table got swapped
-        if (oldPdPresentBit === 1 && newPdPresentBit === 1) {
-            if (newL2FrameNumber === oldL2FrameNumber) {
-                return
-            }
-            if (this.pageTableRegistry[oldL2FrameNumber]) {
-                this.pageTableRegistry[oldL2FrameNumber] = this.pageTableRegistry[oldL2FrameNumber].filter(
-                    (entry) => !(entry.pageTableId === pageTableId && entry.directoryIndex === directoryIndex)
-                );
-            }
-            (this.pageTableRegistry[newL2FrameNumber] ??= []).push({pageTableId: pageTableId, directoryIndex: directoryIndex});
-        }
-    }
-
-    private getCurrentPageTableId(): number {
-        const currentPcbPointer = this._cpu.mainMemory.readDoublewordFrom(DoubleWord.fromNumber(0xE0100A00)); // Mem address of current active pcb
-        const pid = (this._cpu.mainMemory.readDoublewordFrom(currentPcbPointer) >>> 24) & 0xFF; // first byte of PCB = pid
-        return pid;
     }
 
 }
