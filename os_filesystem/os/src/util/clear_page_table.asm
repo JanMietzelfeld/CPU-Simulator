@@ -94,18 +94,17 @@ MOV $0, %ebx ; index counter
 
     ; find word offset in bitmap
     MOV %eax, %ebx
-    SHR $5, %ebx ; word index (global index / 32)
-    SHL $2, %ebx ; byte offset in bitmap (word index * 4)
+    SHR $5, %ebx ; word index (global index / 32) division by 32 because each dword has 32 bit
+    SHL $2, %ebx ; byte offset in bitmap (word index * 4) each dword has 4 byte so multiply by 4
     ADD %ebx, %ecx ; memory address of dword in bitmap
 
-    ; find bit position
-    AND $31, %eax 
-    MOV $31, %ebx
-    SUB %eax, %ebx ; index of the bit
+    ; find bit position in dword
+    AND $31, %eax ; AND $31 = modulo 32
+    MOV %eax, %ebx ; index of the bit
 
     ; create mask to clear bit
-    MOV $1, %eax
-    SHL %ebx, %eax ; shift bit into position
+    MOV $0x80000000, %eax ; bitmask with first bit set
+    SHR %ebx, %eax ; shift bit into position to create bitmask
     NOT %eax ; invert to zero specific bit
 
     ; eax bitmask
