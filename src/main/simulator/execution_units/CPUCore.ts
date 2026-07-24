@@ -1003,6 +1003,16 @@ export class CPUCore {
                 this.ebx.content = DoubleWord.fromNumber(this.fs.getStdinBufferStringCount());
                 break;
             }
+            case DevOperations.PERFORMANCE_TIMER_START:{
+                const id: number = op2;
+                this.performanceTimerStart(id);
+                break;
+            }
+            case DevOperations.PERFORMANCE_TIMER_STOP:{
+                const id: number = op2;
+                this.performanceTimerStop(id);
+                break;
+            }
             default:{
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
             }
@@ -1011,6 +1021,25 @@ export class CPUCore {
         return;
     }
 
+    /**
+     * This method starts a simple timer for OS performance measurements in form oof
+     * execution time.
+     * The method can be called from the simulator itself as well.
+     * @param id The id of the timer.
+     */
+    public performanceTimerStart(id: number): void {
+        console.time("Timer id: " + id);
+    }
+
+    /**
+     * This method stops a simple timer for OS performance measurements in form oof
+     * execution time.
+     * The method can be called from the simulator itself as well.
+     * @param id The id of the timer.
+     */
+    public performanceTimerStop(id: number): void {
+        console.timeEnd("Timer id: " + id);
+    }
 
     /*
      * -------------------- Arithmetic operations --------------------
