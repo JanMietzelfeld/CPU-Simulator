@@ -23,10 +23,11 @@
 ;
 ; 0xFFFFF000 - 0xFFFFFFFF - interrupt stack     (4096 Bytes)                                        - 1 Page Frame
 ; 0xE0101000 - 0xFFFFFFFF - unused space
-; 0xE0100A03 - 0xE0100FFF - Padding             (4096 Entries - 1024*2 - 512 - 2 = 1535 Bytes)   \
-; 0xE0100A00 - 0xE0100A00 - Running process *PCB(4 Byte)                                          |
+; 0xE0100B04 - 0xE0100FFF - Padding             (4096 Entries - 1024*2 - 256*3 - 4 = 1276 Bytes)   \
+; 0xE0100A04 - 0xE0100B03 - Blocked Queue for IO(256 Entries * 1 Byte (pid size) = 256 Bytes)     |
+; 0xE0100A00 - 0xE0100A03 - Running process *PCB(4 Byte)                                          |
 ; 0xE0100900 - 0xE01009FF - Blocked Queue       (256 Entries * 1 Byte (pid size) = 256 Bytes)     | - 1     Page Frame
-; 0xE0100800 - 0xE01008FF - Wating Queue        (256 Entries * 1 Byte (pid size) = 256 Bytes)     | 
+; 0xE0100800 - 0xE01008FF - Waiting Queue       (256 Entries * 1 Byte (pid size) = 256 Bytes)     | 
 ; 0xE0100400 - 0xE01007FF - Interrupt Table     (256 Entries * 4 Bytes = 1 KiB)                   |
 ; 0xE0100000 - 0xE01003FF - PCB Table Mapping   (256 Entries * 4 Bytes = 1 KiB)                  /
 ; 0xE00C0000 - 0xE00FFFFF - PCB List            (256 Entries * 1 KiB = 256 KiB)                     - 64    Page Frames
@@ -97,6 +98,7 @@
 ; Runnung    has the id 1
 ; Waiting    has the id 2
 ; Blocked    has the id 3
+; IO Blocked has the id 4
 ;
 ;
 ; Process ID (pid) definition
@@ -125,7 +127,8 @@
 ; | 0x21 - 0x21 Periodic Timer  - Hardware interrupt |
 ; | 0x22 - 0x7F Unused          - Hardware interrupt |
 ; | 0x80 - 0x80 System Calls    - Software interrupt | External interrupts (224)
-; | 0x81 - 0xFF Unused          - Hardware interrupt |
+; | 0x81 - 0x81 Keyboard        - Hardware interrupt |
+; | 0x82 - 0xFF Unused          - Hardware interrupt |
 ; |--------------------------------------------------|
 ;
 ;
@@ -157,8 +160,10 @@
 ; file_seek = 5
 ; file_create = 6
 ; file_delete = 7
+; console_print_number = 8
+; console_read_number = 9
 ;
-; 8-15 unused
+; 10-15 unused
 ;
 ; process_create = 16
 ; process_exit = 17

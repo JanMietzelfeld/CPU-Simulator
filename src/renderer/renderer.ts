@@ -972,6 +972,39 @@ export class Renderer {
     }
 
     /**
+     * This callback is used as the click listener logic for the text field of the console GUI element.
+     * @param event An object, which represents the event fired, whenever a click on the text window of the console occurs.
+     */
+    private readonly onClickListenerConsole: EventListenerOrEventListenerObject = async (event: Event): Promise<void> => {
+        const target: HTMLElement = event.target as HTMLElement;
+        const parent: HTMLElement | null = target.parentElement;
+        if (parent !== null) {
+            if (target.getAttribute("id") === "console-input") return;
+            const consoleInputField: HTMLInputElement = this._document.getElementById("console-input") as HTMLInputElement;
+            consoleInputField.focus();
+        }
+        return;
+    }
+
+    /**
+     *  This callback is used as listener logic for the input field of the console GUI element. If "Enter" is pressed
+     *  a keyboard interrupt is fired and the console input gets disabled.
+     * @param event An object, which represents the event fired, whenever a key is pressed while focused on the console input field.
+     */
+    private readonly onKeyUpConsole: EventListenerOrEventListenerObject = async (event: Event): Promise<void> => {
+        const target: HTMLInputElement = event.target as HTMLInputElement;
+        const keyboardEvent: KeyboardEvent = event as KeyboardEvent;
+        const consoleContent: string = target.value.trim();
+        if (keyboardEvent.key === 'Enter' && consoleContent.length !== 0) {
+            const lines = consoleContent.split(/\\n/);
+            for (const line of lines) {
+                this._window.simulator.keyboardInterrupt(line.trim());
+            }
+            target.value= "";
+        }
+    }
+
+    /**
      * This field represents a flag, which enables automatic scroll for the GUIs Page Table widget.
      */
     public autoScrollForPageTableEnabled: boolean;
@@ -1052,6 +1085,17 @@ export class Renderer {
         const blockSizeSelect: HTMLSelectElement = this._document.getElementById("ram-select-blocksize") as HTMLSelectElement;
         byteDataTypeSelect.addEventListener("change", this.onChangeListenerRamByteRepresentation);
         blockSizeSelect.addEventListener("change", this.onChangeListenerRamBlockSize);
+    }
+
+    /**
+     * This method registers all the listener for the console widget.
+     */
+    public registerConsoleListener(): void {
+        const console = this._document.getElementById("console-input-container");
+        if (console !== null) {
+            console.addEventListener("click", this.onClickListenerConsole);
+            console.addEventListener("keyup", this.onKeyUpConsole);
+        }
     }
 
     /**
@@ -1584,6 +1628,34 @@ export class Renderer {
         return;
     }
 
+    public async hideConsole(): Promise<void> {
+        const console: HTMLElement | null = document.getElementById("console-section");
+        if (console !== null) {
+            console.style.display = "none";
+        }
+        return;
+    }
+
+    public async showConsole(): Promise<void> {
+        const consoleSection: HTMLElement | null = document.getElementById("console-section");
+        const console: HTMLElement | null = document.getElementById("console");
+        if (consoleSection && console !== null) {
+            consoleSection.style.display = "block";
+            console.children.namedItem("console-input-container")!.scrollTop = console.children.namedItem("console-input-container")!.scrollHeight;
+        }
+        return;
+    }
+
+    public async updateConsole(message: string): Promise<void> {
+        const consoleOutput: HTMLElement | null = document.getElementById("console-output");
+        const consoleInputContainer: HTMLElement | null = document.getElementById("console-input-container");
+        if (consoleOutput && consoleInputContainer !== null) {
+            consoleOutput.insertAdjacentElement("beforeend", document.createElement("br"));
+            consoleOutput.insertAdjacentText("beforeend", message);
+            consoleInputContainer.scrollTop = consoleInputContainer.scrollHeight;
+        }
+        return;
+    }
     /**
      * This method builds the table rows for the RAM display element, displaying the content as numerical values.
      * @param physicalAddressStart The start address of the display range.

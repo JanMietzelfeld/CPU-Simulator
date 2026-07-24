@@ -7,6 +7,7 @@ import { SimulationController } from './simulator/SimulationController';
 import appIcon from './../../assets/icons/app/icon.png';
 import { PageNumber } from './../types/binary/PageNumber';
 import fs from "node:fs";
+import { InterruptNumbers } from '../types/enumerations/InterruptNumbers';
 import { PageTableEntry } from '../types/binary/PageTableEntry';
 import { PhysicalAddress } from '../types/binary/PhysicalAddress';
 
@@ -148,6 +149,23 @@ const buildMenu = (win: BrowserWindow, simulator: SimulationController): Menu =>
 											label: "Enable Logging",
 											click() {
 												win.webContents.send("show_log");
+											}
+										}
+									]
+								},
+								{
+									label: "Console",
+									submenu : [
+										{
+											label: "Disable Console",
+											click() {
+												win.webContents.send("hide_console");
+											}
+										},
+										{
+											label: "Enable Console",
+											click() {
+												win.webContents.send("show_console");
 											}
 										}
 									]
@@ -541,6 +559,13 @@ const registerHandlers = (simulator: SimulationController, win: BrowserWindow): 
 		simulator.autoScrollForPageTableEnabled = true;
 		return;
 	});
+
+	ipcMain.removeHandler("keyboard_interrupt");
+	ipcMain.on("keyboard_interrupt", async (event: IpcMainInvokeEvent, consoleInput: string): Promise<void> => {
+		simulator.core.fs.pushStdinBuffer(consoleInput)
+		simulator.core.triggertExternalInterrupt(InterruptNumbers.KEYBOARD);
+		return;
+	})
 
 };
 

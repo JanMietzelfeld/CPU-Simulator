@@ -6,4 +6,5 @@ export enum InterruptNumbers {
 	TIMER = 0x20,
 	PERIODIC_TIMER = 0x21,
 	SYSTEM_CALL = 0x80,
+	KEYBOARD = 0x81,
 }

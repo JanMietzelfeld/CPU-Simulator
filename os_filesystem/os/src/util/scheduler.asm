@@ -102,6 +102,9 @@
     CMP $CONST_OS_PROCESS_STATUS_BLOCKED, %ebx  ; is the process blocked ?
     JE _UTIL_SCHEDULER_PROCESS_BLOCKED
 
+    CMP $CONST_OS_PROCESS_STATUS_IO_BLOCKED, %ebx ; is the process blocked waiting for IO?
+    JE _UTIL_SCHEDULER_PROCESS_IO_BLOCKED
+
     ._UTIL_SCHEDULER_PROCESS_RUNNING:
 
     ; ebx = status, eax = pointer to status bit in the pcb
@@ -300,5 +303,27 @@
 ._UTIL_SCHEDULER_RESCHEDULE:
     RET
 
+._UTIL_SCHEDULER_PROCESS_IO_BLOCKED:
+
+    MOV $CONST_OS_PROCESS_BLOCKED_IO_QUEUE_START, %ecx
+
+    MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
+    MOV *%eax, %eax ; pcb pointer
+
+    MOV *%eax, %ebx
+    AND $0xFF000000, %ebx ; Isolate the pid byte
+
+    ; add to the blocked queue
+    SUB $1, %ecx
+
+    ._UTIL_SCHEDULER_FIND_FREE_BLOCKED_IO:
+        ADD $1, %ecx
+        MOV *%ecx, %eax ; Copy list entry to eax
+        SHR $24, %eax ; Move pid to the right
+        CMP $0, %eax ; Is entry free or not
+        JNE _UTIL_SCHEDULER_FIND_FREE_BLOCKED_IO
+    AND $0xFFFFFF, *%ecx ; Clear the pid of the entry
+    OR %ebx, *%ecx ; add the current process to the end of the blocked queue
+    JMP _UTIL_SCHEDULER_FIND_NEXT
 
 

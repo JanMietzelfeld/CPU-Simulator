@@ -323,6 +323,17 @@ td {
   white-space: normal;
 }
 
+.console-element {
+  border:none; 
+  background: transparent; 
+  outline: 0;
+  font-weight: bold;
+  font-size: large;
+  color: white;
+  box-sizing:border-box;
+  width: 100%;
+}
+
 @-webkit-keyframes pulse {
   0% {
     -webkit-box-shadow: 0 0 0 0 var(--pumpkin);

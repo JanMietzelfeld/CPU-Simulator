@@ -26,6 +26,7 @@ window.onload = async () => {
 	renderer.registerChangeListener();
 	renderer.registerClickListener();
 	renderer.registerRAMSearchListener();
+	renderer.registerConsoleListener();
 	renderer.registerAddressRangeBoxListener();
 	renderer.registerDetailedRamViewSelectElement();
 
@@ -108,3 +109,15 @@ window.windowUpdate.onHideLog(() => {
 window.windowUpdate.onShowLog(() => {
 	renderer.showLog();
 });
+
+window.windowUpdate.onHideConsole(() => {
+	renderer.hideConsole();
+});
+
+window.windowUpdate.onShowConsole(() => {
+	renderer.showConsole();
+});
+
+window.windowUpdate.onUpdateConsole((value: string) => {
+	renderer.updateConsole(value);
+})
