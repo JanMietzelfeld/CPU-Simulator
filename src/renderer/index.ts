@@ -26,14 +26,9 @@ window.onload = async () => {
 	renderer.registerChangeListener();
 	renderer.registerClickListener();
 	renderer.registerRAMSearchListener();
-<<<<<<< HEAD
-	renderer.createPhysicalRAMView();
-	renderer.createVirtualRAMView();
 	renderer.registerConsoleListener();
-=======
 	renderer.registerAddressRangeBoxListener();
 	renderer.registerDetailedRamViewSelectElement();
->>>>>>> origin/dev
 
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);

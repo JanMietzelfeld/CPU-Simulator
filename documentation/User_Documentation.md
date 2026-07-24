@@ -50,7 +50,7 @@ In the current implementation the constants can be misused as variables, see the
 
 ## 1.2 Symbolic Variables
 
-:warning:**Caution:** In the current implementation the symbolic integer and string variables are stored in the code segment. The code segment is write protected in user mode and only writeable in kernel mode. To assign different values to the variables during program runtime, the program has to switch into kernel mode. Under normal circumstances the program should not be able to switch into kernel mode directly. To make the variables work correctly, a modified NOP instruction has been implemented as a work-around, which switches the program into kernel mode. This NOP instruction has to be used once before variables can be assigned a new value (see the examples below). The modified NOP instruction is needed until a (writable) data segment or some other way of holding the variables in writable storage is implemented. 
+:warning:**Caution:** In the current implementation the symbolic integer and string variables are stored in the code segment. The code segment is write protected in user mode and only writeable in kernel mode. To assign different values to the variables during program runtime, the program has to switch into kernel mode. Under normal circumstances the program should not be able to switch into kernel mode directly. To make the variables work correctly, a modified NOP instruction has been implemented as a work-around, which switches the program into kernel mode. This NOP instruction has to be used once before variables can be assigned a new value (see the examples below). The modified NOP instruction is needed until a (writable) data segment or some other way of holding the variables in writable storage is implemented.
 
 Using the modified NOP instruction also makes constants behave like variables, so caution is advised.
 
@@ -268,3 +268,19 @@ Settings -> Behavior -> Output -> Console -> Enable Console
 Settings -> Behavior -> Output -> Console -> Disable Console  
 If the console is disabled the previous content stays intact. Only the GUI element gets hidden and the content is shown again on enablement.
 Clicking anywhere inside the console window puts the selection focus on the write element of the console, indicated by the blinking cursor. Once the cursor is blinking the user can input data by writing and submitting it by pressing the enter key.
+
+## 3 Operating System
+
+## 3.1 Time-slice Management
+
+To fairly distribute processing time between multiple running processes the Ihme-Core simulator uses time-slice management. Each process gets a time slice of a certain length. In the Ihme-Core OS the time slice is implemented through a counter in the process control block.
+On boot the OS sets a periodic timer, the system timer. Each time the periodic timer runs out it sends an interrupt. The interrupt service routine decrements the time slice counter in the process control block of the currently running process. The time slice counter only gets decremented if the current running process is in the user mode. Once the time slice counter hits zero the process is put into the ready state and the scheduler picks a new process to run with a reset time slice counter.
+If a process yields or is put in the blocked state, the time slice timer is reset.
+The time slice counter uses periodic interrupts as unit of measurement and the periodic timer uses instructions. Both values can be set independently in the `os_filesystem/os/src/constants.asm` file.
+
+``` Assembly
+.CONST CONST_OS_PROCESS_TIME_SLICE_SIZE 3
+.CONST CONST_OS_PERIODIC_TIMER_FREQUENCY 5
+```
+
+In this example three periodic timer interrupts can happen before the scheduler causes a context switch and 5 user instructions can be run before the periodic timer triggers a hardware interrupt.

@@ -972,7 +972,6 @@ export class Renderer {
     }
 
     /**
-<<<<<<< HEAD
      * This callback is used as the click listener logic for the text field of the console GUI element.
      * @param event An object, which represents the event fired, whenever a click on the text window of the console occurs.
      */
@@ -1006,18 +1005,6 @@ export class Renderer {
     }
 
     /**
-     * This field represents a flag, which enables automatic scroll for the GUIs virtual RAM widget.
-     */
-    public autoScrollForVirtualRAMEnabled: boolean;
-
-    /**
-     * This field represents a flag, which enables automatic scroll for the GUIs physical RAM widget.
-     */
-    public autoScrollForPhysicalRAMEnabled: boolean;
-
-    /**
-=======
->>>>>>> origin/dev
      * This field represents a flag, which enables automatic scroll for the GUIs Page Table widget.
      */
     public autoScrollForPageTableEnabled: boolean;
@@ -1641,7 +1628,6 @@ export class Renderer {
         return;
     }
 
-<<<<<<< HEAD
     public async hideConsole(): Promise<void> {
         const console: HTMLElement | null = document.getElementById("console-section");
         if (console !== null) {
@@ -1670,7 +1656,6 @@ export class Renderer {
         }
         return;
     }
-=======
     /**
      * This method builds the table rows for the RAM display element, displaying the content as numerical values.
      * @param physicalAddressStart The start address of the display range.
@@ -1979,5 +1964,4 @@ export class Renderer {
         return virtualAddresses;
     }
 
->>>>>>> origin/dev
 }

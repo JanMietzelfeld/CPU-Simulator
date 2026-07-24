@@ -166,7 +166,7 @@ export class PassthroughFilesystem {
         } else {
             // fd=0 -> console output
             getMainWindow()?.webContents.send('update_console', new TextDecoder('UTF-8').decode(buffer));
-            return buffer.length;
+            return buffer.byteLength;
         }
     }
 
