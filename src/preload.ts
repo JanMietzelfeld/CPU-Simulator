@@ -69,6 +69,8 @@ contextBridge.exposeInMainWorld("simulator", {
 		ipcRenderer.on("disable_auto_scroll_page_table", () => callback()),
 	onEnableAutoScrollForPageTable: (callback: () => void) => 
 		ipcRenderer.on("enable_auto_scroll_page_table", () => callback()),
+	keyboardInterrupt: (consoleInput: string) =>
+		ipcRenderer.send("keyboard_interrupt", consoleInput),
 });
 
 contextBridge.exposeInMainWorld("windowUpdate", {
@@ -80,6 +82,12 @@ contextBridge.exposeInMainWorld("windowUpdate", {
 		ipcRenderer.on("hide_log", () => callback()),
 	onShowLog: (callback: () => void) =>
 		ipcRenderer.on("show_log", () => callback()),
+	onHideConsole: (callback: () => void) =>
+		ipcRenderer.on("hide_console", () => callback()),
+	onShowConsole: (callback: () => void) =>
+		ipcRenderer.on("show_console", () => callback()),
+	onUpdateConsole: (callback: (message: string) => void) =>
+		ipcRenderer.on('update_console', (_event, message) => callback(message)),
 	onEnableRamFollowEip: (callback: () => void) => 
 		ipcRenderer.on("enable_ram_view_follow_eip", () => callback()),
 	onDisableRamFollowEip: (callback: () => void) => 

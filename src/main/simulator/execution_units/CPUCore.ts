@@ -22,6 +22,7 @@ import { DebugLogger } from "../Logger";
 import { ExceptionError } from "../../../types/errors/ExceptionError";
 import { RegisterNumbers } from "../../../types/enumerations/RegisterNumbers";
 import { getMainWindow } from "../../index";
+import { PeriodicTimer } from "./PeriodicTimer";
 import { FrameNumber } from "../../../types/binary/FrameNumber";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { InstructionSet } from "../../../types/enumerations/InstructionSet";
@@ -174,6 +175,7 @@ export class CPUCore {
     public fs: PassthroughFilesystem;
 
     public readonly timer: Timer;
+    public readonly periodicTimer: PeriodicTimer;
 
     public mainMemory: RAM;
 
@@ -205,6 +207,7 @@ export class CPUCore {
         this.mmu = new MemoryManagementUnit(this);
         this.fs = new PassthroughFilesystem(pathToOSFilesystem);
         this.timer = new Timer(this);
+        this.periodicTimer = new PeriodicTimer(this);
         this._decodedInstruction = null;
         this._processingWidth = processingWidth;
     }
@@ -247,6 +250,7 @@ export class CPUCore {
         {
             this.internalCycle();
             this.timer.countDown();
+            this.periodicTimer.countDown();
         }
 
         while (this.flags.isInKernelMode())
@@ -988,6 +992,16 @@ export class CPUCore {
                 const timeValue = this.internal_pop();
 
                 this.timer.addTimer(op2, timeValue);
+                break;
+            }
+            case DevOperations.PERIODIC_TIMER_SET:{ //  0001111 setupTimer(time_value=op2)
+                const timerValue = op2;
+                this.periodicTimer.setupTimer(timerValue);
+                break;
+            }
+            case DevOperations.CONSOLE_BUFFER_STATUS:{
+                this.eax.content = DoubleWord.fromNumber(this.fs.getStdinBufferNumberCount());
+                this.ebx.content = DoubleWord.fromNumber(this.fs.getStdinBufferStringCount());
                 break;
             }
             case DevOperations.FRAME_MAP_SIGNAL:{
