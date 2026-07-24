@@ -117,3 +117,19 @@ The following registers implement the jump on click feature:
 - EIP
 - ITP
 - PTP
+
+## 3 Operating System
+
+## 3.1 Time-slice Management
+
+To fairly distribute processing time between multiple running processes the Ihme-Core simulator uses time-slice management. Each process gets a time slice of a certain length. In the Ihme-Core OS the time slice is implemented through a counter in the process control block.
+On boot the OS sets a periodic timer, the system timer. Each time the periodic timer runs out it sends an interrupt. The interrupt service routine decrements the time slice counter in the process control block of the currently running process. The time slice counter only gets decremented if the current running process is in the user mode. Once the time slice counter hits zero the process is put into the ready state and the scheduler picks a new process to run with a reset time slice counter.
+If a process yields or is put in the blocked state, the time slice timer is reset.
+The time slice counter uses periodic interrupts as unit of measurement and the periodic timer uses instructions. Both values can be set independently in the `os_filesystem/os/src/constants.asm` file.
+
+``` Assembly
+.CONST CONST_OS_PROCESS_TIME_SLICE_SIZE 3
+.CONST CONST_OS_PERIODIC_TIMER_FREQUENCY 5
+```
+
+In this example three periodic timer interrupts can happen before the scheduler causes a context switch and 5 user instructions can be run before the periodic timer triggers a hardware interrupt.

@@ -12,4 +12,5 @@
     ; collect all the ISRs for external interrupts here
 
     .INCLUDE "os/src/interrupts/hardware/timer/timer"             ; 0x20
+    .INCLUDE "os/src/interrupts/hardware/timer/periodic_timer"    ; 0x21
     .INCLUDE "os/src/interrupts/syscalls/syscalls"                ; 0x80
