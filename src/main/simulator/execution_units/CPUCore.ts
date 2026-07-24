@@ -276,7 +276,6 @@ export class CPUCore {
     public handleInterrupt(number: InterruptNumbers)
     {
         if (this.flags.interrupt == 0) {
-            console.log("Interrupt Number: " + number)
             this.reset(); //A CPU exception while interrupt are disabled -> panic, reset system
             throw new Error("Kernel Panic");
         }
