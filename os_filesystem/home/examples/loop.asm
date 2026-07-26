@@ -1,7 +1,6 @@
 .LOOP_START:
 
 MOV $10, %eax      ; Kopiere den Wert 100 in das Register eax.
-PUSH $20
 
 .loop: 
     SUB $1, %eax     ; Subtrahiere den Wert 1 vom Wert im Register eax.
@@ -9,7 +8,7 @@ PUSH $20
     JG loop          ; Springe zum Schleifenanfang, wenn der Wert im Register eax noch größer als 0 ist.
 
 ; Ende des Programms. Das Ergebnis steht in Register eax.
-POP %ecx
+
 MOV $0x12345678, %edx ; notify the simulator (for the Siulator.test.ts test)
 MOV $CONST_SYSCALL_PROCESS_EXIT, %eax
 INT $0x80 ; Exit Syscall

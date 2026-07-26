@@ -8,7 +8,6 @@ import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
 import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
-import { FrameOffset } from "../../types/binary/FrameOffset";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -269,16 +268,6 @@ export class SimulationController {
         {
             writeFileSync(newProcessNamePath, Buffer.from([0]));
         }
-
-        const zeroFramePath = this.pathToOSFilesystem + "/os/util/zero_frame.bin"
-
-        if (!existsSync(zeroFramePath))
-        {
-            const buffer = Buffer.alloc((2**FrameOffset.NUMBER_OF_BITS) * 4);
-
-            writeFileSync(zeroFramePath, buffer);
-        }
-
     }
 
     /**

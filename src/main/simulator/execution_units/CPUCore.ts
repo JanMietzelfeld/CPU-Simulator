@@ -23,7 +23,6 @@ import { ExceptionError } from "../../../types/errors/ExceptionError";
 import { RegisterNumbers } from "../../../types/enumerations/RegisterNumbers";
 import { getMainWindow } from "../../index";
 import { PeriodicTimer } from "./PeriodicTimer";
-import { FrameNumber } from "../../../types/binary/FrameNumber";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { InstructionSet } from "../../../types/enumerations/InstructionSet";
 import { VirtualAddress } from "../../../types/binary/VirtualAddress";
@@ -902,12 +901,6 @@ export class CPUCore {
                 } else {
                     if (bytesRead > 0) {
 
-                        if (bytesRead > 0 && this.fs.fd_map.get(op2)?.filename === "os/util/zero_frame.bin")
-                        {
-                            this.mainMemory.clearFrame(FrameNumber.fromPhysicalAddress(PhysicalAddress.fromNumber(bufferAddress)));
-                            break;
-                        }
-                        
                         for (let index = 0; index < doubleWordbytesRead; index += 4) {
                             this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(bufferAddress + index), buffer.getUint32(index) as DoubleWord);
                         }
