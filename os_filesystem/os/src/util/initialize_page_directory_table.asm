@@ -4,7 +4,6 @@
 ; Return value (immediate value):
 ;   none
 .UTIL_INITIALIZE_PAGE_DIRECTORY_TABLE:
-DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_START, $5
     PUSH %eax
     PUSH %ebx
     PUSH %ecx
@@ -84,5 +83,4 @@ DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_START, $5
         POP %ecx
         POP %ebx
         POP %eax
-        DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_STOP, $5
         RET

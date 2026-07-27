@@ -5,7 +5,6 @@
 ;   none
 .SYSCALLS_PROCESS_EXIT_WITH_ASSERTS:
 .SYSCALLS_PROCESS_EXIT:
-    DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_START, $4
     ; set status of current process to terminated
 
     MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
@@ -27,7 +26,7 @@
     ; Return value (immediate value):
     ;   none
     CALL UTIL_CLEAR_PAGE_DIRECTORY_TABLE
-    DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_STOP, $4
+    
     ; UTIL_SCHEDULER
     ; Parameters:
     ;   none     
