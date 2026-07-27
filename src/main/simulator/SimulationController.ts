@@ -8,7 +8,6 @@ import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
 import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
-import { FrameOffset } from "../../types/binary/FrameOffset";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -268,47 +267,6 @@ export class SimulationController {
         if (!existsSync(newProcessNamePath))
         {
             writeFileSync(newProcessNamePath, Buffer.from([0]));
-        }
-
-        const zeroFramePath = this.pathToOSFilesystem + "/os/util/empty_frame.bin"
-
-        if (!existsSync(zeroFramePath))
-        {
-            const buffer = Buffer.alloc((2**FrameOffset.NUMBER_OF_BITS) * 4);
-
-            writeFileSync(zeroFramePath, buffer);
-        }
-
-        const pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
-
-        if (!existsSync(pageTablePath)) {
-
-            const USER_SPACE_ENTRIES = 786432;
-            const KERNEL_SPACE_ENTRIES = 262144;
-            const OS_CODE_SPACE_SIZE = 65536;
-            const ENTRY_SIZE = 4;
-
-            const buffer = Buffer.alloc((USER_SPACE_ENTRIES + KERNEL_SPACE_ENTRIES) * ENTRY_SIZE);
-
-            // First region
-            for (let i = 0; i < USER_SPACE_ENTRIES; i++) {
-                buffer.writeUInt32BE(0x40000000, i * ENTRY_SIZE);
-            }
-
-            // Second region
-            const baseOffset = USER_SPACE_ENTRIES * ENTRY_SIZE;
-
-            for (let i = 0; i < KERNEL_SPACE_ENTRIES; i++) {
-                const index = baseOffset + i * ENTRY_SIZE;
-
-                const value = i < OS_CODE_SPACE_SIZE
-                    ? 0xB0000000 + i + USER_SPACE_ENTRIES
-                    : 0x90000000 + i + USER_SPACE_ENTRIES;
-
-                buffer.writeUInt32BE(value, index);
-            }
-
-            writeFileSync(pageTablePath, buffer);
         }
     }
 

@@ -47,9 +47,9 @@ export class ArithmeticLogicUnit {
 
         // count bits using bitwise ops
         for (let i = 0; i < 8; i++) {
-            const resukt = Byte.logicalRightShift(value);
-            value = resukt[0];
-            parity ^= resukt[1];
+            const result = Byte.logicalRightShift(value);
+            value = result[0];
+            parity ^= result[1];
         }
         
         if (parity === 0) {
@@ -380,7 +380,7 @@ export class ArithmeticLogicUnit {
      */
     public shr(value: DoubleWord, count: DoubleWord.BitCount): DoubleWord {
 
-        let result: DoubleWord = DoubleWord.ZERO;
+        let result: DoubleWord = value;
 
         this._cpu.flags.clearCarry()
 
