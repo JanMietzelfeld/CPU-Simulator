@@ -99,7 +99,7 @@ JMP _OS_ENTRY ; start of the os
 
     ; --- Finished with the External interrupts---
 
-
+DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_START, $1
 ; Interrupt Table Is Set Up
 
 ; UTIL_SETUP_KERNEL_L2_MAPPING
@@ -108,10 +108,12 @@ JMP _OS_ENTRY ; start of the os
 ; Return value (immediate value):
 ;   none
 CALL UTIL_SETUP_KERNEL_L2_MAPPING
+DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_STOP, $1 ; timer to measure the kernel identity mapping creation
 
 ; L2 page tables that map the kernel space have been created
 ; These L2 maps later get linked into the page directory of new processes
 
+DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_START, $2
 ; Create the init process
     
     ; the code for init Program should be located in the file os/user/init (as bynary file)
@@ -138,7 +140,8 @@ CALL UTIL_SETUP_KERNEL_L2_MAPPING
     ; TODO stop the simulator
 
     ._SOS_BOOT_INIT_PROCESS_CREATED:
-
+DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_STOP, $2 ; timer to measure the time the init process creation takes
+DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_START, $3
 ; Create the idle process
 
     ; the code for idle Program should be located in the file os/user/idle (as bynary file)
@@ -163,7 +166,7 @@ CALL UTIL_SETUP_KERNEL_L2_MAPPING
     ; TODO stop the simulator
 
     ._OS_ENTRY_IDLE_PROCESS_CREATED:
-
+DEV $CONST_DEV_COMMAND_PERFORMANCE_TIMER_STOP, $3 ; timer to measure the idle process creation
 
     ; set the init process to the running process
     MOV $CONST_OS_CURRENT_PCB_POINTER, %eax
