@@ -108,7 +108,7 @@ export class Assembler {
 		const pageSize: number = 4096;
 		const totalCodeSize = programSizeBytes + constantsSizeBytes;
 		const numberOfPagesProgram = Math.ceil(totalCodeSize / pageSize);
-		const variableBaseAddress = numberOfPagesProgram * pageSize;
+		const variableBaseAddress = (numberOfPagesProgram * pageSize) + baseOffset;
 
 		this.writeMetadata(totalCodeSize, numberOfPagesProgram, variableBaseAddress, variablesSizeBytes);
 		this.replaceSymbols(lines, constants, variables, numericalConstants, programSizeBytes, variableBaseAddress);
@@ -397,7 +397,7 @@ export class Assembler {
 		 * later, because the keys in the map do not have to be consecutive, as blank lines 
 		 * have been removed from the original source text.
 		 */
-		let programLocationCounter = baseOffset;
+		let programLocationCounter = 0;
 
 		/**
 		 * This variable is used to track the offset of variables to later calculate the actual virtual memory address.
@@ -465,7 +465,6 @@ export class Assembler {
 					//Calculate the size the string will use in memory including null termination and round up to the next size that
 					//is divisible by four. This insures the string always fits into multiple double words.
 					const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
-					programLocationCounter += stringMemSize + 12;
 					constantCounter += stringMemSize;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBuffer, "gim"))) {
@@ -554,7 +553,7 @@ export class Assembler {
 					const jumpLabel = value.substring(value.indexOf(".") + 1, value.lastIndexOf(":")).trim();
 					jumpLabels.set(
 						jumpLabel, 
-						programLocationCounter.toString(2)
+						(programLocationCounter + baseOffset).toString(2)
 					);
 					lines.delete(lineNo);
 				}
