@@ -102,7 +102,7 @@ export class Assembler {
 		const counters = this.locateSymbols(lines, jumpLabels, constants, variables, numericalConstants, baseOffset);
 		const programSizeBytes: number = counters[0];
 		const constantsSizeBytes: number = counters[1];
-		const variablesSizeBytes: number = counters[3];
+		const variablesSizeBytes: number = counters[2];
 		
 		//calculate variables base address
 		const pageSize: number = 4096;
@@ -127,6 +127,7 @@ export class Assembler {
 	 * ELF header 32 byte (8 dwords)
 	 * byte 0x0-0x4 magic number
 	 * byte 0x5-0x8 program header byte offset
+	 * 6 dwords free
 	 * 
 	 * Program header (16 dwords)
 	 * 1 DWORD Total_Frames x
@@ -139,11 +140,15 @@ export class Assembler {
 	 * 9 dwords free
 	 */
 	private writeMetadata(totalCodeSize: number, codePages: number, dataSegmentBaseAddr: number, dataSegmentSize: number): void {
-		const magicNumber: Byte = Byte.fromNumber(0x7F_45_4c_46) // 0x7F followed by ELF in ASCII
-		const programHeaderOffset: Byte = Byte.fromNumber(32);
-		const emptyByte: Byte = Byte.fromNumber(0);
-		const elfHeader: DoubleWord = DoubleWord.fromBytes(magicNumber, programHeaderOffset, emptyByte, emptyByte);
-		this.metadata.push(elfHeader);
+		const magicNumber: DoubleWord = DoubleWord.fromNumber(0x7F_45_4c_46) // 0x7F followed by ELF in ASCII
+		const programHeaderOffset: DoubleWord = DoubleWord.fromNumber(32);
+		this.metadata.push(magicNumber);
+		this.metadata.push(programHeaderOffset);
+
+		//fill unused space with zero
+		for (let i = 0; i < 6; ++i) {
+			this.metadata.push(DoubleWord.fromNumber(0));
+		}
 
 		//calculate needed frames for data segment
 		const pageSize: number = 4096;
@@ -157,7 +162,6 @@ export class Assembler {
 		const codeOffsetFile: number = 96; //32 byte elf header + 64 byte program header
 
 		const dataSegmentFileOffset: number = codeOffsetFile + dataSegmentSize;
-
 		this.metadata.push(DoubleWord.fromNumber(totalPages));
 		this.metadata.push(DoubleWord.fromNumber(neededL2PageTables));
 		this.metadata.push(DoubleWord.fromNumber(codeOffsetFile));
@@ -165,6 +169,9 @@ export class Assembler {
 		this.metadata.push(DoubleWord.fromNumber(dataSegmentFileOffset));
 		this.metadata.push(DoubleWord.fromNumber(dataSegmentSize));
 		this.metadata.push(DoubleWord.fromNumber(dataSegmentBaseAddr));
+		for (let i = 0; i < 9; ++i) {
+			this.metadata.push(DoubleWord.fromNumber(0));
+		}
 	}
 
 	/**
@@ -1006,11 +1013,10 @@ export class Assembler {
 		this.encodedInstructions = [];
 		this.encodedVariables = [];
 		this.encodedConstants = [];
+		this.metadata = [];
 		const lines: Map<number, string> = this.preprocess(s);
 		this.encode(lines, baseOffset);
-		let encodedInstructions: DoubleWord[] = this.metadata.concat(this.encodedInstructions);
-		encodedInstructions = encodedInstructions.concat(this.encodedConstants);
-		encodedInstructions = encodedInstructions.concat(this.encodedVariables);
+		const encodedInstructions: DoubleWord[] = this.metadata.concat(this.encodedInstructions, this.encodedConstants, this.encodedVariables);
 		return encodedInstructions;
 	}
 }
