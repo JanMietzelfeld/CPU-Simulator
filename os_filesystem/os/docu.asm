@@ -1,5 +1,22 @@
 ; os documentation
 
+; Program binary
+;Metadata Layout
+;ELF header 32 byte (8 dwords)
+;1 DWORD magic number (0x7F followed by ELF in ASCII)
+;1 DWORD program header byte offset
+;6 DWORD free
+
+;Program header (16 dwords)
+;1 DWORD Total_Frames
+;1 DWORD Total_L2_Tables
+;1 DWORD Code_Offset
+;1 DWORD Code_Size
+;1 DWORD Data_Offset
+;1 DWORD Data_Size
+;1 DWORD Data_Vaddr_Base
+;9 DWORD free
+
 ; Kernel
 
 ; Memory layout (32 bit architecture, 4 GiB total)

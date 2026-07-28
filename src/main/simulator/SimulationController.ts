@@ -121,9 +121,23 @@ export class SimulationController {
 
         const buffer = readFileSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin");
 
-        const lenght =  buffer.length - (buffer.length % 4);
+        const magicNumber: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(0));
 
-        for (let i = 0; i < lenght; i+=4) {
+        if (buffer.length < 96) {
+            throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable. File too small.")
+        }
+        if (magicNumber != 0x7F_45_4c_46) {
+            throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable.")
+        }
+
+        const programHeaderOffset = buffer.readUint32BE(1 * 4) //elf header position for program header offset
+        
+        const programLength = buffer.readUint32BE(programHeaderOffset + 3 * 4); //header position for program size
+        const length =  programLength - (programLength % 4);
+        
+        const codeOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary
+        
+        for (let i = codeOffset; i < programLength; i+=4) {
             const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i));
             this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
         }
@@ -131,12 +145,12 @@ export class SimulationController {
         if (buffer.length % 4 !== 0)
         {
             const value: DoubleWord = DoubleWord.fromBytes(
-                Byte.fromNumber(buffer[lenght]), 
-                Byte.fromNumber(buffer.length % 4 >= 2 ? buffer[lenght+1] : 0), 
-                Byte.fromNumber(buffer.length % 4 === 3 ? buffer[lenght+2] : 0), 
+                Byte.fromNumber(buffer[length]), 
+                Byte.fromNumber(buffer.length % 4 >= 2 ? buffer[length+1] : 0), 
+                Byte.fromNumber(buffer.length % 4 === 3 ? buffer[length+2] : 0), 
                 Byte.ZERO);
 
-            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + length), value)
         }
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
