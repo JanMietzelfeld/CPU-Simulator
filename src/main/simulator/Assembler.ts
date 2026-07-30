@@ -111,7 +111,7 @@ export class Assembler {
 		const variableBaseAddress = (numberOfPagesProgram * pageSize) + baseOffset;
 
 		this.writeMetadata(totalCodeSize, numberOfPagesProgram, variableBaseAddress, variablesSizeBytes);
-		this.replaceSymbols(lines, constants, variables, numericalConstants, programSizeBytes, variableBaseAddress);
+		this.replaceSymbols(lines, constants, variables, numericalConstants, programSizeBytes + baseOffset, variableBaseAddress);
 		
 		// Iterate lines of code.
 		for (const [lineNo, line] of lines.entries()) {
@@ -170,7 +170,7 @@ export class Assembler {
 
 		const codeOffsetFile: number = 96; //32 byte elf header + 64 byte program header
 
-		const dataSegmentFileOffset: number = codeOffsetFile + dataSegmentSize;
+		const dataSegmentFileOffset: number = codeOffsetFile + totalCodeSize;
 
 		this.metadata.push(DoubleWord.fromNumber(neededL2PageTables));
 

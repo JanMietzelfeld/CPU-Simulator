@@ -28,10 +28,10 @@
     POP %edx ; restore stack return
     CMP $0, %eax
     JG _UTIL_LOAD_PROGRAM_FILE_STAT
-    MOV %edx, %esp ; clean stack
-    POP %ecx
-    POP %ebx
-    RET
+        MOV %edx, %esp ; clean stack
+        POP %ecx
+        POP %ebx
+        RET
 
     ._UTIL_LOAD_PROGRAM_FILE_STAT:
         ; SYSCALLS_FILE_OPEN
@@ -56,7 +56,7 @@
         ; *(%esp) = file descriptor
 
         ; prepare stack for further calls
-
+        
         .CONST BUF 32 ELF_HEADER ; prepare buffer to store elf header
 
         ; SYSCALLS_FILE_READ
@@ -84,7 +84,8 @@
         ._UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR:
         ADD $12, %esp ; clear read params from stack
         ; get magic number
-        MOV *$ELF_HEADER, %ebx
+        MOV $ELF_HEADER, %ebx
+        MOV *%ebx, %ebx
         CMP $0x7F454c46, %ebx ; check magic number
         JE _UTIL_LOAD_PROGRAM_MAGIC_MATCH
             MOV %edx, %esp ; reset stack

@@ -95,6 +95,7 @@ export class PassthroughFilesystem {
             }
             const vfd = this.fd_map.get(fd)!
             if (this.file_stat(vfd.filename) < vfd.seek_position) {
+                console.log(vfd.filename + " size: " + this.file_stat(vfd.filename) + " Seek position: " + vfd.seek_position)
                 // invalid seek position
                 return -2;
             }

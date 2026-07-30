@@ -132,26 +132,16 @@ export class SimulationController {
 
         const programHeaderOffset = buffer.readUint32BE(1 * 4) //elf header position for program header offset
         
+        const codeFileOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary
         const programLength = buffer.readUint32BE(programHeaderOffset + 3 * 4); //header position for program size
-        const length =  programLength - (programLength % 4);
-        
-        const codeOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary
-        
-        for (let i = codeOffset; i < programLength; i+=4) {
-            const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i));
-            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
-        }
+        this.loadSegment(codeFileOffset, programLength, SimulationController.KERNEL_SPACE_START, buffer);
 
-        if (buffer.length % 4 !== 0)
-        {
-            const value: DoubleWord = DoubleWord.fromBytes(
-                Byte.fromNumber(buffer[length]), 
-                Byte.fromNumber(buffer.length % 4 >= 2 ? buffer[length+1] : 0), 
-                Byte.fromNumber(buffer.length % 4 === 3 ? buffer[length+2] : 0), 
-                Byte.ZERO);
+        // load data segment
+        const dataSegmentStartAddress = buffer.readUint32BE(programHeaderOffset + 7 * 4); //header position for data segment start address
+        const dataFileOffset = buffer.readUint32BE(programHeaderOffset + 8 * 4); //header position for data offset in binary
+        const dataSegmentLength = buffer.readUint32BE(programHeaderOffset + 9 * 4); //header position for data size
+        this.loadSegment(dataFileOffset, dataSegmentLength,dataSegmentStartAddress, buffer);
 
-            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + length), value)
-        }
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
 
@@ -183,6 +173,31 @@ export class SimulationController {
     }
 
 
+    private loadSegment(fileOffset: number, segmentLength: number, targetAddress: number, buffer: Buffer): void {
+        if (segmentLength <= 0) {
+            return;
+        }
+        const doubleWordAlignedLength = segmentLength - (segmentLength % 4);
+
+        //write full double words
+        for (let i = 0; i < doubleWordAlignedLength; i += 4) {
+            const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i + fileOffset));
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(targetAddress + i), value);
+        }
+
+        // write rest
+        const remainder = segmentLength % 4;
+        if (remainder !== 0) {
+            const value: DoubleWord = DoubleWord.fromBytes(
+                Byte.fromNumber(buffer[fileOffset + doubleWordAlignedLength]), 
+                Byte.fromNumber(remainder >= 2 ? buffer[fileOffset + doubleWordAlignedLength + 1] : 0), 
+                Byte.fromNumber(remainder === 3 ? buffer[fileOffset + doubleWordAlignedLength + 2] : 0), 
+                Byte.ZERO
+            );
+
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(targetAddress + doubleWordAlignedLength), value)
+        }
+    }
 
     /**
      * This method is used to initialize a process and prepare its execution.
