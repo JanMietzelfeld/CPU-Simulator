@@ -47,6 +47,178 @@
         ; *(%esp+4) = file lenght
         ; *(%esp) = file descriptor
 
+        ; prepare stack for further calls
+
+        .CONST BUF 32 ELF_HEADER ; prepare buffer to store elf header
+
+        ; SYSCALLS_FILE_READ
+        ; Parameters (ebx is a pointer to the following struct):
+        ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
+        ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
+        ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
+        ; Return value (immediate value):
+        ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
+        PUSH $32 ; buffer size
+        PUSH $ELF_HEADER ; pointer to buffer
+        PUSH %eax ; file descriptor
+        CALL SYSCALLS_FILE_READ
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR
+            ;TODO error handling
+
+        ._UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR:
+        POP %eax ; restore file descriptor
+        POP %ebx
+        POP %ebx
+        ; get magic number
+        MOV *$ELF_HEADER, %ebx
+        CMP 0x7F454c46, %ebx ; check magic number
+        JE _UTIL_LOAD_PROGRAM_MAGIC_MATCH
+            ;todo error
+
+        ._UTIL_LOAD_PROGRAM_MAGIC_MATCH:
+        MOV $ELF_HEADER, %ebx
+        ADD $4, %ebx ; offset to read program header offset
+        MOV *%ebx, %edx ; program header offset
+
+        
+
+        ; SYSCALLS_FILE_SEEK
+        ; Parameters (ebx is a pointer to the following struct):
+        ;   *(ebx)     file descriptor
+        ;   *(ebx+4)   seek offset
+        ;   *(ebx+8)   seek mode (0 - Seek from current position, 1 - Seek from start of file, 2 - Seek from end of file)
+        ; Return value (immediate value):
+        ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
+        PUSH $1 ; seek mode start from file to get the correct offset
+        PUSH %edx ; second dword in elf header is program header offset
+        PUSH %eax ; file descriptor
+        MOV %esp, %ebx ; set pointer to start of struct
+        CALL SYSCALLS_FILE_SEEK
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_PH_SEEK_NO_ERROR
+            ;todo error
+        ._UTIL_LOAD_PROGRAM_PH_SEEK_NO_ERROR:
+        POP %eax ; restore fd
+        POP %ebx
+        POP %ebx
+
+        ; SYSCALLS_FILE_READ
+        ; Parameters (ebx is a pointer to the following struct):
+        ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
+        ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
+        ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
+        ; Return value (immediate value):
+        ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
+        .CONST BUF 64 PROGRAM_HEADER ; prepare buffer for program header
+        PUSH $64 ; buffer size
+        PUSH $PROGRAM_HEADER ; pointer to buffer
+        PUSH %eax ; fd
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_READ_PH_NO_ERROR
+            ;todo error
+        ._UTIL_LOAD_PROGRAM_READ_PH_NO_ERROR:
+        POP %eax ; restore fd
+        POP %ebx
+        POP %ebx
+
+        ; stack now
+        ; esp + 12 = pointer to pcb
+        ; esp + 8 = pointer to ASCII filename
+        ; esp + 4 = file length
+        ; esp = file descriptor
+
+        MOV $PROGRAM_HEADER, %eax
+        ADD $4, %eax ; offset where the needed amount of L2 page tables is stored
+        MOV *%eax, %eax
+
+        ; prepare page tables
+
+        ; %eax now holds amount of needed L2 page tables
+        ; initialize and map L2 page tables to base directory
+
+        ; get PCB pointer from stack
+        MOV %esp, %ebx
+        ADD $12, %ebx
+        MOV *%ebx, %ebx
+        ADD $4, %ebx
+        MOV *%ebx, %ebx ; ebx = pcb pointer
+        ADD $2, %ebx ; move to page directory base address in pcb
+        MOV *%ebx, %ebx ; page directory base address now in ebx
+        MOV %ebx, %ecx
+        PUSH %ecx ; save page directory base address
+
+        MOV $0, %ebx ; counter for base directory index
+        ; eax needed amount of L2 page tables
+        ; ebx page directory index counter
+        ; ecx page directory base address
+    
+    ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES:
+        CMP %eax, %ebx ; all L2 page tab mapped?
+        JGE _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES_DONE
+        ; save counters and free registers for use
+        PUSH %eax
+        PUSH %ebx
+        PUSH %ecx
+
+        ; Searches for a free page table, marks it as used and returns the base address
+        ; UTIL_ALLOCATE_PAGE_TABLE
+        ; Parameters 
+        ;   none
+        ; Return value (immediate value):
+        ;   eax     page table base address (0xFFFFFFFF = invalid)
+        CALL UTIL_ALLOCATE_PAGE_TABLE
+        POP %ecx
+        CMP $0xFFFFFFFF, %eax
+        JNE _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLE_NO_ERROR
+            ADD $20, %esp
+            POP %ebx
+            MOV $-4, %eax
+            RET
+
+    ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLE_NO_ERROR:
+        MOV %eax, %ebx
+        ; ecx current page directory address
+        ; ebx initialized page table base address
+        AND $0xFFFFF000, %ebx ; calculate the address part of the page table entry
+        SHR $12, %ebx ; make space for the flags (12)
+        OR $0xA0000000, %ebx ; A = Present and Executable bit
+        MOV %ebx, *%ecx ; write the base directory entry
+
+        POP %ebx ; page directory index counter
+        POP %eax ; needed amount of L2 page tables
+        ADD $1, %ebx
+        ADD $4, %ecx ; next base directory index
+
+        JMP _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES
+    
+    ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES_DONE:
+
+    PUSH $PROGRAM_HEADER
+    ; stack now
+    ; esp + 20 = pointer to pcb
+    ; esp + 16 = pointer to ASCII filename
+    ; esp + 12 = file length
+    ; esp + 8 = file descriptor
+    ; esp + 4 = page directory base address
+    ; esp = pointer to buffer with program header
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         ; calculate number of needed frames
 
         MOV %esp, %eax
