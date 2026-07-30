@@ -34,7 +34,6 @@ PUSH $1 ; seek Mode
 PUSH %eax ; offset
 PUSH %ecx ; fd
 MOV %esp, %ebx ; put struct in ebx for seek
-DEV $8, %eax
 CALL SYSCALLS_FILE_SEEK
 JGE _UTIL_LOAD_SEGMENT_SEEK_SEGMENT_START_NO_ERROR
     ; remove seek params
@@ -374,7 +373,6 @@ JE _UTIL_LOAD_SEGMENT_REMAINDER_CHECK
         ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
         CALL SYSCALLS_FILE_READ
         POP %edx ; restore stack return
-        DEV $8, %eax
         CMP $0, %eax
         JGE _UTIL_LOAD_SEGMENT_REMAINDER_READ_NO_ERROR
             POP %ebx

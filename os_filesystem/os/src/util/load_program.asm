@@ -57,7 +57,7 @@
 
         ; prepare stack for further calls
         
-        .CONST BUF 32 ELF_HEADER ; prepare buffer to store elf header
+        .BUF 32 ELF_HEADER ; prepare buffer to store elf header
 
         ; SYSCALLS_FILE_READ
         ; Parameters (ebx is a pointer to the following struct):
@@ -132,7 +132,7 @@
         ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
         ; Return value (immediate value):
         ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
-        .CONST BUF 64 PROGRAM_HEADER ; prepare buffer for program header
+        .BUF 64 PROGRAM_HEADER ; prepare buffer for program header
         PUSH $64 ; buffer size
         PUSH $PROGRAM_HEADER ; pointer to buffer
         PUSH %ecx ; fd

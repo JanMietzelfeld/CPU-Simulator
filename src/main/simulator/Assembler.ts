@@ -308,16 +308,16 @@ export class Assembler {
 					lineEncoded = true;
 				}
 			}
-		} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBuffer, "gim"))) {
-			const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationBuffer, "gim");
+		} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationBuffer, "gim"))) {
+			const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBuffer, "gim");
 			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
 				const stringParts: string[] = regexMatch[0].toString().trim().split(" ");
-				const bufferName = stringParts[3];
-				const bufferSize: number = parseInt(stringParts[2], 10);
-				if (constants.has(bufferName)) {
+				const bufferName = stringParts[2];
+				const bufferSize: number = parseInt(stringParts[1], 10);
+				if (variables.has(bufferName)) {
 					const encodedInstruction: DoubleWord[] = this.initializeBuffer(lineNo, line, bufferSize);
-					this.encodedConstants.push(...encodedInstruction);
+					this.encodedVariables.push(...encodedInstruction);
 					lineEncoded = true;
 				}
 			}
@@ -485,31 +485,21 @@ export class Assembler {
 					const stringMemSize = Math.ceil((Buffer.byteLength(constantValue) / 4)) * 4;
 					constantCounter += stringMemSize;
 				}
-			} else if (line.match(new RegExp(this.languageDefinition.constant_formats.declarationBuffer, "gim"))) {
-				/**
-				 * 
-				 * 
-				 * 
-				 * MOVE THIS TO VARIABLES
-				 * BUFFER NOT WRITEABLE OTHERWISE!!!!!
-				 * 
-				 * 
-				 * 
-				 */
-				const regexExp = new RegExp(this.languageDefinition.constant_formats.declarationBuffer, "gim");
+			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationBuffer, "gim"))) {
+				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBuffer, "gim");
 				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
 					const stringParts: string[] = regexMatch[0].toString().trim().split(" ");
-					const bufferName = stringParts[3];
-					const bufferSize: number = parseInt(stringParts[2], 10);
-					constants.set(
+					const bufferName = stringParts[2];
+					const bufferSize: number = parseInt(stringParts[1], 10);
+					variables.set(
 						bufferName, 
-						constantCounter
+						variableCounter
 					);
 					//Calculate the size the buffer will take up in memory. Since the system is based on fixed 32 bit instructions, the buffer size needs to fit into
 					//multiple of double words.
 					const bufferMemSize = Math.ceil((bufferSize / 4)) * 4;
-					constantCounter += bufferMemSize;
+					variableCounter += bufferMemSize;
 				}
 			} else if (line.match(new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim"))) {
 				const regexExp = new RegExp(this.languageDefinition.variable_formats.declarationBinary, "gim");
