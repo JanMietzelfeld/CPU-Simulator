@@ -130,14 +130,23 @@ export class Assembler {
 	 * 6 dwords free
 	 * 
 	 * Program header (16 dwords)
-	 * 1 DWORD Total_Frames x
-	 * 1 DWORD Total_L2_Tables x
-	 * 1 DWORD Code_Offset
-	 * 1 DWORD Code_Size x
-	 * 1 DWORD Data_Offset
-	 * 1 DWORD Data_Size x
-	 * 1 DWORD Data_Vaddr_Base x
-	 * 9 dwords free
+	 * 1 DWORD Total_L2_Tables
+	 * 
+	 * 1 DWORD Text segment virtual start address
+	 * 1 DWORD Text segment file offset
+	 * 1 DWORD Text segment size
+	 * 
+	 * rodata not implemented yet
+	 * 1 DWORD Free
+	 * 1 DWORD Free
+	 * 1 DWORD Free
+	 * 
+	 * 1 DWORD Data segment virtual start address
+	 * 1 DWORD Data segment file offset
+	 * 1 DWORD Data segment size
+	 * 
+	 
+	 * 6 dwords free
 	 */
 	private writeMetadata(totalCodeSize: number, codePages: number, dataSegmentBaseAddr: number, dataSegmentSize: number): void {
 		const magicNumber: DoubleWord = DoubleWord.fromNumber(0x7F_45_4c_46) // 0x7F followed by ELF in ASCII
@@ -162,14 +171,23 @@ export class Assembler {
 		const codeOffsetFile: number = 96; //32 byte elf header + 64 byte program header
 
 		const dataSegmentFileOffset: number = codeOffsetFile + dataSegmentSize;
-		this.metadata.push(DoubleWord.fromNumber(totalPages));
+
 		this.metadata.push(DoubleWord.fromNumber(neededL2PageTables));
+
+		// for now program starts fixed at 0
+		this.metadata.push(DoubleWord.fromNumber(0));
 		this.metadata.push(DoubleWord.fromNumber(codeOffsetFile));
 		this.metadata.push(DoubleWord.fromNumber(totalCodeSize));
+
+		this.metadata.push(DoubleWord.fromNumber(0));
+		this.metadata.push(DoubleWord.fromNumber(0));
+		this.metadata.push(DoubleWord.fromNumber(0));
+
+		this.metadata.push(DoubleWord.fromNumber(dataSegmentBaseAddr));
 		this.metadata.push(DoubleWord.fromNumber(dataSegmentFileOffset));
 		this.metadata.push(DoubleWord.fromNumber(dataSegmentSize));
-		this.metadata.push(DoubleWord.fromNumber(dataSegmentBaseAddr));
-		for (let i = 0; i < 9; ++i) {
+		
+		for (let i = 0; i < 6; ++i) {
 			this.metadata.push(DoubleWord.fromNumber(0));
 		}
 	}
