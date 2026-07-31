@@ -15,10 +15,9 @@
 ; 1 DWORD Text segment file offset
 ; 1 DWORD Text segment size
 ; 
-; rodata not implemented yet
-; 1 DWORD Free
-; 1 DWORD Free
-; 1 DWORD Free
+; 1 DWORD RoData segment virtual start address
+; 1 DWORD RoData segment file offset
+; 1 DWORD RoData segment size
 ; 
 ; 1 DWORD Data segment virtual start address
 ; 1 DWORD Data segment file offset

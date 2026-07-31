@@ -27,7 +27,7 @@
     CALL SYSCALLS_FILE_STAT
     POP %edx ; restore stack return
     CMP $0, %eax
-    JG _UTIL_LOAD_PROGRAM_FILE_STAT
+    JGE _UTIL_LOAD_PROGRAM_FILE_STAT
         MOV %edx, %esp ; clean stack
         POP %ecx
         POP %ebx
@@ -227,7 +227,7 @@
     ; esp + 4 = file descriptor
     ; esp + 8 = original ebx struct
     
-    ; prepare stack to load text segment
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; prepare stack to load text segment ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     MOV $PROGRAM_HEADER, %eax
     ADD $8, %eax ; offset in PH
@@ -294,6 +294,73 @@
 
     ._UTIL_LOAD_PROGRAM_LOAD_TEXT_SEGMENT_SUCCESS:
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; prepare stack to load roData segment ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    ; get roData segment size
+    MOV $PROGRAM_HEADER, %eax
+    ADD $24, %eax ; PH offset
+    MOV *%eax, %eax 
+    CMP $0, %eax
+    JE _UTIL_LOAD_PROGRAM_RO_DATA_SEGMENT_SKIP
+    ; prepare stack for roData segment
+    MOV %esp, %ebx
+    ADD $8, %ebx ; roData segment size
+    MOV %eax, *%ebx ; set new segment size
+
+    ; get virtual address start of roData segment
+    MOV $PROGRAM_HEADER, %eax
+    ADD $16, %eax ; PH offset
+    MOV *%eax, %eax ; get v-address
+    MOV %esp, %ebx
+    ADD $12, %ebx ; offset for stack v-address
+    MOV %eax, *%ebx ; set new v-address
+
+    ; set new flags
+    MOV %esp, %eax
+    ADD $16, %eax ; stack offset for flags
+    MOV $0x800, *%eax ; set new flags 800 = present, writeable not set
+
+    ; set new file offset
+    MOV $PROGRAM_HEADER, %eax
+    ADD $20, %eax ; offset in PH
+    MOV *%eax, %eax ; file offset for roData segment
+    MOV %esp, %ebx
+    ADD $24, %ebx ; stack offset for file offset
+    MOV %eax, *%ebx ; write new file offset
+    MOV %esp, %ebx ; set ebx to start of struct for call
+
+    ; UTIL_LOAD_SEGMENT
+    ; Parameters
+    ;   ebx holds the start of the following struct
+    ;   ebx + 24 = segment offset in file
+    ;   ebx + 20 = process id
+    ;   ebx + 16 = page table flags
+    ;   ebx + 12 = segment virtual memory start address
+    ;   ebx +  8 = segment size in bytes
+    ;   ebx +  4 = page directory base address
+    ;   ebx      = file descriptor
+    ; Return value (immediate value):
+    ;   eax success status (0 = success, -1 = error)
+    PUSH %edx ; save stack return
+    CALL UTIL_LOAD_SEGMENT
+    POP %edx
+    CMP $0, %eax
+    JGE _UTIL_LOAD_PROGRAM_LOAD_RO_DATA_SEGMENT_SUCCESS
+        ; error
+        MOV %edx, %esp ; reset stack
+        POP %ecx
+        POP %ebx
+        MOV $-4, %eax
+        RET
+
+    ._UTIL_LOAD_PROGRAM_LOAD_RO_DATA_SEGMENT_SUCCESS:
+
+
+
+    ._UTIL_LOAD_PROGRAM_RO_DATA_SEGMENT_SKIP:
+
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; prepare stack to load data segment ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ; get data segment size
     MOV $PROGRAM_HEADER, %eax
     ADD $36, %eax ; PH offset

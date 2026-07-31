@@ -132,9 +132,16 @@ export class SimulationController {
 
         const programHeaderOffset = buffer.readUint32BE(1 * 4) //elf header position for program header offset
         
+        // load text segment
         const codeFileOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary
         const programLength = buffer.readUint32BE(programHeaderOffset + 3 * 4); //header position for program size
         this.loadSegment(codeFileOffset, programLength, SimulationController.KERNEL_SPACE_START, buffer);
+
+        // load roData segment
+        const roDataStartAddress = buffer.readUint32BE(programHeaderOffset + 4 * 4);
+        const roDataFileOffset = buffer.readUint32BE(programHeaderOffset + 5 * 4);
+        const roDataSize = buffer.readUint32BE(programHeaderOffset + 6 * 4);
+        this.loadSegment(roDataFileOffset, roDataSize, roDataStartAddress, buffer);
 
         // load data segment
         const dataSegmentStartAddress = buffer.readUint32BE(programHeaderOffset + 7 * 4); //header position for data segment start address

@@ -100,18 +100,28 @@ export class Assembler {
 		const numericalConstants: Map<string, string> = new Map();
 
 		const counters = this.locateSymbols(lines, jumpLabels, constants, variables, numericalConstants, baseOffset);
-		const programSizeBytes: number = counters[0];
+		const textSizeBytes: number = counters[0];
 		const constantsSizeBytes: number = counters[1];
 		const variablesSizeBytes: number = counters[2];
 		
-		//calculate variables base address
+		//calculate important offsets and sizes
 		const pageSize: number = 4096;
-		const totalCodeSize = programSizeBytes + constantsSizeBytes;
-		const numberOfPagesProgram = Math.ceil(totalCodeSize / pageSize);
-		const variableBaseAddress = (numberOfPagesProgram * pageSize) + baseOffset;
+		const pageTableEntries: number = 1024;
+		const numberOfPagesText: number = Math.ceil(textSizeBytes / pageSize);
+		const numberOfPagesRoData: number = Math.ceil(constantsSizeBytes / pageSize);
+		const numberOfPagesData: number = Math.ceil(variablesSizeBytes / pageSize);
 
-		this.writeMetadata(totalCodeSize, numberOfPagesProgram, variableBaseAddress, variablesSizeBytes);
-		this.replaceSymbols(lines, constants, variables, numericalConstants, programSizeBytes + baseOffset, variableBaseAddress);
+		const totalNeededPages: number = numberOfPagesText + numberOfPagesRoData + numberOfPagesData;
+
+		const neededL2PageTables: number = Math.ceil(totalNeededPages / pageTableEntries);
+
+		// calculate base addresses
+		const roDataBaseAddress: number = (numberOfPagesText * pageSize) + baseOffset;
+		const dataBaseAddress: number = ((numberOfPagesText + numberOfPagesRoData) * pageSize) + baseOffset;
+
+
+		this.writeMetadata(neededL2PageTables, baseOffset, roDataBaseAddress, dataBaseAddress, counters);
+		this.replaceSymbols(lines, constants, variables, numericalConstants, roDataBaseAddress, dataBaseAddress);
 		
 		// Iterate lines of code.
 		for (const [lineNo, line] of lines.entries()) {
@@ -136,10 +146,9 @@ export class Assembler {
 	 * 1 DWORD Text segment file offset
 	 * 1 DWORD Text segment size
 	 * 
-	 * rodata not implemented yet
-	 * 1 DWORD Free
-	 * 1 DWORD Free
-	 * 1 DWORD Free
+	 * 1 DWORD RoData segment virtual start address
+	 * 1 DWORD RoData segment file offset
+	 * 1 DWORD RoData segment size
 	 * 
 	 * 1 DWORD Data segment virtual start address
 	 * 1 DWORD Data segment file offset
@@ -148,7 +157,12 @@ export class Assembler {
 	 
 	 * 6 dwords free
 	 */
-	private writeMetadata(totalCodeSize: number, codePages: number, dataSegmentBaseAddr: number, dataSegmentSize: number): void {
+	private writeMetadata(neededL2PageTables: number, baseOffset: number, roDataBaseAddress: number, dataBaseAddress: number, sizes: number[]): void {
+		const textSizeBytes: number = sizes[0];
+		const roDataSizeBytes: number = sizes[1];
+		const dataSizeBytes: number = sizes[2];
+
+		// prepare elf header
 		const magicNumber: DoubleWord = DoubleWord.fromNumber(0x7F_45_4c_46) // 0x7F followed by ELF in ASCII
 		const programHeaderOffset: DoubleWord = DoubleWord.fromNumber(32);
 		this.metadata.push(magicNumber);
@@ -159,33 +173,28 @@ export class Assembler {
 			this.metadata.push(DoubleWord.fromNumber(0));
 		}
 
-		//calculate needed frames for data segment
-		const pageSize: number = 4096;
-		const numberOfDataPages = Math.ceil(dataSegmentSize / pageSize);
+		// calculate file offsets
+		const textFileOffset: number = 96; //32 byte elf header + 64 byte program header
+		const roDataFileOffset: number = textFileOffset + textSizeBytes;
+		const dataFileOffset: number = roDataFileOffset + roDataSizeBytes;
 
-		const totalPages: number = numberOfDataPages + codePages;
-
-		const pageTableEntries = 1024;
-		const neededL2PageTables: number = Math.ceil(totalPages / pageTableEntries);
-
-		const codeOffsetFile: number = 96; //32 byte elf header + 64 byte program header
-
-		const dataSegmentFileOffset: number = codeOffsetFile + totalCodeSize;
-
+		// write metadata
 		this.metadata.push(DoubleWord.fromNumber(neededL2PageTables));
 
-		// for now program starts fixed at 0
-		this.metadata.push(DoubleWord.fromNumber(0));
-		this.metadata.push(DoubleWord.fromNumber(codeOffsetFile));
-		this.metadata.push(DoubleWord.fromNumber(totalCodeSize));
+		// text metadata
+		this.metadata.push(DoubleWord.fromNumber(baseOffset));
+		this.metadata.push(DoubleWord.fromNumber(textFileOffset));
+		this.metadata.push(DoubleWord.fromNumber(textSizeBytes));
 
-		this.metadata.push(DoubleWord.fromNumber(0));
-		this.metadata.push(DoubleWord.fromNumber(0));
-		this.metadata.push(DoubleWord.fromNumber(0));
+		// roData metadata
+		this.metadata.push(DoubleWord.fromNumber(roDataBaseAddress));
+		this.metadata.push(DoubleWord.fromNumber(roDataFileOffset));
+		this.metadata.push(DoubleWord.fromNumber(roDataSizeBytes));
 
-		this.metadata.push(DoubleWord.fromNumber(dataSegmentBaseAddr));
-		this.metadata.push(DoubleWord.fromNumber(dataSegmentFileOffset));
-		this.metadata.push(DoubleWord.fromNumber(dataSegmentSize));
+		// data metadata
+		this.metadata.push(DoubleWord.fromNumber(dataBaseAddress));
+		this.metadata.push(DoubleWord.fromNumber(dataFileOffset));
+		this.metadata.push(DoubleWord.fromNumber(dataSizeBytes));
 		
 		for (let i = 0; i < 6; ++i) {
 			this.metadata.push(DoubleWord.fromNumber(0));
