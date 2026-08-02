@@ -309,7 +309,8 @@ export class Assembler {
 			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
 				const value: string = regexMatch[0].toString().trim();
-				const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+				const stringParts: string[] = regexMatch[0].toString().trim().split(" ");
+				const constantName = stringParts[1];
 				const constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 				if (constants.has(constantName)) {
 					const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, constantValue);
@@ -335,7 +336,7 @@ export class Assembler {
 			const regexMatch = regexExp.exec(line);
 			if (regexMatch !== null) {
 				const value: string = regexMatch[0].toString().trim();
-				const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+				const variableName = value.substring(value.indexOf(".") + 1, value.indexOf(" ")).trim();
 				const variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 				if (variables.has(variableName)) {
 					const encodedInstruction: DoubleWord[] = this.encodeString(lineNo, line, variableValue);
@@ -483,7 +484,8 @@ export class Assembler {
 				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
-					const constantName = value.substring(value.indexOf(".CONST") + 6, value.lastIndexOf(" ")).trim();
+					const stringParts: string[] = regexMatch[0].toString().trim().split(" ");
+					const constantName = stringParts[1];
 					const constantValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 					constants.set(
 						constantName, 
@@ -551,7 +553,7 @@ export class Assembler {
 				const regexMatch = regexExp.exec(line);
 				if (regexMatch !== null) {
 					const value: string = regexMatch[0].toString().trim();
-					const variableName = value.substring(value.indexOf(".") + 1, value.lastIndexOf(" ")).trim();
+					const variableName = value.substring(value.indexOf(".") + 1, value.indexOf(" ")).trim();
 					const variableValue = value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")) + "\0";
 					variables.set(
 						variableName, 
