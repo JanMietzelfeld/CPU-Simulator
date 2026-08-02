@@ -2535,7 +2535,7 @@ export class CPUCore {
         // Add the number of the interrupt handler to the interrupt tables base address, which is stored in the ITP register.
         const interruptHandlerTableEntry: DoubleWord = DoubleWord.fromNumber(this.itp.content + target.value*4);
         // Load interrupt handler address
-        const interruptHandler = this.mmu.readDoublewordFrom(interruptHandlerTableEntry, true)
+        const interruptHandler = this.mmu.readDoublewordFrom(interruptHandlerTableEntry, false);
         /*
          * Before calling a subroutine, the caller needs to push the return address onto the STACK.
          * The return address is necessary to hand over control to the caller again after the subroutine 

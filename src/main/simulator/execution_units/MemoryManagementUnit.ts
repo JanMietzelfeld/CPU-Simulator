@@ -218,9 +218,9 @@ export class MemoryManagementUnit {
             throw new ExceptionError(InterruptNumbers.PAGE_FAULT);
         }
 
-        if (!ignorePermissionFlags && !this._cpu.flags.isInKernelMode()) {
+        if (!ignorePermissionFlags) {
             // Check if the page frame is accessable only in kernel mode.
-            if (PageTableEntryFlags.isKernelModeOnly(pageTableEntryFlags)) {
+            if (!this._cpu.flags.isInKernelMode() && PageTableEntryFlags.isKernelModeOnly(pageTableEntryFlags)) {
                 throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             }
             // Check if the page frames contents are executable.
