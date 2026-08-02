@@ -9,6 +9,10 @@
 ; Return value (immediate value):
 ;   eax     success status (0 = success, -1 = file does not exists, -2 = not a file, -3 = out of memory, -4 = unknown)
 .UTIL_LOAD_PROGRAM:
+    PUSH %ebx
+    PUSH %ecx
+    MOV %esp, %edx ; save stack return
+
     PUSH %ebx ; save ebx
 
     MOV *%ebx, %ebx
@@ -19,24 +23,29 @@
     ;   (ebx)     Pointer to a ASCII filename
     ; Return value (immediate value):
     ;   eax     file length or error code (>=0 = length, -1 = file does not exists, -2 = not a file)
+    PUSH %edx ; save stack return
     CALL SYSCALLS_FILE_STAT
+    POP %edx ; restore stack return
     CMP $0, %eax
-    JG _UTIL_LOAD_PROGRAM_FILE_STAT
-    POP %ebx
-    RET
+    JGE _UTIL_LOAD_PROGRAM_FILE_STAT
+        MOV %edx, %esp ; clean stack
+        POP %ecx
+        POP %ebx
+        RET
 
     ._UTIL_LOAD_PROGRAM_FILE_STAT:
-        PUSH %eax ; Push the file length onto the stack
-
         ; SYSCALLS_FILE_OPEN
         ; Parameters (ebx is a pointer to the start of an ASCII filename):
         ;   (ebx)     Pointer to a ASCII filename
         ; Return value (immediate value):
         ;   eax     file descriptor (-1 = error)
+        PUSH %edx
         CALL SYSCALLS_FILE_OPEN
+        POP %edx ; stack return point
         CMP $0, %eax
         JGE _UTIL_LOAD_PROGRAM_FILE_OPEN
-        POP %ebx
+        MOV %edx, %esp
+        POP %ecx
         POP %ebx
         MOV $-4, %eax
         RET
@@ -44,46 +53,125 @@
     ._UTIL_LOAD_PROGRAM_FILE_OPEN:
         PUSH %eax ; Push the file descriptor onto the stack
 
-        ; *(%esp+4) = file lenght
         ; *(%esp) = file descriptor
 
-        ; calculate number of needed frames
-
-        MOV %esp, %eax
-        ADD $4, %eax
-        MOV *%eax, %eax ; get file lenght
-
-        MOV %eax, %ebx ; copy
-
-        SHR $CONST_OS_FRAME_BIT_SIZE, %eax ; divide by frame size (2¹²) = 12 bit shifts to the right
-
-        ; check if there is a remainder
-        MOV $CONST_CPU_BIT_WIDTH, %ecx 
-        SUB $CONST_OS_FRAME_BIT_SIZE, %ecx
-        SAL %ecx, %ebx
-        CMP $0, %ebx
-        JE UTIL_LOAD_PROGRAM_NO_REMAINDER
-        ADD $1, %eax ; if there is a remainder we need to allocate one more frame for it
-
-    .UTIL_LOAD_PROGRAM_NO_REMAINDER:
-        PUSH %eax ; Push the number of needed frames onto the stack
-        ; calculate number of required L2 page tables and write them to the page directory
-        ; use ceiling function to floor function for optimization
-        ADD $1023, %eax
-        SHR $10, %eax ; divide by the amount of entries a page table can hold 2¹⁰ = 1024
+        ; prepare stack for further calls
         
+        .BUF 32 ELF_HEADER ; prepare buffer to store elf header
+
+        ; SYSCALLS_FILE_READ
+        ; Parameters (ebx is a pointer to the following struct):
+        ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
+        ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
+        ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
+        ; Return value (immediate value):
+        ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
+        PUSH $32 ; buffer size
+        PUSH $ELF_HEADER ; pointer to buffer
+        PUSH %eax ; file descriptor
+        MOV %esp, %ebx ; prepare bx for read
+        PUSH %edx
+        CALL SYSCALLS_FILE_READ
+        POP %edx
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR
+            MOV %edx, %esp ; reset stack
+            POP %ecx
+            POP %ebx
+            MOV $-4, %eax
+            RET
+
+        ._UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR:
+        ADD $12, %esp ; clear read params from stack
+        ; get magic number
+        MOV $ELF_HEADER, %ebx
+        MOV *%ebx, %ebx
+        CMP $0x7F454c46, %ebx ; check magic number
+        JE _UTIL_LOAD_PROGRAM_MAGIC_MATCH
+            MOV %edx, %esp ; reset stack
+            POP %ecx
+            POP %ebx
+            MOV $-4, %eax
+            RET
+
+        ._UTIL_LOAD_PROGRAM_MAGIC_MATCH:
+        MOV $ELF_HEADER, %ebx
+        ADD $4, %ebx ; offset to read program header offset
+        MOV *%ebx, %eax ; program header offset
+        MOV *%esp, %ecx ; get FD from stack
+        ; SYSCALLS_FILE_SEEK
+        ; Parameters (ebx is a pointer to the following struct):
+        ;   *(ebx)     file descriptor
+        ;   *(ebx+4)   seek offset
+        ;   *(ebx+8)   seek mode (0 - Seek from current position, 1 - Seek from start of file, 2 - Seek from end of file)
+        ; Return value (immediate value):
+        ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
+        PUSH $1 ; seek mode start from file start to get the correct offset
+        PUSH %eax ; second dword in elf header is program header offset
+        PUSH %ecx ; file descriptor
+        MOV %esp, %ebx ; set pointer to start of struct
+        PUSH %edx ; save stack return
+        CALL SYSCALLS_FILE_SEEK
+        POP %edx
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_PH_SEEK_NO_ERROR
+            MOV %edx, %esp ; reset stack
+            POP %ecx
+            POP %ebx
+            MOV $-4, %eax
+            RET
+        ._UTIL_LOAD_PROGRAM_PH_SEEK_NO_ERROR:
+
+        ADD $12, %esp ; clear seek params from stack
+
+        MOV *%esp, %ecx ; get fd from stack
+        ; SYSCALLS_FILE_READ
+        ; Parameters (ebx is a pointer to the following struct):
+        ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
+        ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
+        ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
+        ; Return value (immediate value):
+        ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
+        .BUF 64 PROGRAM_HEADER ; prepare buffer for program header
+        PUSH $64 ; buffer size
+        PUSH $PROGRAM_HEADER ; pointer to buffer
+        PUSH %ecx ; fd
+        MOV %esp, %ebx ; set ebx for read
+        PUSH %edx
+        CALL SYSCALLS_FILE_READ
+        POP %edx ; restore stack return
+        CMP $0, %eax
+        JGE _UTIL_LOAD_PROGRAM_READ_PH_NO_ERROR
+            MOV %edx, %esp ; reset stack
+            POP %ecx
+            POP %ebx
+            MOV $-4, %eax
+            RET
+        ._UTIL_LOAD_PROGRAM_READ_PH_NO_ERROR:
+        ADD $12, %esp ; clear read params from stack
+
+        ; stack now
+        ; esp + 4 = original ebx struct
+        ; esp = file descriptor
+
+        MOV $PROGRAM_HEADER, %eax
+        MOV *%eax, %eax ; first DWORD in program header is the amount of needed L2 tables
+
+        ; prepare page tables
+
         ; %eax now holds amount of needed L2 page tables
         ; initialize and map L2 page tables to base directory
 
         ; get PCB pointer from stack
         MOV %esp, %ebx
-        ADD $12, %ebx
+        ADD $4, %ebx
         MOV *%ebx, %ebx
         ADD $4, %ebx
         MOV *%ebx, %ebx ; ebx = pcb pointer
         ADD $2, %ebx ; move to page directory base address in pcb
         MOV *%ebx, %ebx ; page directory base address now in ebx
-        MOV %ebx, %ecx
+        MOV %ebx, %ecx ; copy
+        PUSH %ecx ; save page directory base address
 
         MOV $0, %ebx ; counter for base directory index
         ; eax needed amount of L2 page tables
@@ -104,11 +192,14 @@
         ;   none
         ; Return value (immediate value):
         ;   eax     page table base address (0xFFFFFFFF = invalid)
+        PUSH %edx
         CALL UTIL_ALLOCATE_PAGE_TABLE
+        POP %edx
         POP %ecx
         CMP $0xFFFFFFFF, %eax
         JNE _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLE_NO_ERROR
-            ADD $20, %esp
+            MOV %edx, %esp ; reset stack
+            POP %ecx
             POP %ebx
             MOV $-4, %eax
             RET
@@ -119,260 +210,223 @@
         ; ebx initialized page table base address
         AND $0xFFFFF000, %ebx ; calculate the address part of the page table entry
         SHR $12, %ebx ; make space for the flags (12)
-        OR $0xA0000000, %ebx ; A = Present and Executable bit
+        OR $0x80000000, %ebx ; 8 = Present bit, access rights are checked on L2 level
         MOV %ebx, *%ecx ; write the base directory entry
 
         POP %ebx ; page directory index counter
         POP %eax ; needed amount of L2 page tables
         ADD $1, %ebx
-        ADD $4, %ecx ; next base directory index
+        ADD $4, %ecx ; next base directory entry address
 
         JMP _UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES
     
     ._UTIL_LOAD_PROGRAM_ALLOCATE_PAGE_TABLES_DONE:
-        PUSH $1 ; Push the number of written frames onto the stack
-        PUSH $0 ; push page table index onto stack
-        PUSH $0 ; push page directory index onto stack
 
-    ._UTIL_LOAD_PROGRAM_ALLOCATE_FRAMES:
-        ; set up parameter
-        MOV %esp, %ebx
-        ADD $24, %ebx
-        MOV *%ebx, %ebx
-        ADD $4, %ebx
-        MOV *%ebx, %ebx ; ebx = pcb pointer
+    ; stack now
+    ; esp = page directory base address
+    ; esp + 4 = file descriptor
+    ; esp + 8 = original ebx struct
+    
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; prepare stack to load text segment ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-        ; UTIL_ALLOCATE_FRAME
-        ; Parameters 
-        ;   ebx     pcb pointer
-        ; Return value (immediate value):
-        ;   eax     frame address (0xFFFFFFFF = invalid)
-        CALL UTIL_ALLOCATE_FRAME
-        CMP $0xFFFFFFFF, %eax
-        JNE _UTIL_LOAD_PROGRAM_ALLOCATE_FRAME_NO_ERROR
+    MOV $PROGRAM_HEADER, %eax
+    ADD $8, %eax ; offset in PH
+    PUSH *%eax ; put text segment file offset on stack
 
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
+    MOV %esp, %eax
+    ADD $12, %eax ; get original ebx struct from stack
+    MOV *%eax, %eax ; struct
+    ADD $4, %eax ; struct offset
+    MOV *%eax, %eax ; get pcb pointer
+    MOV *%eax, %eax ; get first dword from pcb
+    AND $0xFF000000, %eax ; mask PID, first byte in pcb
+    SHR $24, %eax ; PID
+    PUSH %eax ; put pid on stack
 
-        MOV $-3, %eax
-        RET
+    ; prepare flags
+    PUSH $0xA00 ; A00 = present + Executable
 
-    ._UTIL_LOAD_PROGRAM_ALLOCATE_FRAME_NO_ERROR:
-        ; ebx = pcb pointer
-        ; eax = frame address
+    ; prepare virtual address offset
+    MOV $PROGRAM_HEADER, %eax
+    ADD $4, %eax ; offset in program header for virtual base address
+    PUSH *%eax ; put virtual address on stack
 
-        ; inform simulator that frame has been allocated
-        ; FRAME_MAPPED_SIGNAL
-        ; (esp+8) virtual address
-        ; (esp+4) frame address
-        ; (esp)   process id
-        ; values get popped from stack
+    ; prepare segment size
+    MOV $PROGRAM_HEADER, %eax
+    ADD $12, %eax ; offset for text segment size in PH
+    PUSH *%eax ; put on stack 
 
-        MOV *%esp, %ecx
-        SHL $10, %ecx ; Page directory index with space for L2 index
-        PUSH %ecx
-        MOV %esp, %ecx ;
-        ADD $8, %ecx
-        OR *%ecx, *%esp ; Created vpn
-        POP %ecx ; vpn now in ecx
-        SHL $12, %ecx
-        PUSH %ecx ; put virtual address onto stack
-        PUSH %eax ; put frame address onto stack
-        MOV *%ebx, %ecx ; pcb content
-        AND $0xFF000000, %ecx
-        SHR $24, %ecx ; PID is first byte of pcb
-        PUSH %ecx
-        DEV $CONST_DEV_COMMAND_FRAME_MAPPED_SIGNAL, $0
+    ; prepare page directory base address
+    MOV %esp, %eax
+    ADD $20, %eax ; stack offset for page directory base
+    PUSH *%eax ; put page directory base on stack
 
-        PUSH %eax ; Push the frame start address onto the stack
+    ; prepare fd
+    MOV %esp, %eax
+    ADD $28, %eax ; stack offset for fd
+    PUSH *%eax ; push fd
 
-        ; struct for syscall Read
-        PUSH $CONST_OS_FRAME_SIZE ; Push the buffer size onto the stack
-        PUSH %eax ; Push the frame start address onto the stack
-
-        MOV %esp, %ecx
-        ADD $28, %ecx
-        PUSH *%ecx ; Push the file descriptor onto the stack
-
-        MOV %esp, %ebx ; set ebx to start of the struct
-
-        DEV $CONST_DEV_COMMAND_CPU_IS_MEMORY_VIRTUALIZATION_ENABLED, $0
-        PUSH %eax ; is virtualization enabled
-        DEV $CONST_DEV_COMMAND_CPU_DISABLE_MEMORY_VIRTUALIZATION, $0
-
-        ; SYSCALLS_FILE_READ
-        ; Parameters (ebx is a pointer to the following struct):
-        ;   *(ebx)     file descriptor (fd=0 for console, fd>0 for files)
-        ;   *(ebx+4)   pointer to buffer, this buffer will be filled by the file system
-        ;   *(ebx+8)   buffer size, limits the amount of bytes that will be read
-        ; Return value (immediate value):
-        ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
-        CALL SYSCALLS_FILE_READ
-        CMP $0, %eax
-        JGE _UTIL_LOAD_PROGRAM_FILE_READ_NO_ERROR
-
+    MOV %esp, %ebx ; set ebx to struct start
+    
+    ; UTIL_LOAD_SEGMENT
+    ; Parameters
+    ;   ebx holds the start of the following struct
+    ;   ebx + 24 = segment offset in file
+    ;   ebx + 20 = process id
+    ;   ebx + 16 = page table flags
+    ;   ebx + 12 = segment virtual memory start address
+    ;   ebx +  8 = segment size in bytes
+    ;   ebx +  4 = page directory base address
+    ;   ebx      = file descriptor
+    ; Return value (immediate value):
+    ;   eax success status (0 = success, -1 = error)
+    PUSH %edx ; save stack return
+    CALL UTIL_LOAD_SEGMENT
+    POP %edx
+    CMP $0, %eax
+    JGE _UTIL_LOAD_PROGRAM_LOAD_TEXT_SEGMENT_SUCCESS
+        ; error
+        MOV %edx, %esp ; reset stack
+        POP %ecx
         POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-
         MOV $-4, %eax
         RET
 
-    ._UTIL_LOAD_PROGRAM_FILE_READ_NO_ERROR:
-        POP %ebx ; was virtualization enabled
-        CMP $0, %ebx
-        JE _UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTUALIZATION
-        DEV $CONST_DEV_COMMAND_CPU_ENABLE_MEMORY_VIRTUALIZATION, $0
+    ._UTIL_LOAD_PROGRAM_LOAD_TEXT_SEGMENT_SUCCESS:
 
-    ._UTIL_LOAD_PROGRAM_SKIP_MEMORY_VIRTUALIZATION:
-        POP %ebx
-        POP %ebx
-        POP %ebx
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; prepare stack to load roData segment ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-        PUSH $0         ; seek mode
-        PUSH $CONST_OS_FRAME_SIZE    ; seek offset
+    ; get roData segment size
+    MOV $PROGRAM_HEADER, %eax
+    ADD $24, %eax ; PH offset
+    MOV *%eax, %eax 
+    CMP $0, %eax
+    JE _UTIL_LOAD_PROGRAM_RO_DATA_SEGMENT_SKIP
+    ; prepare stack for roData segment
+    MOV %esp, %ebx
+    ADD $8, %ebx ; roData segment size
+    MOV %eax, *%ebx ; set new segment size
 
-        MOV %esp, %ecx
-        ADD $28, %ecx
-        PUSH *%ecx ; file descriptor
+    ; get virtual address start of roData segment
+    MOV $PROGRAM_HEADER, %eax
+    ADD $16, %eax ; PH offset
+    MOV *%eax, %eax ; get v-address
+    MOV %esp, %ebx
+    ADD $12, %ebx ; offset for stack v-address
+    MOV %eax, *%ebx ; set new v-address
 
-        MOV %esp, %ebx ; set ebx to start of the struct
+    ; set new flags
+    MOV %esp, %eax
+    ADD $16, %eax ; stack offset for flags
+    MOV $0x800, *%eax ; set new flags 800 = present, writeable not set
 
-        ; SYSCALLS_FILE_SEEK
-        ; Parameters (ebx is a pointer to the following struct):
-        ;   *(ebx)     file descriptor
-        ;   *(ebx+4)   seek offset
-        ;   *(ebx+8)   seek mode (0 - Seek from current position, 1 - Seek from start of file, 2 - Seek from end of file)
-        ; Return value (immediate value):
-        ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
-        CALL SYSCALLS_FILE_SEEK
-        CMP $0, %eax
-        JGE _UTIL_LOAD_PROGRAM_FILE_SEEK_NO_ERROR
+    ; set new file offset
+    MOV $PROGRAM_HEADER, %eax
+    ADD $20, %eax ; offset in PH
+    MOV *%eax, %eax ; file offset for roData segment
+    MOV %esp, %ebx
+    ADD $24, %ebx ; stack offset for file offset
+    MOV %eax, *%ebx ; write new file offset
+    MOV %esp, %ebx ; set ebx to start of struct for call
 
+    ; UTIL_LOAD_SEGMENT
+    ; Parameters
+    ;   ebx holds the start of the following struct
+    ;   ebx + 24 = segment offset in file
+    ;   ebx + 20 = process id
+    ;   ebx + 16 = page table flags
+    ;   ebx + 12 = segment virtual memory start address
+    ;   ebx +  8 = segment size in bytes
+    ;   ebx +  4 = page directory base address
+    ;   ebx      = file descriptor
+    ; Return value (immediate value):
+    ;   eax success status (0 = success, -1 = error)
+    PUSH %edx ; save stack return
+    CALL UTIL_LOAD_SEGMENT
+    POP %edx
+    CMP $0, %eax
+    JGE _UTIL_LOAD_PROGRAM_LOAD_RO_DATA_SEGMENT_SUCCESS
+        ; error
+        MOV %edx, %esp ; reset stack
+        POP %ecx
         POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-        POP %ebx
-
         MOV $-4, %eax
         RET
 
-        ._UTIL_LOAD_PROGRAM_FILE_SEEK_NO_ERROR:
+    ._UTIL_LOAD_PROGRAM_LOAD_RO_DATA_SEGMENT_SUCCESS:
 
+
+
+    ._UTIL_LOAD_PROGRAM_RO_DATA_SEGMENT_SKIP:
+
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; prepare stack to load data segment ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; get data segment size
+    MOV $PROGRAM_HEADER, %eax
+    ADD $36, %eax ; PH offset
+    MOV *%eax, %eax 
+    CMP $0, %eax
+    JE _UTIL_LOAD_PROGRAM_DATA_SEGMENT_SKIP
+    ; prepare stack for data segment
+    MOV %esp, %ebx
+    ADD $8, %ebx ; data segment size
+    MOV %eax, *%ebx ; set new segment size
+
+    ; get virtual address start of data segment
+    MOV $PROGRAM_HEADER, %eax
+    ADD $28, %eax ; PH offset
+    MOV *%eax, %eax ; get v-address
+    MOV %esp, %ebx
+    ADD $12, %ebx ; offset for stack v-address
+    MOV %eax, *%ebx ; set new v-address
+
+    ; set new flags
+    MOV %esp, %eax
+    ADD $16, %eax ; stack offset for flags
+    MOV $0xC00, *%eax ; set new flags C00 = present + Writable
+
+    ; set new file offset
+    MOV $PROGRAM_HEADER, %eax
+    ADD $32, %eax ; offset in PH
+    MOV *%eax, %eax ; file offset for data segment
+    MOV %esp, %ebx
+    ADD $24, %ebx ; stack offset for file offset
+    MOV %eax, *%ebx ; write new file offset
+    MOV %esp, %ebx ; set ebx to start of struct for call
+
+    ; UTIL_LOAD_SEGMENT
+    ; Parameters
+    ;   ebx holds the start of the following struct
+    ;   ebx + 24 = segment offset in file
+    ;   ebx + 20 = process id
+    ;   ebx + 16 = page table flags
+    ;   ebx + 12 = segment virtual memory start address
+    ;   ebx +  8 = segment size in bytes
+    ;   ebx +  4 = page directory base address
+    ;   ebx      = file descriptor
+    ; Return value (immediate value):
+    ;   eax success status (0 = success, -1 = error)
+    PUSH %edx ; save stack return
+    CALL UTIL_LOAD_SEGMENT
+    POP %edx
+    CMP $0, %eax
+    JGE _UTIL_LOAD_PROGRAM_LOAD_DATA_SEGMENT_SUCCESS
+        ; error
+        MOV %edx, %esp ; reset stack
+        POP %ecx
         POP %ebx
+        MOV $-4, %eax
+        RET
+
+    ._UTIL_LOAD_PROGRAM_LOAD_DATA_SEGMENT_SUCCESS:
+
+
+
+    ._UTIL_LOAD_PROGRAM_DATA_SEGMENT_SKIP:
+
+
+        MOV %edx, %esp ; reset stack
+        POP %ecx
         POP %ebx
-        POP %ebx
-
-        ; map the frame into the virtual memory space
-
-        ; *(%esp+16) = number of needed frames
-        ; *(%esp+12) = number of written frames
-        ; *(%esp+8) = page table index
-        ; *(%esp+4) = page directory index
-        ; *(%esp) = frame start address
-
-
-        MOV %esp, %ebx ; get ebx back
-        ADD $28, %ebx
-        MOV *%ebx, %ebx
-        ADD $4, %ebx
-        MOV *%ebx, %ebx ; ebx = pcb pointer
-
-        ADD $2, %ebx ; address of the Page directory Pointer
-        MOV *%ebx, %eax ; Page directory Pointer
-
-        ; get offset in page directory table
-        MOV %esp, %ebx
-        ADD $4, %ebx
-        MOV *%ebx, %ecx
-        SHL $2, %ecx
-        ADD %ecx, %eax ; eax now points to the correct entry in the page directory table
-        MOV *%eax, %eax ; get page directory entry
-        ; get page table address
-        AND $0xFFFFF, %eax
-        SHL $12, %eax ; eax now contains base address of the L2 page table at the current base directory index
-        ; Find entry in L2 page table
-        ADD $4, %ebx
-        MOV *%ebx, %ecx
-        SHL $2, %ecx
-        ADD %ecx, %eax ; eax now points to the correct index in the L2 page table
-
-        POP %ecx ; frame start address
-
-        AND $0xFFFFF000, %ecx ; calculate the address part of the page table entry
-        SHR $12, %ecx ; make space for the flags (12)
-        OR $0xA0000000, %ecx ; A = Present and Executable bit
-        MOV %ecx, *%eax
-
-        ; increment page table index
-        MOV %esp, %eax
-        ADD $4, %eax
-        ADD $1, *%eax
-        CMP $1024, *%eax ; has the L2 page table been filled?
-        JNE _UTIL_LOAD_PROGRAM_L2_NOT_FULL
-        MOV $0, *%eax ; reset L2 index
-        SUB $4, %eax ; page directory index
-        ADD $1, *%eax ; increase page directory index
-
-    ._UTIL_LOAD_PROGRAM_L2_NOT_FULL:
-        MOV %esp, %eax
-        ADD $12, %eax ; number of needed frames pointer
-
-        MOV %esp, %ebx
-        ADD $8, %ebx ; number of written frames pointer
-
-        CMP *%eax, *%ebx ; all frames written?
-
-        JE _UTIL_LOAD_PROGRAM_FIND_FRAMES_END
-            ADD $1, *%ebx
-        JMP _UTIL_LOAD_PROGRAM_ALLOCATE_FRAMES
-
-    ._UTIL_LOAD_PROGRAM_FIND_FRAMES_END:
-        POP %ebx ; POP the page directory index from the stack
-        POP %ebx ; POP the page table index from the stack
-        POP %ebx ; POP the number of written frames from the stack
-        POP %ebx ; POP the number of needed frames from the stack
-        POP %ebx ; POP the file descriptor from the stack
-
-        ; SYSCALLS_FILE_CLOSE
-        ; Parameters (ebx is used as a immediate value):
-        ;   ebx     file descriptor
-        ; Return value:
-        ;   eax     success status (0 = success, -1 = invalid file descriptor)
-        CALL SYSCALLS_FILE_CLOSE
-        CMP $-1, %eax
-        JNE _UTIL_LOAD_PROGRAM_FILE_CLOSED
-            ; this should not be able to happen
-
-            ; panic
-
-            ; TODO stop the simulator
-
-    ._UTIL_LOAD_PROGRAM_FILE_CLOSED:
-        POP %eax ; POP the file lenght from the stack
-        POP %ebx ; POP the ebx input
-
-
-MOV $0, %eax
-RET
+        MOV $0, %eax
+        RET

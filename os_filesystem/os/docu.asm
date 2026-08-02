@@ -1,5 +1,30 @@
 ; os documentation
 
+; Program binary
+; Metadata Layout
+
+; ELF header 32 byte (8 dwords)
+; byte 0x0-0x4 magic number
+; byte 0x5-0x8 program header byte offset
+; 6 dwords free
+; 
+; Program header (16 dwords)
+; 1 DWORD Total_L2_Tables
+; 
+; 1 DWORD Text segment virtual start address
+; 1 DWORD Text segment file offset
+; 1 DWORD Text segment size
+; 
+; 1 DWORD RoData segment virtual start address
+; 1 DWORD RoData segment file offset
+; 1 DWORD RoData segment size
+; 
+; 1 DWORD Data segment virtual start address
+; 1 DWORD Data segment file offset
+; 1 DWORD Data segment size
+; 6 dwords free
+
+
 ; Kernel
 
 ; Memory layout (32 bit architecture, 4 GiB total)
