@@ -57,7 +57,7 @@
 
         ; prepare stack for further calls
         
-        .BUF 32 ELF_HEADER ; prepare buffer to store elf header
+        .BUF 32 ICE_HEADER ; prepare buffer to store ice header
 
         ; SYSCALLS_FILE_READ
         ; Parameters (ebx is a pointer to the following struct):
@@ -67,26 +67,26 @@
         ; Return value (immediate value):
         ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
         PUSH $32 ; buffer size
-        PUSH $ELF_HEADER ; pointer to buffer
+        PUSH $ICE_HEADER ; pointer to buffer
         PUSH %eax ; file descriptor
         MOV %esp, %ebx ; prepare bx for read
         PUSH %edx
         CALL SYSCALLS_FILE_READ
         POP %edx
         CMP $0, %eax
-        JGE _UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR
+        JGE _UTIL_LOAD_PROGRAM_READ_ICE_HEADER_NO_ERROR
             MOV %edx, %esp ; reset stack
             POP %ecx
             POP %ebx
             MOV $-4, %eax
             RET
 
-        ._UTIL_LOAD_PROGRAM_READ_ELF_HEADER_NO_ERROR:
+        ._UTIL_LOAD_PROGRAM_READ_ICE_HEADER_NO_ERROR:
         ADD $12, %esp ; clear read params from stack
         ; get magic number
-        MOV $ELF_HEADER, %ebx
+        MOV $ICE_HEADER, %ebx
         MOV *%ebx, %ebx
-        CMP $0x7F454c46, %ebx ; check magic number
+        CMP $0x7F494345, %ebx ; check magic number
         JE _UTIL_LOAD_PROGRAM_MAGIC_MATCH
             MOV %edx, %esp ; reset stack
             POP %ecx
@@ -95,7 +95,7 @@
             RET
 
         ._UTIL_LOAD_PROGRAM_MAGIC_MATCH:
-        MOV $ELF_HEADER, %ebx
+        MOV $ICE_HEADER, %ebx
         ADD $4, %ebx ; offset to read program header offset
         MOV *%ebx, %eax ; program header offset
         MOV *%esp, %ecx ; get FD from stack
@@ -107,7 +107,7 @@
         ; Return value (immediate value):
         ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
         PUSH $1 ; seek mode start from file start to get the correct offset
-        PUSH %eax ; second dword in elf header is program header offset
+        PUSH %eax ; second dword in ice header is program header offset
         PUSH %ecx ; file descriptor
         MOV %esp, %ebx ; set pointer to start of struct
         PUSH %edx ; save stack return

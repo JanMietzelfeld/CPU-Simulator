@@ -3,7 +3,7 @@
 ; Program binary
 ; Metadata Layout
 
-; ELF header 32 byte (8 dwords)
+; ICE header 32 byte (8 dwords)
 ; byte 0x0-0x4 magic number
 ; byte 0x5-0x8 program header byte offset
 ; 6 dwords free
