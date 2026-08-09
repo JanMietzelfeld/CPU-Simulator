@@ -126,11 +126,11 @@ export class SimulationController {
         if (buffer.length < 96) {
             throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable. File too small.")
         }
-        if (magicNumber != 0x7F_45_4c_46) {
+        if (magicNumber != 0x7F_49_43_45) {
             throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable.")
         }
 
-        const programHeaderOffset = buffer.readUint32BE(1 * 4) //elf header position for program header offset
+        const programHeaderOffset = buffer.readUint32BE(1 * 4) //ice header position for program header offset
         
         // load text segment
         const codeFileOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary

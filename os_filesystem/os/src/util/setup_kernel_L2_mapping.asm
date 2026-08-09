@@ -54,7 +54,7 @@
     ._UTIL_INITIALIZE_PAGE_DIRECTORY_FILE_OPEN:
 
     PUSH %eax ; save fd
-    .BUF 32 _UTIL_SETUP_KERNEL_L2_MAPPING_ELF_HEADER
+    .BUF 32 _UTIL_SETUP_KERNEL_L2_MAPPING_ICE_HEADER
 
     ; SYSCALLS_FILE_READ
     ; Parameters (ebx is a pointer to the following struct):
@@ -64,14 +64,14 @@
     ; Return value (immediate value):
     ;   eax     success status (>=0 = number of bytes read, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = no console input ready)
     PUSH $32 ; buffer size
-    PUSH $_UTIL_SETUP_KERNEL_L2_MAPPING_ELF_HEADER ; pointer to buffer
+    PUSH $_UTIL_SETUP_KERNEL_L2_MAPPING_ICE_HEADER ; pointer to buffer
     PUSH %eax ; file descriptor
     MOV %esp, %ebx ; prepare ebx for read
     PUSH %edx
     CALL SYSCALLS_FILE_READ
     POP %edx
     CMP $0, %eax
-    JGE _UTIL_SETUP_KERNEL_L2_MAPPING_READ_ELF_HEADER_NO_ERROR
+    JGE _UTIL_SETUP_KERNEL_L2_MAPPING_READ_ICE_HEADER_NO_ERROR
         MOV %edx, %esp ; clean stack
         POP %edx
         POP %ecx
@@ -79,13 +79,13 @@
         POP %eax
         RET
 
-    ._UTIL_SETUP_KERNEL_L2_MAPPING_READ_ELF_HEADER_NO_ERROR:
+    ._UTIL_SETUP_KERNEL_L2_MAPPING_READ_ICE_HEADER_NO_ERROR:
     ADD $12, %esp ; clear read params from stack
 
     
     ;seek to PH header in binary
 
-    MOV $_UTIL_SETUP_KERNEL_L2_MAPPING_ELF_HEADER, %ebx
+    MOV $_UTIL_SETUP_KERNEL_L2_MAPPING_ICE_HEADER, %ebx
     ADD $4, %ebx ; offset to read program header offset
     MOV *%ebx, %eax ; program header offset
     MOV *%esp, %ecx ; get FD from stack
@@ -97,7 +97,7 @@
     ; Return value (immediate value):
     ;   eax     success status (0 = success, -1 = invalid file descriptor, -2 = seek position out of file bounds, -3 = negative seek position)
     PUSH $1 ; seek mode start from file start to get the correct offset in file
-    PUSH %eax ; second dword in elf header is program header offset
+    PUSH %eax ; second dword in ICE header is program header offset
     PUSH %ecx ; file descriptor
     MOV %esp, %ebx ; set pointer to start of struct
     PUSH %edx ; save stack return

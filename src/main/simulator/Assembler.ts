@@ -134,7 +134,7 @@ export class Assembler {
 
 	/**
 	 * Metadata Layout
-	 * ELF header 32 byte (8 dwords)
+	 * ICE header 32 byte (8 dwords)
 	 * byte 0x0-0x4 magic number
 	 * byte 0x5-0x8 program header byte offset
 	 * 6 dwords free
@@ -162,8 +162,8 @@ export class Assembler {
 		const roDataSizeBytes: number = sizes[1];
 		const dataSizeBytes: number = sizes[2];
 
-		// prepare elf header
-		const magicNumber: DoubleWord = DoubleWord.fromNumber(0x7F_45_4c_46) // 0x7F followed by ELF in ASCII
+		// prepare ice header
+		const magicNumber: DoubleWord = DoubleWord.fromNumber(0x7F_49_43_45) // 0x7F followed by ICE in ASCII
 		const programHeaderOffset: DoubleWord = DoubleWord.fromNumber(32);
 		this.metadata.push(magicNumber);
 		this.metadata.push(programHeaderOffset);
@@ -174,7 +174,7 @@ export class Assembler {
 		}
 
 		// calculate file offsets
-		const textFileOffset: number = 96; //32 byte elf header + 64 byte program header
+		const textFileOffset: number = 96; //32 byte ice header + 64 byte program header
 		const roDataFileOffset: number = textFileOffset + textSizeBytes;
 		const dataFileOffset: number = roDataFileOffset + roDataSizeBytes;
 
