@@ -3,6 +3,7 @@ import { DoubleWord } from "../../types/binary/DoubleWord";
 import { InstructionOperand } from "../../types/binary/InstructionOperand";
 import { DecodedOperandTypes } from "../../types/enumerations/DecodedOperandTypes";
 import { EncodedOperandTypes } from "../../types/enumerations/EncodedOperandTypes";
+import { ProgramMetadata } from "../../types/enumerations/ProgramMetadata";
 import { OpCode } from "../../types/enumerations/OpCode";
 import { RegisterNumbers } from "../../types/enumerations/RegisterNumbers";
 
@@ -10,30 +11,22 @@ export function disassembleProgram(program: DoubleWord[]): string {
 
     let disassembledCode = "";
 
-    if (program.length < 24) {
-        throw new Error("File is not a valid executable. File too small.")
+    const metadata: ProgramMetadata = ProgramMetadata.fromFileArray(program);
+
+    for (let i = 0; i < ProgramMetadata.getRoDataSegmentSize(metadata) / DoubleWord.NUMBER_OF_BYTES; i++) {
+        disassembledCode += ".CONST CONSTANT_" + (i + 1) + " " + program[ProgramMetadata.getRoDataSegmentFileOffset(metadata) / DoubleWord.NUMBER_OF_BYTES + i] + "\n";
     }
 
-    if (program[0] !== 0x7F_49_43_45) {
-        throw new Error("File is not a valid executable.")
+    for (let i = 0; i < ProgramMetadata.getDataSegmentSize(metadata) / DoubleWord.NUMBER_OF_BYTES; i++) {
+        disassembledCode += ".variable_" + (i + 1) + " " + program[ProgramMetadata.getDataSegmentFileOffset(metadata) / DoubleWord.NUMBER_OF_BYTES + i] + "\n";
     }
 
-    const header: DoubleWord[] = program.slice(program[1] / DoubleWord.NUMBER_OF_BYTES, program[1] / DoubleWord.NUMBER_OF_BYTES + 16);
-
-    for (let i = 0; i < header[6] / DoubleWord.NUMBER_OF_BYTES; i++) {
-        disassembledCode += ".CONST CONSTANT_" + (i + 1) + " " + program[header[2] / DoubleWord.NUMBER_OF_BYTES + i] + "\n";
-    }
-
-    for (let i = 0; i < header[9] / DoubleWord.NUMBER_OF_BYTES; i++) {
-        disassembledCode += ".variable_" + (i + 1) + " " + program[header[5] / DoubleWord.NUMBER_OF_BYTES + i] + "\n";
-    }
-
-    if (header[11] !== 0)
+    if (ProgramMetadata.getUninitializedDataSegmentSize(metadata) !== 0)
     {
-        disassembledCode += ".BUF" + program[header[9]] + " buffer\n";
+        disassembledCode += ".BUF" + ProgramMetadata.getUninitializedDataSegmentSize(metadata) + " buffer\n";
     }
 
-    program = program.slice(program[1] / DoubleWord.NUMBER_OF_BYTES + 16, program[1] / DoubleWord.NUMBER_OF_BYTES + 16 + header[3] / DoubleWord.NUMBER_OF_BYTES);
+    program = program.slice(ProgramMetadata.getProgramHeaderOffset(metadata) / DoubleWord.NUMBER_OF_BYTES + ProgramMetadata.PROGRAM_HEADER_SIZE_IN_DOUBLEWORDS, ProgramMetadata.getProgramHeaderOffset(metadata) / DoubleWord.NUMBER_OF_BYTES + ProgramMetadata.PROGRAM_HEADER_SIZE_IN_DOUBLEWORDS + ProgramMetadata.getTextSegmentSize(metadata) / DoubleWord.NUMBER_OF_BYTES);
 
     return disassembledCode + disassemble(program);
 };

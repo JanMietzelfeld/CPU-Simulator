@@ -1,11 +1,12 @@
 import { readFileSync } from 'fs';
 import { Assembler } from '../main/simulator/Assembler';
 import { DoubleWord } from '../types/binary/DoubleWord';
+import { ProgramMetadata } from '../types/enumerations/ProgramMetadata';
 
 describe('Encode instructions', () => {
     const assembler = new Assembler("./settings/language_definition.json", "./os_filesystem");
     
-    const elfHeader: DoubleWord[] = [0x7F_49_43_45 as DoubleWord, 
+    const elfHeader: DoubleWord[] = [ProgramMetadata.ICE_MAGIC_NUMBER, 
         32 as DoubleWord, DoubleWord.ZERO, DoubleWord.ZERO, DoubleWord.ZERO, DoubleWord.ZERO, DoubleWord.ZERO, DoubleWord.ZERO,]
 
     test('Encode instruction "ADD $1, %eax"', () => {

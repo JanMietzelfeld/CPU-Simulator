@@ -6,6 +6,7 @@ import { Byte } from "../../types/binary/Byte";
 import { OpCode } from "../../types/enumerations/OpCode";
 import { EncodedOperandTypes } from "../../types/enumerations/EncodedOperandTypes";
 import { Instruction } from "../../types/binary/Instruction";
+import { ProgramMetadata } from "../../types/enumerations/ProgramMetadata";
 
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
@@ -15,7 +16,7 @@ export class Assembler {
 	private readonly nopInstruction: DoubleWord[];
 
 
-	private metadata: DoubleWord[] = [];
+	private metadata: ProgramMetadata = [] as ProgramMetadata;
 	private jumpLabels: Map<string, [number, number | null]> = new Map();
 	private aliases: Map<string, DoubleWord> = new Map();
 	private constants: Map<string, DoubleWord[]> = new Map();
@@ -202,7 +203,7 @@ export class Assembler {
 			}
 		}
 
-		if (byteCount !== this.metadata[11]) {
+		if (byteCount !== ProgramMetadata.getTextSegmentSize(this.metadata)) {
 			throw new Error("The actual Program size differs from the precomputed size: " + byteCount + " vs " + this.metadata[11]);
 		}
 
@@ -263,18 +264,18 @@ export class Assembler {
 		const uninitializedDataBaseAddress: number = ((numberOfPagesText + numberOfPagesRoData + numberOfPagesData) * pageSize) + baseOffset;
 
 		// prepare elf header
-		const magicNumber: DoubleWord = DoubleWord.fromNumber(0x7F_49_43_45) // 0x7F followed by ICE in ASCII
-		const programHeaderOffset: DoubleWord = DoubleWord.fromNumber(8 * DoubleWord.NUMBER_OF_BYTES);
+		const magicNumber: DoubleWord = ProgramMetadata.ICE_MAGIC_NUMBER;
+		const programHeaderOffset: DoubleWord = DoubleWord.fromNumber(ProgramMetadata.ICE_HEADER_SIZE_IN_DOUBLEWORDS * DoubleWord.NUMBER_OF_BYTES);
 		this.metadata.push(magicNumber);
 		this.metadata.push(programHeaderOffset);
 
 		//fill unused space with zero
-		for (let i = 0; i < 6; ++i) {
+		for (let i = 0; i < ProgramMetadata.ICE_HEADER_SIZE_IN_DOUBLEWORDS - 2; ++i) {
 			this.metadata.push(DoubleWord.ZERO);
 		}
 
 		// calculate file offsets
-		const textFileOffset: number = 96; //32 byte elf header + 64 byte program header
+		const textFileOffset: number = ProgramMetadata.SIZE_IN_BYTES;
 		const roDataFileOffset: number = textFileOffset + textSizeBytes;
 		const dataFileOffset: number = roDataFileOffset + roDataSizeBytes;
 
@@ -300,7 +301,7 @@ export class Assembler {
 		this.metadata.push(DoubleWord.fromNumber(uninitializedDataBaseAddress));
 		this.metadata.push(DoubleWord.fromNumber(uninitializedDataSizeBytes));
 		
-		for (let i = 0; i < 4; ++i) {
+		for (let i = 0; i < ProgramMetadata.PROGRAM_HEADER_SIZE_IN_DOUBLEWORDS - 12; ++i) {
 			this.metadata.push(DoubleWord.ZERO);
 		}
 	}
@@ -547,7 +548,7 @@ export class Assembler {
 				line = line.replace(regexMatch[2], this.aliases.get(regexMatch[2])!.toString());
 			} else if (regexMatch !== null && this.constants.has(regexMatch[2])) {
 				unresolvable = unresolvable || this.metadata.length === 0;
-				let address = unresolvable ? DoubleWord.ZERO : this.metadata[8 + 4];
+				let address = unresolvable ? DoubleWord.ZERO : ProgramMetadata.getRoDataSegmentVirtualStartAddress(this.metadata);
 				for (const [name, data] of this.constants) {
 					if (regexMatch[2] === name || unresolvable)
 					{
@@ -572,7 +573,7 @@ export class Assembler {
 				let address = DoubleWord.ZERO;
 				if (this.initializedData.has(regexMatch[2])) {
 					unresolvable = unresolvable || this.metadata.length === 0;
-					address = unresolvable ? DoubleWord.ZERO : this.metadata[8 + 7];
+					address = unresolvable ? DoubleWord.ZERO : ProgramMetadata.getRoDataSegmentVirtualStartAddress(this.metadata);
 					for (const [name, data] of this.initializedData) {
 						if (regexMatch[2] === name || unresolvable)
 						{
@@ -582,7 +583,7 @@ export class Assembler {
 					}
 				} else if (this.uninitializedData.has(regexMatch[2])) {
 					unresolvable = unresolvable || this.metadata.length === 0;
-					address = unresolvable ? DoubleWord.ZERO : this.metadata[8 + 10];
+					address = unresolvable ? DoubleWord.ZERO : ProgramMetadata.getUninitializedDataSegmentVirtualStartAddress(this.metadata);
 					for (const [name, size] of this.uninitializedData) {
 						if (regexMatch[2] === name || unresolvable)
 						{
@@ -921,7 +922,7 @@ export class Assembler {
 	 * @returns An array of DoubleWords representing the binary encoded instructions of the given computer program.
 	 */
 	public assemble(code: string, baseOffset: number = 0): DoubleWord[] {
-		this.metadata = [];
+		this.metadata = [] as ProgramMetadata;
 		this.jumpLabels = new Map();
 		this.aliases = new Map();
 		this.constants = new Map();

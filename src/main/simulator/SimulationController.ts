@@ -8,6 +8,7 @@ import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
 import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
+import { ProgramMetadata } from "../../types/enumerations/ProgramMetadata";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -123,37 +124,30 @@ export class SimulationController {
 
         const buffer = readFileSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin");
 
-        const magicNumber: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(0));
+        const metatdata: ProgramMetadata = ProgramMetadata.fromBuffer(buffer);
 
-        if (buffer.length < 96) {
-            throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable. File too small.")
-        }
-        if (magicNumber !== 0x7F_49_43_45) {
-            throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable.")
-        }
-
-        const programHeaderOffset = buffer.readUint32BE(1 * 4) //ice header position for program header offset
+        const programHeaderOffset = ProgramMetadata.getProgramHeaderOffset(metatdata); //ice header position for program header offset
         
         // load text segment
-        const codeFileOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary
-        const programLength = buffer.readUint32BE(programHeaderOffset + 3 * 4); //header position for program size
+        const codeFileOffset = ProgramMetadata.getTextSegmentFileOffset(metatdata); //header position for code offset in binary
+        const programLength = ProgramMetadata.getTextSegmentSize(metatdata); //header position for program size
         this.loadSegment(codeFileOffset, programLength, SimulationController.KERNEL_SPACE_START, buffer);
 
         // load roData segment
-        const roDataStartAddress = buffer.readUint32BE(programHeaderOffset + 4 * 4);
-        const roDataFileOffset = buffer.readUint32BE(programHeaderOffset + 5 * 4);
-        const roDataSize = buffer.readUint32BE(programHeaderOffset + 6 * 4);
+        const roDataStartAddress = ProgramMetadata.getRoDataSegmentVirtualStartAddress(metatdata);
+        const roDataFileOffset = ProgramMetadata.getRoDataSegmentFileOffset(metatdata);
+        const roDataSize = ProgramMetadata.getRoDataSegmentSize(metatdata);
         this.loadSegment(roDataFileOffset, roDataSize, roDataStartAddress, buffer);
 
         // load data segment
-        const dataSegmentStartAddress = buffer.readUint32BE(programHeaderOffset + 7 * 4); //header position for data segment start address
-        const dataFileOffset = buffer.readUint32BE(programHeaderOffset + 8 * 4); //header position for data offset in binary
-        const dataSegmentLength = buffer.readUint32BE(programHeaderOffset + 9 * 4); //header position for data size
+        const dataSegmentStartAddress = ProgramMetadata.getDataSegmentVirtualStartAddress(metatdata); //header position for data segment start address
+        const dataFileOffset = ProgramMetadata.getDataSegmentFileOffset(metatdata); //header position for data offset in binary
+        const dataSegmentLength = ProgramMetadata.getDataSegmentSize(metatdata); //header position for data size
         this.loadSegment(dataFileOffset, dataSegmentLength,dataSegmentStartAddress, buffer);
 
         // load uninitialized data segment
-        const uninitializeDataSegmentStartAddress = buffer.readUint32BE(programHeaderOffset + 10 * 4); //header position for uninitialized data segment start address
-        const uninitializeDataSegmentLength = buffer.readUint32BE(programHeaderOffset + 11 * 4); //header position for data size
+        const uninitializeDataSegmentStartAddress = ProgramMetadata.getUninitializedDataSegmentVirtualStartAddress(metatdata); //header position for uninitialized data segment start address
+        const uninitializeDataSegmentLength = ProgramMetadata.getUninitializedDataSegmentSize(metatdata); //header position for data size
         this.loadSegment(0, uninitializeDataSegmentLength, uninitializeDataSegmentStartAddress, Buffer.alloc(uninitializeDataSegmentLength));
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
