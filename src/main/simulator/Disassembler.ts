@@ -6,9 +6,34 @@ import { EncodedOperandTypes } from "../../types/enumerations/EncodedOperandType
 import { OpCode } from "../../types/enumerations/OpCode";
 import { RegisterNumbers } from "../../types/enumerations/RegisterNumbers";
 
-export function disassemble(program: DoubleWord[], startAddress: number = 0): string {
+export function disassemble(program: DoubleWord[]): string {
 
     let disassembledCode = "";
+
+    if (program.length < 24) {
+        throw new Error("File is not a valid executable. File too small.")
+    }
+
+    if (program[0] !== 0x7F_49_43_45) {
+        throw new Error("File is not a valid executable.")
+    }
+
+    const header: DoubleWord[] = program.slice(program[1] / DoubleWord.NUMBER_OF_BYTES, program[1] / DoubleWord.NUMBER_OF_BYTES + 16);
+
+    for (let i = 0; i < header[6] / DoubleWord.NUMBER_OF_BYTES; i++) {
+        disassembledCode += ".CONST CONSTANT_" + (i + 1) + " " + program[header[2] / DoubleWord.NUMBER_OF_BYTES + i] + "\n";
+    }
+
+    for (let i = 0; i < header[9] / DoubleWord.NUMBER_OF_BYTES; i++) {
+        disassembledCode += ".variable_" + (i + 1) + " " + program[header[5] / DoubleWord.NUMBER_OF_BYTES + i] + "\n";
+    }
+
+    if (header[11] !== 0)
+    {
+        disassembledCode += ".BUF" + program[header[9]] + " buffer\n";
+    }
+
+    program = program.slice(program[1] / DoubleWord.NUMBER_OF_BYTES + 16, program[1] / DoubleWord.NUMBER_OF_BYTES + 16 + header[3] / DoubleWord.NUMBER_OF_BYTES);
 
     for (let i = 0; i < program.length; i++) {
 

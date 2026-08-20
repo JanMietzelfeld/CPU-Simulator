@@ -9,6 +9,12 @@ import { PageTableEntryFlags } from "../../../types/binary/PageTableEntryFlags";
 import { VirtualAddress } from "../../../types/binary/VirtualAddress";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { PageTableEntry } from "../../../types/binary/PageTableEntry";
+import { FrameNumber } from "../../../types/binary/FrameNumber";
+
+interface memoryMapEntry {
+        pageTableId: number;
+        pageNumber: number;
+}
 
 /**
  * This class represents a Memory Management Unit (MMU). This specialized execution unit is responsible
@@ -79,6 +85,15 @@ export class MemoryManagementUnit {
 
     public pageFaultAddress: DoubleWord | undefined = undefined;
 
+    /**
+     * This array stores a mapping between the physical frame number and virtual page numbers along with the associated pid.
+     * Each entry is an array of objects. The Entries are only populated if a vpn is mapped to that frame number.
+     * {
+     *  pageTableId: number
+     *  pageNumber: number
+     * }
+     */
+    public reverseMemoryMap: memoryMapEntry[][] = [];
 
     /**
      * Constructs a new instance from the given references of the RAM, Page Table Pointer (PTP) register, the ALU and the EFLAGS register.
@@ -194,10 +209,8 @@ export class MemoryManagementUnit {
         }
 
         const pageNumber = PageNumber.fromVirtualAddress(virtualAddress);
-        const pageTableEntry: PageTableEntry = disableTlb ? this.searchPageTable(virtualAddress)
-                : this._tlb.get(pageNumber) ?? this.searchPageTable(virtualAddress);
-
-        const pageTableEntryFlags: PageTableEntryFlags = PageTableEntryFlags.fromPageTableEntry(pageTableEntry);
+        const pageTableEntry: PageTableEntry = disableTlb ? this.findPageTableEntry(virtualAddress) : this._tlb.get(pageNumber) ?? this.findPageTableEntry(virtualAddress);
+        const pageTableEntryFlags: PageTableEntryFlags = PageTableEntry.getFlags(pageTableEntry);
 
         // Check if a page frame is connected to the page to which the specified virtual address refers.
         if (!PageTableEntryFlags.isPresent(pageTableEntryFlags)) {
@@ -205,9 +218,9 @@ export class MemoryManagementUnit {
             throw new ExceptionError(InterruptNumbers.PAGE_FAULT);
         }
 
-        if (!ignorePermissionFlags && !this._cpu.flags.isInKernelMode()) {
+        if (!ignorePermissionFlags) {
             // Check if the page frame is accessable only in kernel mode.
-            if (PageTableEntryFlags.isKernelModeOnly(pageTableEntryFlags)) {
+            if (!this._cpu.flags.isInKernelMode() && PageTableEntryFlags.isKernelModeOnly(pageTableEntryFlags)) {
                 throw new ExceptionError(InterruptNumbers.GENERAL_PROTECTION_FAULT);
             }
             // Check if the page frames contents are executable.
@@ -224,7 +237,7 @@ export class MemoryManagementUnit {
             // Set changed flag bit.
             PageTableEntryFlags.setChangedFlagBit(pageTableEntryFlags, 1);
             // Update flag bits of page table entry in memory as well.
-            this._cpu.mainMemory.writeDoubleWordTo(this.calcPhysicalAddressOfPageTableEntry(virtualAddress), pageTableEntry);
+            this._cpu.mainMemory.writeDoubleWordTo(this.findPageTableEntryPhysicalAddress(virtualAddress), pageTableEntry);
         }
 
         // Update or insert the physical memory address into the Translation Lookaside Buffer.
@@ -236,34 +249,111 @@ export class MemoryManagementUnit {
     }
 
     /**
-     * This method computes the physical address of the page table entry, which is associated with the given virtual address.
-     * The page table entry is located at a specific physical address, which is calculated by adding the page number to the page tables base address.
-     * @param virtualAddress The virtual address to compute the physical address of the page table entry for.
-     * @returns The physical address of the page table entry.
+     * This method takes a virtual address and finds the physical address of the matching L2 page table entry.
+     * To find the matching L2 page table the method looks up the L2 page table by using the page directory index of the virtual memory address.
+     * If the page directory entry is empty, meaning the L2 page table, which contains the wanted entry, is not mapped, then a page fault is thrown.
+     * Once the L2 page table is located the physical address of the entry in the L2 page table is calculated and returned.
+     * @param virtualAddress The virtual address of the wanted page table entry physical address.
+     * @returns The physical address of the wanted L2 page table entry.
      */
-    private calcPhysicalAddressOfPageTableEntry(virtualAddress: VirtualAddress): PhysicalAddress {
-        /* 
-         * Add the page number * 4 to the physical page table base address to get the address of the page table entry.
-         * Because every page table entry is 4 bytes long, the page number needs to be multiplied by 4 before 
-         * adding it to the page tables base address.
-         */
-        return PhysicalAddress.fromNumber(this._cpu.ptp.content + PageNumber.fromVirtualAddress(virtualAddress) * 4);
+    private findPageTableEntryPhysicalAddress(virtualAddress: VirtualAddress): PhysicalAddress {
+        const pageDirectoryIndex: number = (virtualAddress >>> 22) & 0x3FF;
+        const pageTableIndex: number = (virtualAddress >>> 12) & 0x3FF;
+
+        const pageDirectoryEntryPhysical: PhysicalAddress = PhysicalAddress.fromNumber(this._cpu.ptp.content + pageDirectoryIndex * 4);
+        const pageDirectoryEntry: PageTableEntry = this._cpu.mainMemory.readDoublewordFrom(pageDirectoryEntryPhysical) as PageTableEntry;
+
+        const pageDirectoryEntryFlags: PageTableEntryFlags = PageTableEntry.getFlags(pageDirectoryEntry);
+
+        if (!PageTableEntryFlags.isPresent(pageDirectoryEntryFlags)) {
+
+            this.pageFaultAddress = virtualAddress;
+            
+            throw new ExceptionError(InterruptNumbers.PAGE_FAULT);
+        }
+
+        //Level 2 Page Table
+        const pageTableBase = (PageTableEntry.getFrameNumber(pageDirectoryEntry) << MemoryManagementUnit.NUMBER_BITS_OFFSET) >>> 0;
+        const pageTableEntryPhysicalAddress: PhysicalAddress = PhysicalAddress.fromNumber(pageTableBase + (pageTableIndex * 4));
+        return pageTableEntryPhysicalAddress;
     }
 
     /**
-     * This method searches the page table for a specific entry. To do this, the page number and an offset are 
-     * extracted from the given virtual address. The page number is filled with zero bits on the right. The offset 
-     * is discarded as part of this method. The padded page number is added to the physical base address of the 
-     * page table. The entry you are looking for is located at the resulting physical address. This entry corresponds 
-     * to the page to which the given virtual memory address is assigned. The page table entry includes some status 
-     * bits and possibly the physical base address of a page frame.
-     * @param virtualAddress The virtual memory address to look up in the page table.
+     * This method takes a virtual address and returns the L2 page table entry, which maps the virtual address to a physical frame.
+     * @param virtualAddress The virtual address to find the L2 page table entry for.
+     * @returns The page table entry that was searched for.
      */
-    private searchPageTable(virtualAddress: VirtualAddress): PageTableEntry {
-        // Compute the physical address, where the page table resides in the page table.
-        const addressOfPageTableEntry: PhysicalAddress = this.calcPhysicalAddressOfPageTableEntry(virtualAddress);
-        // Read page table entry from memory.
-        return this._cpu.mainMemory.readDoublewordFrom(addressOfPageTableEntry) as PageTableEntry;
+    private findPageTableEntry(virtualAddress: VirtualAddress): PageTableEntry {
+        const pageTableEntry: DoubleWord = this._cpu.mainMemory.readDoublewordFrom(this.findPageTableEntryPhysicalAddress(virtualAddress)) as PageTableEntry;
+        return pageTableEntry;
+    }
+
+    /**
+     * This method extracts the frame number and the virtual page number from the physical and virtual address passed to the function.
+     * The frame number is used as index in the reverse memory map and the virtual page number and process id are used to create an object as entry.
+     * This method also checks if a virtual page number for the same id is already mapped to a different frame number and deletes the existing entry.
+     * It prevents silent remaps of a virtual page number to a different frame number without explicitly calling the frame unmap first.
+     * @param physicalAddress The physical address of a page frame.
+     * @param virtualAddress The virtual address the page frame gets mapped to.
+     * @param processId The process id of the process that caused a new frame to get mapped.
+     */
+    public insertReverseMemoryMapping(physicalAddress: PhysicalAddress, virtualAddress: VirtualAddress, processId: DoubleWord): void {
+        const frameNumber: FrameNumber = FrameNumber.fromPhysicalAddress(physicalAddress);
+        const virtualPageNumber: PageNumber = PageNumber.fromVirtualAddress(virtualAddress);
+        const id: number = processId;
+
+        // Check if entry exists in case of silent remapping virtual address to new frame without unmap
+        // If mapping for vpn exists, delete it
+        for (const frameNumber in this.reverseMemoryMap) {
+            const mappings = this.reverseMemoryMap[frameNumber];
+            if (mappings) {
+                const existingIndex = mappings.findIndex(
+                    (entry) => entry.pageTableId === id && entry.pageNumber === virtualPageNumber
+                );
+                if (existingIndex !== -1) {
+                    mappings.splice(existingIndex, 1);
+                    break;
+                }
+            }
+        }
+        (this.reverseMemoryMap[frameNumber] ??= []).push({pageTableId: id, pageNumber: virtualPageNumber});            
+    }
+
+    /**
+     * This method extracts the frame number and the virtual page number from the physical and virtual address passed to the function.
+     * The frame number is used as index in the reverse memory map and the virtual page number and process id are used to identify an entry.
+     * If the entry for the frame number exists, then all entries matching the virtual page number and process id get deleted.
+     * @param physicalAddress The physical address of a page frame.
+     * @param virtualAddress The virtual address the page frame gets mapped to.
+     * @param processId The process id of the process that caused a new frame to get unmapped.
+     */
+    public removeReverseMemoryMapping(physicalAddress: PhysicalAddress, virtualAddress: VirtualAddress, processId: DoubleWord): void {
+        const frameNumber: FrameNumber = FrameNumber.fromPhysicalAddress(physicalAddress);
+        const virtualPageNumber: PageNumber = PageNumber.fromVirtualAddress(virtualAddress);
+        const id: number = processId;
+        if (this.reverseMemoryMap[frameNumber]) {
+                this.reverseMemoryMap[frameNumber] = this.reverseMemoryMap[frameNumber].filter(
+                    (entry) => !(entry.pageTableId === id && entry.pageNumber === virtualPageNumber)
+            );
+        }
+    }
+
+    /**
+     * This method takes a physical address and finds all virtual addresses that are mapped to the physical address.
+     * @param physicalAddress Physical address to find all virtual addresses for.
+     * @returns Array of virtual addresses that are mapped to the searched physical address.
+     */
+    public findVirtualFromPhysical(physicalAddress: PhysicalAddress): VirtualAddress[] {
+        const frameNumber: FrameNumber = FrameNumber.fromPhysicalAddress(physicalAddress);
+        const reverseMemoryMapEntry: memoryMapEntry[] = this.reverseMemoryMap[frameNumber] ?? [];
+        const virtualAddresses: VirtualAddress[] = [];
+        for (const entry of reverseMemoryMapEntry) {
+            const pNumber: number = entry.pageNumber << 12;
+            const offset: number = physicalAddress & 0xFFF;
+            const virtualAddress: VirtualAddress = VirtualAddress.fromNumber(pNumber | offset);
+            virtualAddresses.push(virtualAddress);
+        }
+        return virtualAddresses;
     }
 
 }

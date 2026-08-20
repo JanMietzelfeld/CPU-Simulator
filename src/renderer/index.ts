@@ -26,8 +26,9 @@ window.onload = async () => {
 	renderer.registerChangeListener();
 	renderer.registerClickListener();
 	renderer.registerRAMSearchListener();
-	renderer.createPhysicalRAMView();
-	renderer.createVirtualRAMView();
+	renderer.registerConsoleListener();
+	renderer.registerAddressRangeBoxListener();
+	renderer.registerDetailedRamViewSelectElement();
 
 	await renderer.readEAX(renderer.dataRepresentationEAX);
 	await renderer.readEBX(renderer.dataRepresentationEBX);
@@ -45,8 +46,6 @@ window.onload = async () => {
 
 window.simulator.onLoadedAssemblyProgram(async () => {
 	renderer.programLoaded = true;
-	await renderer.reloadPhysicalRAMView();
-	await renderer.createVirtualRAMView();
 	// TODO: Fix bug!
 	// await renderer.createPageTableView();
 	await renderer.readEAX(renderer.dataRepresentationEAX);
@@ -74,29 +73,8 @@ window.simulator.onError((errorDescription: string) => {
 	alert(errorDescription);
 });
 
-window.simulator.onDisableAutoScrollForPhysicalRAM(() => {
-	renderer.autoScrollForPhysicalRAMEnabled = false;
-	return;
-});
-
-window.simulator.onDisableAutoScrollForVirtualRAM(() => {
-	renderer.autoScrollForVirtualRAMEnabled = false;
-	return;
-});
-
-
 window.simulator.onDisableAutoScrollForPageTable(() => {
 	renderer.autoScrollForPageTableEnabled = false;
-	return;
-});
-
-window.simulator.onEnableAutoScrollForPhysicalRAM(() => {
-	renderer.autoScrollForPhysicalRAMEnabled = true;
-	return;
-});
-
-window.simulator.onEnableAutoScrollForVirtualRAM(() => {
-	renderer.autoScrollForVirtualRAMEnabled = true;
 	return;
 });
 
@@ -104,6 +82,16 @@ window.simulator.onEnableAutoScrollForPageTable(() => {
 	renderer.autoScrollForPageTableEnabled = true;
 	return;
 });
+
+window.windowUpdate.onEnableRamFollowEip(() => {
+	renderer.ramViewFollowEip = true;
+	return;
+})
+
+window.windowUpdate.onDisableRamFollowEip(() => {
+	renderer.ramViewFollowEip = false;
+	return;
+})
 
 window.windowUpdate.onClearLog(() => {
 	renderer.clearLog();
@@ -121,3 +109,15 @@ window.windowUpdate.onHideLog(() => {
 window.windowUpdate.onShowLog(() => {
 	renderer.showLog();
 });
+
+window.windowUpdate.onHideConsole(() => {
+	renderer.hideConsole();
+});
+
+window.windowUpdate.onShowConsole(() => {
+	renderer.showConsole();
+});
+
+window.windowUpdate.onUpdateConsole((value: string) => {
+	renderer.updateConsole(value);
+})

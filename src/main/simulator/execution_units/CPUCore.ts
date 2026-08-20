@@ -19,11 +19,13 @@ import { DebugLogger } from "../Logger";
 import { ExceptionError } from "../../../types/errors/ExceptionError";
 import { RegisterNumbers } from "../../../types/enumerations/RegisterNumbers";
 import { getMainWindow } from "../../index";
-import { FrameNumber } from "../../../types/binary/FrameNumber";
+import { PeriodicTimer } from "./PeriodicTimer";
 import { PhysicalAddress } from "../../../types/binary/PhysicalAddress";
 import { OpCode } from "../../../types/enumerations/OpCode";
 import { DecodedOperandTypes } from "../../../types/enumerations/DecodedOperandTypes";
 import { EncodedOperandTypes } from "../../../types/enumerations/EncodedOperandTypes";
+import { VirtualAddress } from "../../../types/binary/VirtualAddress";
+import { SimulationController } from "../SimulationController";
 
 /**
  * This class represents a CPU core which is capable of executing InstructionSet.
@@ -172,6 +174,7 @@ export class CPUCore {
     public fs: PassthroughFilesystem;
 
     public readonly timer: Timer;
+    public readonly periodicTimer: PeriodicTimer;
 
     public mainMemory: RAM;
 
@@ -203,6 +206,7 @@ export class CPUCore {
         this.mmu = new MemoryManagementUnit(this);
         this.fs = new PassthroughFilesystem(pathToOSFilesystem);
         this.timer = new Timer(this);
+        this.periodicTimer = new PeriodicTimer(this);
         this._processingWidth = processingWidth;
     }
 
@@ -240,14 +244,13 @@ export class CPUCore {
      */
     public cycle(): void {
 
-        if (this.flags.isInUserMode())
-        {
+        if (this.flags.isInUserMode()) {
             this.internalCycle();
             this.timer.countDown();
+            this.periodicTimer.countDown();
         }
 
-        while (this.flags.isInKernelMode())
-        {
+        while (this.flags.isInKernelMode()) {
             this.internalCycle();
         }
 
@@ -256,13 +259,10 @@ export class CPUCore {
 
             this.handleInterrupt(this.interruptQueue.shift() as InterruptNumbers)
 
-            while (this.flags.isInKernelMode())
-            {
+            while (this.flags.isInKernelMode()) {
                 this.internalCycle();
             }
         }
-
-
     }
 
 
@@ -292,7 +292,7 @@ export class CPUCore {
 
         if (number === InterruptNumbers.PAGE_FAULT) {
 
-            if (this.mmu.pageFaultAddress == undefined)
+            if (this.mmu.pageFaultAddress === undefined)
             {
                 throw new Error("Page Fault happent but the did not provide the address that failed");
             }
@@ -303,10 +303,14 @@ export class CPUCore {
         }
     }
 
+    public static instructionCount = 0;
+
     /**
      * This method performs a single instruction cycle.
      */
     private internalCycle(): void {
+
+        CPUCore.instructionCount++;
 
         try {
             this.fetch();
@@ -315,9 +319,7 @@ export class CPUCore {
         } catch(error) {
             if (!(error instanceof ExceptionError)) {
                 DebugLogger.log(error);
-            }
-            else
-            {
+            } else {
                 this.handleInterrupt(error.interruptNumber)
             }
         }
@@ -899,12 +901,6 @@ export class CPUCore {
                 } else {
                     if (bytesRead > 0) {
 
-                        if (bytesRead > 0 && this.fs.fd_map.get(op2)?.filename === "os/util/empty_frame.bin")
-                        {
-                            this.mainMemory.clearFrame(FrameNumber.fromPhysicalAddress(PhysicalAddress.fromNumber(bufferAddress)));
-                            break;
-                        }
-                        
                         for (let index = 0; index < doubleWordbytesRead; index += 4) {
                             this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(bufferAddress + index), buffer.getUint32(index) as DoubleWord);
                         }
@@ -991,6 +987,40 @@ export class CPUCore {
                 this.timer.addTimer(op2, timeValue);
                 break;
             }
+            case DevOperations.PERIODIC_TIMER_SET:{ //  0001111 setupTimer(time_value=op2)
+                const timerValue = op2;
+                this.periodicTimer.setupTimer(timerValue);
+                break;
+            }
+            case DevOperations.CONSOLE_BUFFER_STATUS:{
+                this.eax.content = DoubleWord.fromNumber(this.fs.getStdinBufferNumberCount());
+                this.ebx.content = DoubleWord.fromNumber(this.fs.getStdinBufferStringCount());
+                break;
+            }
+            case DevOperations.FRAME_MAP_SIGNAL:{
+                const processId: DoubleWord = this.internal_pop();
+                const framePhysicalAddress: PhysicalAddress = PhysicalAddress.fromNumber(this.internal_pop());
+                const virtualAddress: VirtualAddress = VirtualAddress.fromNumber(this.internal_pop());
+                this.mmu.insertReverseMemoryMapping(framePhysicalAddress, virtualAddress, processId);
+                break;
+            }
+            case DevOperations.FRAME_UNMAP_SIGNAL:{
+                const processId: DoubleWord = this.internal_pop();
+                const framePhysicalAddress: PhysicalAddress = PhysicalAddress.fromNumber(this.internal_pop());
+                const virtualAddress: VirtualAddress = VirtualAddress.fromNumber(this.internal_pop());
+                this.mmu.insertReverseMemoryMapping(framePhysicalAddress, virtualAddress, processId);
+                break;
+            }
+            case DevOperations.PERFORMANCE_TIMER_START:{
+                const id: number = op2;
+                this.performanceTimerStart(id);
+                break;
+            }
+            case DevOperations.PERFORMANCE_TIMER_STOP:{
+                const id: number = op2;
+                this.performanceTimerStop(id);
+                break;
+            }
             default:{
                 throw new ExceptionError(InterruptNumbers.INVALID_OPCODE);
             }
@@ -999,6 +1029,25 @@ export class CPUCore {
         return;
     }
 
+    /**
+     * This method starts a simple timer for OS performance measurements in form oof
+     * execution time.
+     * The method can be called from the simulator itself as well.
+     * @param id The id of the timer.
+     */
+    public performanceTimerStart(id: number): void {
+        console.time("Timer id: " + id);
+    }
+
+    /**
+     * This method stops a simple timer for OS performance measurements in form oof
+     * execution time.
+     * The method can be called from the simulator itself as well.
+     * @param id The id of the timer.
+     */
+    public performanceTimerStop(id: number): void {
+        console.timeEnd("Timer id: " + id);
+    }
 
     /*
      * -------------------- Arithmetic operations --------------------
@@ -2477,7 +2526,7 @@ export class CPUCore {
         // Add the number of the interrupt handler to the interrupt tables base address, which is stored in the ITP register.
         const interruptHandlerTableEntry: DoubleWord = DoubleWord.fromNumber(this.itp.content + target.value*4);
         // Load interrupt handler address
-        const interruptHandler = this.mmu.readDoublewordFrom(interruptHandlerTableEntry, true)
+        const interruptHandler = this.mmu.readDoublewordFrom(interruptHandlerTableEntry, false);
         /*
          * Before calling a subroutine, the caller needs to push the return address onto the STACK.
          * The return address is necessary to hand over control to the caller again after the subroutine 

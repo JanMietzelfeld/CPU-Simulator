@@ -8,7 +8,6 @@ import { DebugLogger } from "./Logger";
 import { Byte } from "../../types/binary/Byte";
 import { getMainWindow } from "../index";
 import { PhysicalAddress } from "../../types/binary/PhysicalAddress";
-import { FrameOffset } from "../../types/binary/FrameOffset";
 
 /**
  * The main logic of the simulator. Trough this class, the CPU cores and execution is controlled.
@@ -40,16 +39,6 @@ export class SimulationController {
     private static readonly KERNEL_SPACE_START: DoubleWord = DoubleWord.fromNumber(0xC0000000);
 
     /**
-     * This field represents a flag, which enables automatic scroll for the GUIs virtual RAM widget.
-     */
-    public autoScrollForVirtualRAMEnabled: boolean;
-
-    /**
-     * This field represents a flag, which enables automatic scroll for the GUIs physical RAM widget.
-     */
-    public autoScrollForPhysicalRAMEnabled: boolean;
-
-    /**
      * This field represents a flag, which enables automatic scroll for the GUIs Page Table widget.
      */
     public autoScrollForPageTableEnabled: boolean;
@@ -57,6 +46,8 @@ export class SimulationController {
     public readonly pathToOSFilesystem: string;
 
     public readonly inDevMode: boolean;
+
+    public static instructionCount = 0;
 
     /**
      * Creates a new instance.
@@ -73,8 +64,6 @@ export class SimulationController {
         this._assembler = new Assembler(pathToLanguageDefinition, pathToOSFilesystem);
         this._programmLoaded = true;
         this.autoScrollForPageTableEnabled = true;
-        this.autoScrollForPhysicalRAMEnabled = true;
-        this.autoScrollForVirtualRAMEnabled = true;
         this.inDevMode = devMode;
     }
 
@@ -134,23 +123,38 @@ export class SimulationController {
 
         const buffer = readFileSync(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin");
 
-        const lenght =  buffer.length - (buffer.length % 4);
+        const magicNumber: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(0));
 
-        for (let i = 0; i < lenght; i+=4) {
-            const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i));
-            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + i), value)
+        if (buffer.length < 96) {
+            throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable. File too small.")
+        }
+        if (magicNumber !== 0x7F_49_43_45) {
+            throw new Error(this.pathToOSFilesystem + "/os/bin/ihmeOS.bin is not a valid executable.")
         }
 
-        if (buffer.length % 4 !== 0)
-        {
-            const value: DoubleWord = DoubleWord.fromBytes(
-                Byte.fromNumber(buffer[lenght]), 
-                Byte.fromNumber(buffer.length % 4 > 1 ? buffer[lenght+1] : 0), 
-                Byte.fromNumber(buffer.length % 4 > 2 ? buffer[lenght+2] : 0), 
-                Byte.ZERO);
+        const programHeaderOffset = buffer.readUint32BE(1 * 4) //ice header position for program header offset
+        
+        // load text segment
+        const codeFileOffset = buffer.readUint32BE(programHeaderOffset + 2 * 4); //header position for code offset in binary
+        const programLength = buffer.readUint32BE(programHeaderOffset + 3 * 4); //header position for program size
+        this.loadSegment(codeFileOffset, programLength, SimulationController.KERNEL_SPACE_START, buffer);
 
-            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(SimulationController.KERNEL_SPACE_START + lenght), value)
-        }
+        // load roData segment
+        const roDataStartAddress = buffer.readUint32BE(programHeaderOffset + 4 * 4);
+        const roDataFileOffset = buffer.readUint32BE(programHeaderOffset + 5 * 4);
+        const roDataSize = buffer.readUint32BE(programHeaderOffset + 6 * 4);
+        this.loadSegment(roDataFileOffset, roDataSize, roDataStartAddress, buffer);
+
+        // load data segment
+        const dataSegmentStartAddress = buffer.readUint32BE(programHeaderOffset + 7 * 4); //header position for data segment start address
+        const dataFileOffset = buffer.readUint32BE(programHeaderOffset + 8 * 4); //header position for data offset in binary
+        const dataSegmentLength = buffer.readUint32BE(programHeaderOffset + 9 * 4); //header position for data size
+        this.loadSegment(dataFileOffset, dataSegmentLength,dataSegmentStartAddress, buffer);
+
+        // load uninitialized data segment
+        const uninitializeDataSegmentStartAddress = buffer.readUint32BE(programHeaderOffset + 10 * 4); //header position for uninitialized data segment start address
+        const uninitializeDataSegmentLength = buffer.readUint32BE(programHeaderOffset + 11 * 4); //header position for data size
+        this.loadSegment(0, uninitializeDataSegmentLength, uninitializeDataSegmentStartAddress, Buffer.alloc(uninitializeDataSegmentLength));
         
         this.core.eip.content = SimulationController.KERNEL_SPACE_START;
 
@@ -172,8 +176,8 @@ export class SimulationController {
         DebugLogger.log("Starting Execution");
         DebugLogger.log("");
 
-        this.core.cycle();       
-        
+        this.core.cycle();    
+                
         getMainWindow()?.webContents.send('clear_log');
 
         getMainWindow()?.webContents.send('update_log', "OS Initialized");
@@ -182,6 +186,31 @@ export class SimulationController {
     }
 
 
+    private loadSegment(fileOffset: number, segmentLength: number, targetAddress: number, buffer: Buffer): void {
+        if (segmentLength <= 0) {
+            return;
+        }
+        const doubleWordAlignedLength = segmentLength - (segmentLength % 4);
+
+        //write full double words
+        for (let i = 0; i < doubleWordAlignedLength; i += 4) {
+            const value: DoubleWord = DoubleWord.fromNumber(buffer.readUint32BE(i + fileOffset));
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(targetAddress + i), value);
+        }
+
+        // write rest
+        const remainder = segmentLength % 4;
+        if (remainder !== 0) {
+            const value: DoubleWord = DoubleWord.fromBytes(
+                Byte.fromNumber(buffer[fileOffset + doubleWordAlignedLength]), 
+                Byte.fromNumber(remainder > 1 ? buffer[fileOffset + doubleWordAlignedLength + 1] : 0), 
+                Byte.fromNumber(remainder > 2 ? buffer[fileOffset + doubleWordAlignedLength + 2] : 0), 
+                Byte.ZERO
+            );
+
+            this.mainMemory.writeDoubleWordTo(PhysicalAddress.fromNumber(targetAddress + doubleWordAlignedLength), value)
+        }
+    }
 
     /**
      * This method is used to initialize a process and prepare its execution.
@@ -280,47 +309,6 @@ export class SimulationController {
         if (!existsSync(newProcessNamePath))
         {
             writeFileSync(newProcessNamePath, Buffer.from([0]));
-        }
-
-        const zeroFramePath = this.pathToOSFilesystem + "/os/util/empty_frame.bin"
-
-        if (!existsSync(zeroFramePath))
-        {
-            const buffer = Buffer.alloc((2**FrameOffset.NUMBER_OF_BITS) * 4);
-
-            writeFileSync(zeroFramePath, buffer);
-        }
-
-        const pageTablePath = this.pathToOSFilesystem + "/os/util/page_table.bin"
-
-        if (!existsSync(pageTablePath)) {
-
-            const USER_SPACE_ENTRIES = 786432;
-            const KERNEL_SPACE_ENTRIES = 262144;
-            const OS_CODE_SPACE_SIZE = 65536;
-            const ENTRY_SIZE = 4;
-
-            const buffer = Buffer.alloc((USER_SPACE_ENTRIES + KERNEL_SPACE_ENTRIES) * ENTRY_SIZE);
-
-            // First region
-            for (let i = 0; i < USER_SPACE_ENTRIES; i++) {
-                buffer.writeUInt32BE(0x40000000, i * ENTRY_SIZE);
-            }
-
-            // Second region
-            const baseOffset = USER_SPACE_ENTRIES * ENTRY_SIZE;
-
-            for (let i = 0; i < KERNEL_SPACE_ENTRIES; i++) {
-                const index = baseOffset + i * ENTRY_SIZE;
-
-                const value = i < OS_CODE_SPACE_SIZE
-                    ? 0xB0000000 + i + USER_SPACE_ENTRIES
-                    : 0x90000000 + i + USER_SPACE_ENTRIES;
-
-                buffer.writeUInt32BE(value, index);
-            }
-
-            writeFileSync(pageTablePath, buffer);
         }
     }
 }

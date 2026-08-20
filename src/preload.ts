@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld("mainMemory", {
 		ipcRenderer.invoke("readRangeFromPhysicalMemory", fromPhysicalAddress, toPhysicalAddress),
 	readFromPhysicalMemory: (physicalAddress: DoubleWord): Promise<Byte> => 
 		ipcRenderer.invoke("readFromPhysicalMemory", physicalAddress),
+	readDoubleWordFromPhysicalMemory: (physicalAddress: DoubleWord): Promise<DoubleWord> =>
+		ipcRenderer.invoke("readDoubleWordFromPhysicalMemory", physicalAddress),
+	findVirtualAddresses: (physicalAddress: DoubleWord): Promise<DoubleWord[]> =>
+		ipcRenderer.invoke("findVirtualAddresses", physicalAddress),
+	translateVirtualAddress: (virtualAddress: DoubleWord): Promise<DoubleWord> =>
+		ipcRenderer.invoke("translateVirtualAddress", virtualAddress),
 	readRangeFromVirtualMemory: (fromVirtualAddress: DoubleWord, toVirtualAddress: DoubleWord): Promise<Map<DoubleWord, Byte | undefined>> => 
 		ipcRenderer.invoke("readRangeFromVirtualMemory", fromVirtualAddress, toVirtualAddress),
 	readFromVirtualMemory: (virtualAddress: DoubleWord): Promise<Byte | undefined> => 
@@ -59,18 +65,12 @@ contextBridge.exposeInMainWorld("simulator", {
 		ipcRenderer.on("assembled_program", (_event, filePath: string[]) => callback(filePath)),
 	onError: (callback: (errorDescription: string) => void) => 
 		ipcRenderer.on("on_error", (_event, errorDescription: string) => callback(errorDescription)),
-	onDisableAutoScrollForPhysicalRAM: (callback: () => void) => 
-		ipcRenderer.on("disable_auto_scroll_physical_ram", () => callback()),
-	onDisableAutoScrollForVirtualRAM: (callback: () => void) => 
-		ipcRenderer.on("disable_auto_scroll_virtual_ram", () => callback()),
 	onDisableAutoScrollForPageTable: (callback: () => void) => 
 		ipcRenderer.on("disable_auto_scroll_page_table", () => callback()),
-	onEnableAutoScrollForPhysicalRAM: (callback: () => void) => 
-		ipcRenderer.on("enable_auto_scroll_physical_ram", () => callback()),
-	onEnableAutoScrollForVirtualRAM: (callback: () => void) => 
-		ipcRenderer.on("enable_auto_scroll_virtual_ram", () => callback()),
 	onEnableAutoScrollForPageTable: (callback: () => void) => 
 		ipcRenderer.on("enable_auto_scroll_page_table", () => callback()),
+	keyboardInterrupt: (consoleInput: string) =>
+		ipcRenderer.send("keyboard_interrupt", consoleInput),
 });
 
 contextBridge.exposeInMainWorld("windowUpdate", {
@@ -82,4 +82,14 @@ contextBridge.exposeInMainWorld("windowUpdate", {
 		ipcRenderer.on("hide_log", () => callback()),
 	onShowLog: (callback: () => void) =>
 		ipcRenderer.on("show_log", () => callback()),
+	onHideConsole: (callback: () => void) =>
+		ipcRenderer.on("hide_console", () => callback()),
+	onShowConsole: (callback: () => void) =>
+		ipcRenderer.on("show_console", () => callback()),
+	onUpdateConsole: (callback: (message: string) => void) =>
+		ipcRenderer.on('update_console', (_event, message) => callback(message)),
+	onEnableRamFollowEip: (callback: () => void) => 
+		ipcRenderer.on("enable_ram_view_follow_eip", () => callback()),
+	onDisableRamFollowEip: (callback: () => void) => 
+		ipcRenderer.on("disable_ram_view_follow_eip", () => callback()),
 })
