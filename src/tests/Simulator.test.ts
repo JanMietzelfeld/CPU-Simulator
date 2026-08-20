@@ -1,5 +1,4 @@
 
-import { CPUCore } from "../main/simulator/execution_units/CPUCore";
 import { SimulationController } from "../main/simulator/SimulationController";
 import { DoubleWord } from "../types/binary/DoubleWord";
 
@@ -16,8 +15,6 @@ describe('Test Simulator', () => {
       );
     console.timeEnd("init");
 
-    console.log(CPUCore.instructionCount);
-
     console.time("load");
     simulator.createProcess(simulator.pathToOSFilesystem + "/home/examples/loop.asm");
     console.timeEnd("load");
@@ -31,8 +28,6 @@ describe('Test Simulator', () => {
     console.timeEnd("execution");
 
     console.timeEnd("total");
-
-    console.log(CPUCore.instructionCount);
 
     expect(simulator.core.eax.content).toEqual(DoubleWord.ZERO);
   });

@@ -1,44 +1,44 @@
 import { Assembler } from '../main/simulator/Assembler';
 import { DoubleWord } from '../types/binary/DoubleWord';
-import { disassemble } from '../main/simulator/Disassembler';
+import { disassembleProgram } from '../main/simulator/Disassembler';
 
 describe('Disassemble program', () => {
     const assembler = new Assembler("./settings/language_definition.json", "./os_filesystem");
     
     test('Decode instruction "ADD $1, %EAX"', () => {
         const binary: DoubleWord[] = assembler.assemble("ADD $1, %EAX");
-        const result = disassemble(binary);
-        expect(result).toEqual("ADD $0x1, %EAX\n");
+        const result = disassembleProgram(binary);
+        expect(result).toEqual("ADD $0x1, %EAX\nNOP\nNOP\nNOP\n");
     });
 
     test('Decode instruction "MOV $0x64, %EAX"', () => {
         const binary: DoubleWord[] = assembler.assemble("MOV $0x64, %EAX");
-        const result = disassemble(binary);
-        expect(result).toEqual("MOV $0x64, %EAX\n");
+        const result = disassembleProgram(binary);
+        expect(result).toEqual("MOV $0x64, %EAX\nNOP\nNOP\nNOP\n");
     });
 
     test('Decode instruction "NOP"', () => {
         const binary: DoubleWord[] = assembler.assemble("NOP");
-        const result = disassemble(binary);
-        expect(result).toEqual("NOP\n");
+        const result = disassembleProgram(binary);
+        expect(result).toEqual("NOP\nNOP\nNOP\nNOP\n");
     });
 
     test('Decode instruction "ADD" with negative decimal immediate', () => {
         const binary: DoubleWord[] = assembler.assemble("ADD $-10, %EAX");
-        const result = disassemble(binary);
-        expect(result).toEqual("ADD $0xfffffff6, %EAX\n");
+        const result = disassembleProgram(binary);
+        expect(result).toEqual("ADD $0xfffffff6, %EAX\nNOP\nNOP\n");
     });
 
     test('Decode instruction "ADD" with negative hexadecimal immediate', () => {
         const binary: DoubleWord[] = assembler.assemble("ADD $-0x10, %EAX");
-        const result = disassemble(binary);
-        expect(result).toEqual("ADD $0xfffffff0, %EAX\n");
+        const result = disassembleProgram(binary);
+        expect(result).toEqual("ADD $0xfffffff0, %EAX\nNOP\nNOP\n");
     });
 
     test('Decode instruction "ADD" with negative binary immediate', () => {
         const binary: DoubleWord[] = assembler.assemble("ADD $-0b10, %EAX");
-        const result = disassemble(binary);
-        expect(result).toEqual("ADD $0xfffffffe, %EAX\n");
+        const result = disassembleProgram(binary);
+        expect(result).toEqual("ADD $0xfffffffe, %EAX\nNOP\nNOP\n");
     });
 
     test("Decode assembly programs", () => {        
@@ -67,9 +67,12 @@ NOP
 MOV $0x12345678, %EDX
 MOV $0x11, %EAX
 INT $0x80
+NOP
+NOP
+NOP
 `;
-        const binary: DoubleWord[] = assembler.assemble(output);
-        const result = disassemble(binary);
+        const binary: DoubleWord[] = assembler.assemble(input);
+        const result = disassembleProgram(binary);
         expect(result).toEqual(output);
     });
 });

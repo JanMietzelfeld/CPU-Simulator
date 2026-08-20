@@ -5,11 +5,14 @@ import { DoubleWord } from "../../types/binary/DoubleWord";
 import { Byte } from "../../types/binary/Byte";
 import { OpCode } from "../../types/enumerations/OpCode";
 import { EncodedOperandTypes } from "../../types/enumerations/EncodedOperandTypes";
+import { Instruction } from "../../types/binary/Instruction";
 
 export class Assembler {
 	private static readonly NEW_LINE_REGEX: RegExp = /\r?\n|\r/gim;
 	public readonly languageDefinition: AssemblyLanguageDefinition;
  	public readonly pathToOSFilesystem: string
+
+	private readonly nopInstruction: DoubleWord[];
 
 
 	private metadata: DoubleWord[] = [];
@@ -27,6 +30,7 @@ export class Assembler {
 	public constructor(pathToLanguageDefinition: string, pathToOSFilesystem: string) {
 		this.languageDefinition = JSON.parse(readFileSync(pathToLanguageDefinition, "utf-8"));
 		this.pathToOSFilesystem = pathToOSFilesystem;
+		this.nopInstruction = this.encodeLine(0, "NOP", 1) as DoubleWord[];
 	}
 
 	/**
@@ -101,6 +105,9 @@ export class Assembler {
 
 		this.locateSymbols(lines);
 
+		let instructionSize = 0;
+		let alignmentOffset = 0;
+
 		// Second pass (encode all possible lines)
 		let byteCount = 0;
 		const encodedInstructionsWithSymbols: Map<number, DoubleWord[] | string> = new Map();
@@ -119,32 +126,79 @@ export class Assembler {
 			const encodedLine = this.encodeLine(lineNo, line, 1);
 			if (typeof encodedLine === "number") {
 				encodedInstructionsWithSymbols.set(lineNo, line);
-				byteCount += encodedLine * DoubleWord.NUMBER_OF_BYTES;
+				instructionSize = encodedLine * DoubleWord.NUMBER_OF_BYTES;
 			} else {
 				encodedInstructionsWithSymbols.set(lineNo, encodedLine);
-				byteCount += encodedLine.length * DoubleWord.NUMBER_OF_BYTES;
+				instructionSize = encodedLine.length * DoubleWord.NUMBER_OF_BYTES;
 			}
+
+			if ((instructionSize % Instruction.ALIGNEMT_SIZE) + alignmentOffset > Instruction.ALIGNEMT_SIZE) { //This breaks alignemnt
+				//Insert NOPs to preserve alignment
+				if (typeof encodedLine !== "number") {
+					const padding: DoubleWord[] = [];
+					for (let i = alignmentOffset; i < Instruction.ALIGNEMT_SIZE; i += DoubleWord.NUMBER_OF_BYTES) {
+						padding.push(...this.nopInstruction);
+					}
+					padding.push(...encodedLine);
+					encodedInstructionsWithSymbols.set(lineNo, padding);
+				}
+
+				instructionSize += Instruction.ALIGNEMT_SIZE - alignmentOffset;
+			}
+
+			alignmentOffset += instructionSize;
+			alignmentOffset %= Instruction.ALIGNEMT_SIZE;
+
+			byteCount += instructionSize;
 		}
 
+		if (alignmentOffset !== 0)
+		{
+			const padding: DoubleWord[] = [];
+			for (let i = alignmentOffset; i < Instruction.ALIGNEMT_SIZE; i += DoubleWord.NUMBER_OF_BYTES) {
+				padding.push(...this.nopInstruction);
+			}
+			encodedInstructionsWithSymbols.set(Math.max(...encodedInstructionsWithSymbols.keys()) + 1, padding);
+			byteCount += padding.length * DoubleWord.NUMBER_OF_BYTES;
+		}
+ 
 		this.writeMetadata(baseOffset, byteCount);
 
 		// Third pass (decode all lines with unresolved dependencies)
 		if (Array.from(encodedInstructionsWithSymbols.values()).some(v => typeof v === "string")) {
 			byteCount = 0;
+			alignmentOffset = 0;
+			instructionSize = 0
 			for (const [lineNo, line] of encodedInstructionsWithSymbols.entries()) {
 
-				  if (typeof line !== "string") {
-					byteCount += line.length * DoubleWord.NUMBER_OF_BYTES;
-					continue;
+				if (typeof line !== "string") {
+					instructionSize = line.length * DoubleWord.NUMBER_OF_BYTES;
+				} else {
+					const encodedLine = this.encodeLine(lineNo, line, 2);
+					if (typeof encodedLine === "number") {
+						throw new Error("Could not encode the line:" + line);
+					} else {
+						encodedInstructionsWithSymbols.set(lineNo, encodedLine);
+						instructionSize = encodedLine.length * DoubleWord.NUMBER_OF_BYTES;
+					}
+					
+					if ((instructionSize % Instruction.ALIGNEMT_SIZE) + alignmentOffset > Instruction.ALIGNEMT_SIZE) { //This breaks alignemnt
+						//Insert NOPs to preserve alignment
+						const padding: DoubleWord[] = [];
+						for (let i = alignmentOffset; i < Instruction.ALIGNEMT_SIZE; i += DoubleWord.NUMBER_OF_BYTES) {
+							padding.push(...this.nopInstruction);
+						}
+						padding.push(...encodedLine);
+						encodedInstructionsWithSymbols.set(lineNo, padding);
+
+						instructionSize += Instruction.ALIGNEMT_SIZE - alignmentOffset;
+					}
 				}
 
-				const encodedLine = this.encodeLine(lineNo, line, 2);
-				if (typeof encodedLine === "number") {
-					throw new Error("Could not encode the line:" + line);
-				} else {
-					encodedInstructionsWithSymbols.set(lineNo, encodedLine);
-					byteCount += encodedLine.length * DoubleWord.NUMBER_OF_BYTES;
-				}
+				alignmentOffset += instructionSize;
+				alignmentOffset %= Instruction.ALIGNEMT_SIZE;
+
+				byteCount += instructionSize
 			}
 		}
 

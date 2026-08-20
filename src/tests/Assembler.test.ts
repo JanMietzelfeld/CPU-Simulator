@@ -12,6 +12,9 @@ describe('Encode instructions', () => {
         const result: DoubleWord[] = assembler.assemble("ADD $1, %eax");
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b00000000_00010010_00000001_00000000),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080)
         ];
         expect(result.slice(24)).toEqual(expectedOutput);
     });
@@ -20,6 +23,9 @@ describe('Encode instructions', () => {
         const result: DoubleWord[] = assembler.assemble("MOV $0x64, %eax");
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b00010010_00010010_01100100_00000000),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080)
         ];
         expect(result.slice(24)).toEqual(expectedOutput);
     });
@@ -31,12 +37,12 @@ describe('Encode instructions', () => {
             DoubleWord.fromNumber(1),
             DoubleWord.fromNumber(0),
             DoubleWord.fromNumber(96),
-            DoubleWord.fromNumber(4),
+            DoubleWord.fromNumber(16),
             DoubleWord.fromNumber(4096),
-            DoubleWord.fromNumber(100),
+            DoubleWord.fromNumber(112),
             DoubleWord.fromNumber(0),
             DoubleWord.fromNumber(4096),
-            DoubleWord.fromNumber(100),
+            DoubleWord.fromNumber(112),
             DoubleWord.fromNumber(0),
             DoubleWord.fromNumber(4096),
             DoubleWord.fromNumber(0),
@@ -46,6 +52,9 @@ describe('Encode instructions', () => {
             DoubleWord.fromNumber(0),
 
             DoubleWord.fromNumber(0b11111111_00000000_00000000_00000000),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080)
         ];
         expect(result).toEqual(expectedOutput);
     });
@@ -55,6 +64,8 @@ describe('Encode instructions', () => {
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b00000000_10010010_00000000_00000000),
             DoubleWord.fromNumber(0b11111111111111111111111111110110),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080)
         ];
         expect(result.slice(24)).toEqual(expectedOutput);
     });
@@ -64,6 +75,8 @@ describe('Encode instructions', () => {
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b00000000_10010010_00000000_00000000),
             DoubleWord.fromNumber(0b11111111111111111111111111110000),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080)
         ];
         expect(result.slice(24)).toEqual(expectedOutput);
     });
@@ -72,7 +85,9 @@ describe('Encode instructions', () => {
         const result: DoubleWord[] = assembler.assemble("ADD $-0b10, %eax");
         const expectedOutput: DoubleWord[] = [
             DoubleWord.fromNumber(0b00000000_10010010_00000000_00000000),
-            DoubleWord.fromNumber(0b11111111111111111111111111111110)
+            DoubleWord.fromNumber(0b11111111111111111111111111111110),
+            DoubleWord.fromNumber(4278190080),
+            DoubleWord.fromNumber(4278190080)
         ];
         expect(result.slice(24)).toEqual(expectedOutput);
     });

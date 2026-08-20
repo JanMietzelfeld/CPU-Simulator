@@ -25,7 +25,6 @@ import { OpCode } from "../../../types/enumerations/OpCode";
 import { DecodedOperandTypes } from "../../../types/enumerations/DecodedOperandTypes";
 import { EncodedOperandTypes } from "../../../types/enumerations/EncodedOperandTypes";
 import { VirtualAddress } from "../../../types/binary/VirtualAddress";
-import { SimulationController } from "../SimulationController";
 
 /**
  * This class represents a CPU core which is capable of executing InstructionSet.
@@ -303,15 +302,10 @@ export class CPUCore {
         }
     }
 
-    public static instructionCount = 0;
-
     /**
      * This method performs a single instruction cycle.
      */
     private internalCycle(): void {
-
-        CPUCore.instructionCount++;
-
         try {
             this.fetch();
             this.decode();

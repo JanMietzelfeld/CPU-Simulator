@@ -1,4 +1,5 @@
 import { OpCode } from "../enumerations/OpCode";
+import { DoubleWord } from "./DoubleWord";
 import { InstructionOperand } from "./InstructionOperand";
 
 /**
@@ -6,6 +7,9 @@ import { InstructionOperand } from "./InstructionOperand";
  * @author Erik Burmester <erik.burmester@nextbeam.net>
  */
 export class Instruction {
+
+	public static readonly ALIGNEMT_SIZE: number = DoubleWord.NUMBER_OF_BYTES * 4;
+
 	/**
 	 * The instructions operation.
 	 */

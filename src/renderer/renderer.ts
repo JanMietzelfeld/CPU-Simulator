@@ -2,7 +2,8 @@ import { DoubleWord } from "../types/binary/DoubleWord";
 import { Byte } from "../types/binary/Byte";
 import { PhysicalAddress } from "../types/binary/PhysicalAddress";
 import { VirtualAddress } from "../types/binary/VirtualAddress";
-import { disassemble } from "../main/simulator/Disassembler";
+import { disassembleIfPossble } from "../main/simulator/Disassembler";
+import { Instruction } from "../types/binary/Instruction";
 
 /**
  * This enumeration is a duplicate of the one, that can be
@@ -684,7 +685,7 @@ export class Renderer {
             const blockSizeDisable: boolean = (demandedByteRepresentation === "UTF-8" || demandedByteRepresentation === "ASSEMBLY");
             ramBlockSizeSelector.disabled = blockSizeDisable;
             if (demandedByteRepresentation === "ASSEMBLY") {
-                this.ramBlockSize = 12;
+                this.ramBlockSize = Instruction.ALIGNEMT_SIZE;
             } else {
                 const previousBlockSize: string = parent.getAttribute("block-size")!;
                 this.ramBlockSize = parseInt(previousBlockSize);
@@ -812,17 +813,13 @@ export class Renderer {
         const regExEnter = /(0[x])?[a-fA-F0-9]+$/;
         const inputStartValidFormat = regExEnter.test(startAddress);
         const inputEndValidFormat = regExEnter.test(endAddress);
-        const startAddressDec = parseInt(startAddress,16);
-        const endAddressDec = parseInt(endAddress,16);
-        const addressRange = endAddressDec - startAddressDec;
+        const startAddressDec = parseInt(startAddress,16) - parseInt(startAddress,16) % this.ramBlockSize;
+        const endAddressDec = parseInt(endAddress, 16) + (this.ramBlockSize - (parseInt(endAddress, 16) % this.ramBlockSize)) % this.ramBlockSize - 1;
         if (inputStartValidFormat && inputEndValidFormat && startAddressDec <= endAddressDec) {
             this.ramViewStartAddress = startAddressDec;
             this.ramViewEndAddress = endAddressDec;
-            const addressRangeRest = (addressRange + 1) % this.ramBlockSize;
-            if (addressRangeRest !== 0) {
-                this.ramViewEndAddress = endAddressDec + (this.ramBlockSize - addressRangeRest);
-                inputBoxEnd.value = "0x" + this.ramViewEndAddress.toString(16);
-            }
+            inputBoxStart.value =  "0x" + this.ramViewStartAddress.toString(16);
+            inputBoxEnd.value = "0x" + this.ramViewEndAddress.toString(16);
         } else {
             inputBoxStart.value = "0x0";
             inputBoxEnd.value = "0xb";
@@ -1785,7 +1782,7 @@ export class Renderer {
     public async createRamViewRowsAssembly(physicalAddressStart: number, physicalAddressEnd: number, ramTableBody: HTMLTableSectionElement): Promise<void> {
         const ramCells: Map<number, Byte> = await this._window.mainMemory.readRangeFromPhysicalMemory(physicalAddressStart, physicalAddressEnd);
         const ramContent: Array<Byte> = Array.from(ramCells.values());
-        for (let i = 0; i < ramContent.length;) {
+        for (let i = 0; i < ramContent.length; i += this.ramBlockSize) {
             const tableRow: HTMLTableRowElement = this._document.createElement("tr");
             const binary = ramContent.slice(i, (i + this.ramBlockSize));
             const instructionString = await this.getInstructionText(binary);
@@ -1808,9 +1805,10 @@ export class Renderer {
             const addressFrom = "0x" + (physicalAddressStart + i).toString(16);
             const addressTo = "0x" + (physicalAddressStart + i + (this.ramBlockSize - 1)).toString(16);
             physicalAddressColumn.innerHTML = addressFrom + " - " + addressTo;
-            assemblyInstruction.innerHTML = instructionString;
+
+            const html = instructionString.split("\n").map(a => `<p>${a}</p>`).join("");
+            assemblyInstruction.innerHTML = html;
             ramTableBody.appendChild(tableRow);
-            i += this.ramBlockSize;
         }
     }
 
@@ -1882,11 +1880,11 @@ export class Renderer {
                 instructions[i],
                 instructions[i+1],
                 instructions[i+2],
-                instructions[i+2],
+                instructions[i+3],
             ));
         }
         
-        return disassemble(data);
+        return disassembleIfPossble(data);
     }
 
     /**
